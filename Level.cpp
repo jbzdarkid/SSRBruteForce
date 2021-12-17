@@ -38,15 +38,23 @@ Level::Level(u8 width, u8 height, const char* asciiGrid) {
       // Note that there is some ambiguity here with sausages thinking their first half is at (0, 0)
       // but it's OK, because they will just be replaced once their first half is actually found.
       int num = c - '0';
-      if (_sausages.Size() > num) { // First sausage half was (maybe) already found
-        if (_sausages[num].x == x-1) _sausages[num].dir = Right;
-        else if (_sausages[num].y == y-1) _sausages[num].dir = Down;
+      if (sausages.Size() > num) { // First sausage half was (maybe) already found
+        if (sausages[num].x1 == x-1 && sausages[num].y1 == y) {
+          sausages[num].x2 = x;
+          sausages[num].y2 = y;
+          sausages[num].flags |= Sausage::Flags::Horizontal;
+        } else if (sausages[num].x1 == x && sausages[num].y1 == y-1) {
+          sausages[num].x2 = x;
+          sausages[num].y2 = y;
+          sausages[num].flags &= ~Sausage::Flags::Horizontal;
+        }
       } else {
-        _sausages.Ensure(num + 1);
-        _sausages.Resize(num + 1);
-        _sausages[num] = Sausage{x, y};
+        sausages.Ensure(num + 1);
+        sausages.Resize(num + 1);
+        sausages[num] = Sausage{x, y};
       }
     }
+    _start = _stephen;
   }
 }
 
@@ -57,62 +65,79 @@ Level::~Level() {
 bool Level::Move(Direction dir) {
   if (_stephen.dir == Up) {
     if (dir == Left) {
-      if (!MoveForkThroughSpace(_stephen.x - 1, _stephen.y - 1, Left)) return false;
-      if (MoveForkThroughSpace(_stephen.x - 1, _stephen.y, Down)) _stephen.dir = Left;
+      if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Left)) return false;
+      if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) _stephen.dir = Left;
     } else if (dir == Right) {
-      if (!MoveForkThroughSpace(_stephen.x + 1, _stephen.y - 1, Right)) return false;
-      if (MoveForkThroughSpace(_stephen.x + 1, _stephen.y, Down)) _stephen.dir = Right;
+      if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Right)) return false;
+      if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) _stephen.dir = Right;
     } else if (dir == Up) {
       if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y - 2, Up)) _stephen.y--;
+      if (MoveThroughSpace(_stephen.x, _stephen.y - 2, Up)) _stephen.y--;
     } else if (dir == Down) {
       if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y + 1, Down)) _stephen.y++;
+      if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Down)) _stephen.y++;
     }
   } else if (_stephen.dir == Down) {
     if (dir == Left) {
-      if (!MoveForkThroughSpace(_stephen.x - 1, _stephen.y + 1, Left)) return false;
-      if (MoveForkThroughSpace(_stephen.x - 1, _stephen.y, Up)) _stephen.dir = Left;
+      if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Left)) return false;
+      if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) _stephen.dir = Left;
     } else if (dir == Right) {
-      if (!MoveForkThroughSpace(_stephen.x + 1, _stephen.y + 1, Right)) return false;
-      if (MoveForkThroughSpace(_stephen.x + 1, _stephen.y, Up)) _stephen.dir = Right;
+      if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Right)) return false;
+      if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) _stephen.dir = Right;
     } else if (dir == Down) {
       if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y + 2, Down)) _stephen.y++;
+      if (MoveThroughSpace(_stephen.x, _stephen.y + 2, Down)) _stephen.y++;
     } else if (dir == Up) {
       if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y - 1, Up)) _stephen.y--;
+      if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Up)) _stephen.y--;
     }
   } else if (_stephen.dir == Left) {
     if (dir == Up) {
-      if (!MoveForkThroughSpace(_stephen.x - 1, _stephen.y - 1, Up)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y - 1, Right)) _stephen.dir = Up;
+      if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Up)) return false;
+      if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) _stephen.dir = Up;
     } else if (dir == Down) {
-      if (!MoveForkThroughSpace(_stephen.x - 1, _stephen.y + 1, Down)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y + 1, Right)) _stephen.dir = Down;
+      if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Down)) return false;
+      if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) _stephen.dir = Down;
     } else if (dir == Left) {
       if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) return false;
-      if (MoveForkThroughSpace(_stephen.x - 2, _stephen.y, Left)) _stephen.x--;
+      if (MoveThroughSpace(_stephen.x - 2, _stephen.y, Left)) _stephen.x--;
     } else if (dir == Right) {
       if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) return false;
-      if (MoveForkThroughSpace(_stephen.x + 1, _stephen.y, Right)) _stephen.x++;
+      if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Right)) _stephen.x++;
     }
   } else if (_stephen.dir == Right) {
     if (dir == Up) {
-      if (!MoveForkThroughSpace(_stephen.x + 1, _stephen.y - 1, Up)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y - 1, Left)) _stephen.dir = Up;
+      if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Up)) return false;
+      if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) _stephen.dir = Up;
     } else if (dir == Down) {
-      if (!MoveForkThroughSpace(_stephen.x + 1, _stephen.y + 1, Down)) return false;
-      if (MoveForkThroughSpace(_stephen.x, _stephen.y + 1, Left)) _stephen.dir = Down;
+      if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Down)) return false;
+      if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) _stephen.dir = Down;
     } else if (dir == Right) {
       if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) return false;
-      if (MoveForkThroughSpace(_stephen.x + 2, _stephen.y, Right)) _stephen.x++;
+      if (MoveThroughSpace(_stephen.x + 2, _stephen.y, Right)) _stephen.x++;
     } else if (dir == Left) {
       if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) return false;
-      if (MoveForkThroughSpace(_stephen.x - 1, _stephen.y, Left)) _stephen.x--;
+      if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Left)) _stephen.x--;
     }
   }
 
+  if (IsGrill(_stephen.x, _stephen.y)) { // Burned step
+    if (dir == Up) Move(Down);
+    else if (dir == Down) Move(Up);
+    else if (dir == Left) Move(Right);
+    else if (dir == Right) Move(Left);
+  }
+
+  return true;
+}
+
+bool Level::Won() const {
+  if (_stephen.x != _start.x) return false;
+  if (_stephen.y != _start.y) return false;
+  if (_stephen.dir != _start.dir) return false;
+  for (Sausage sausage : sausages) {
+    if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
+  }
   return true;
 }
 
@@ -158,34 +183,71 @@ void Level::Print() const {
   delete[] row;
 }
 
-bool Level::MoveForkThroughSpace(s8 x, s8 y, Direction dir) {
+bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir) {
   if (!CanTurnThrough(x, y)) return false;
 
   s8 sausageNo = GetSausage(x, y);
-  if (sausageNo == -1) return true; // Fork move should succeed because there's nothing in the way.
-  Sausage sausage = _sausages[sausageNo];
+  if (sausageNo == -1) return true; // The move should succeed because there's nothing in the way.
+  Sausage sausage = sausages[sausageNo];
 
-  // TODO: Check for sausage collision with whatever
-  if (dir == Up) sausage.y--;
-  if (dir == Down) sausage.y++;
-  if (dir == Left) sausage.x--;
-  if (dir == Right) sausage.x++;
+  u8 sidesToCook = 0;
 
-  _sausages[sausageNo] = sausage;
+  // This is a little wrong. This code allows a sausage push which returns false to have side-effects.
+  // For example, if one sausage pushes two different sausages, and only one them can move.
+  if (dir == Up) {
+    if (                          !MoveThroughSpace(sausage.x1, sausage.y1 - 1, dir)) return false;
+    if (sausage.IsHorizontal() && !MoveThroughSpace(sausage.x2, sausage.y2 - 1, dir)) return false;
+    if (                                    IsGrill(sausage.x1, sausage.y1 - 1)) sidesToCook |= Sausage::Flags::Cook1A;
+    if (                                    IsGrill(sausage.x2, sausage.y2 - 1)) sidesToCook |= Sausage::Flags::Cook2A;
+  } else if (dir == Down) {
+    if (sausage.IsHorizontal() && !MoveThroughSpace(sausage.x1, sausage.y1 + 1, dir)) return false;
+    if (                          !MoveThroughSpace(sausage.x2, sausage.y2 + 1, dir)) return false;
+    if (                                    IsGrill(sausage.x1, sausage.y1 + 1)) sidesToCook |= Sausage::Flags::Cook1A;
+    if (                                    IsGrill(sausage.x2, sausage.y2 + 1)) sidesToCook |= Sausage::Flags::Cook2A;
+  } else if (dir == Left) {
+    if (                          !MoveThroughSpace(sausage.x1 - 1, sausage.y1, dir)) return false;
+    if (sausage.IsHorizontal() && !MoveThroughSpace(sausage.x2 - 1, sausage.y2, dir)) return false;
+    if (                                    IsGrill(sausage.x1 - 1, sausage.y1)) sidesToCook |= Sausage::Flags::Cook1A;
+    if (                                    IsGrill(sausage.x2 - 1, sausage.y2)) sidesToCook |= Sausage::Flags::Cook2A;
+  } else if (dir == Right) {
+    if (                          !MoveThroughSpace(sausage.x1 + 1, sausage.y1, dir)) return false;
+    if (sausage.IsHorizontal() && !MoveThroughSpace(sausage.x2 + 1, sausage.y2, dir)) return false;
+    if (                                    IsGrill(sausage.x1 + 1, sausage.y1)) sidesToCook |= Sausage::Flags::Cook1A;
+    if (                                    IsGrill(sausage.x2 + 1, sausage.y2)) sidesToCook |= Sausage::Flags::Cook2A;
+  }
+
+  // Finally, success -- move and cook the sausage.
+
+  if (dir == Up) {
+    if (sausage.IsHorizontal()) sausage.flags ^= Sausage::Flags::Rolled;
+    sausage.y1--;
+    sausage.y2--;
+  } else if (dir == Down) {
+    if (sausage.IsHorizontal()) sausage.flags ^= Sausage::Flags::Rolled;
+    sausage.y1++;
+    sausage.y2++;
+  } else if (dir == Left) {
+    if (!sausage.IsHorizontal()) sausage.flags ^= Sausage::Flags::Rolled;
+    sausage.x1--;
+    sausage.x2--;
+  } else if (dir == Right) {
+    if (!sausage.IsHorizontal()) sausage.flags ^= Sausage::Flags::Rolled;
+    sausage.x1++;
+    sausage.x2++;
+  }
+
+  if (sausage.IsRolled()) sidesToCook *= 2; // Shift cooking flags to the rolled side
+  if ((sausage.flags & sidesToCook) > 0) return false; // Move would burn a side of the sausage
+  sausage.flags |= sidesToCook;
+
+  sausages[sausageNo] = sausage;
   return true;
 }
 
 s8 Level::GetSausage(s8 x, s8 y) const {
-  for (u8 i=0; i<_sausages.Size(); i++) {
-    Sausage sausage = _sausages[i];
-    if ((x == sausage.x && y == sausage.y)
-      || (sausage.dir == Up && x == sausage.x && y == sausage.y - 1)
-      || (sausage.dir == Down && x == sausage.x && y == sausage.y + 1)
-      || (sausage.dir == Left && x == sausage.x - 1 && y == sausage.y)
-      || (sausage.dir == Right && x == sausage.x + 1 && y == sausage.y))
-    {
-      return i;
-    }
+  for (u8 i=0; i<sausages.Size(); i++) {
+    Sausage sausage = sausages[i];
+    if ((x == sausage.x1 && y == sausage.y1) || (x == sausage.x2 && y == sausage.y2)) return i;
   }
   return -1;
 }
@@ -202,4 +264,9 @@ bool Level::CanWalkOnto(s8 x, s8 y) const {
 bool Level::CanTurnThrough(s8 x, s8 y) const {
   if (!IsWithinGrid(x, y)) return true;
   return true; // We don't have elevation tiles yet, but some day
+}
+
+bool Level::IsGrill(s8 x, s8 y) const {
+  if (!IsWithinGrid(x, y)) return false;
+  return _grid[x][y] == Grill;
 }

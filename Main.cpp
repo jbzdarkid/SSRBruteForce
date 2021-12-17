@@ -9,16 +9,31 @@ int main() {
   " _^_"
   "__  ");
 
-  MaidensWalk.Print();
-  printf("ULDR :");
-  while (true) {
+  Level Seafinger(5, 5,
+  "_##0 "
+  "_##0_"
+  "_##  "
+  "   1^"
+  "   1_");
+
+  Level& level = MaidensWalk;
+
+  level.Print();
+  printf("ULDR: ");
+  int moves = 0;
+  while (!level.Won()) {
     int ch = getchar();
-    if (ch == '\n') continue;
-    if (ch == 'u')      MaidensWalk.Move(Up);
-    else if (ch == 'd') MaidensWalk.Move(Down);
-    else if (ch == 'l') MaidensWalk.Move(Left);
-    else if (ch == 'r') MaidensWalk.Move(Right);
-    MaidensWalk.Print();
-  printf("ULDR :");
+    if (ch == '\n') {
+      level.Print();
+      printf("ULDR: ");
+      continue;
+    }
+    else if (ch == 'u') level.Move(Up);
+    else if (ch == 'd') level.Move(Down);
+    else if (ch == 'l') level.Move(Left);
+    else if (ch == 'r') level.Move(Right);
+    moves++;
   }
+
+  printf("Level completed in %d moves\n", moves);
 }
