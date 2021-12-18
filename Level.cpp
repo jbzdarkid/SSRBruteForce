@@ -191,10 +191,10 @@ State Level::GetState() const {
   return s;
 }
 
-void Level::SetState(const State& s) {
-  stephen = s.stephen;
-  sausages[0] = s.s0;
-  if (sausages.Size() > 1) sausages[1] = s.s1;
+void Level::SetState(const State* s) {
+  stephen = s->stephen;
+  sausages[0] = s->s0;
+  if (sausages.Size() > 1) sausages[1] = s->s1;
 }
 
 bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir) {

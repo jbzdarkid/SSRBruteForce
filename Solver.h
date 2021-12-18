@@ -8,7 +8,7 @@ struct Solver {
   Vector<Direction> Solve(u32 moveLimit);
 
 private:
-  u16 SolveInternal(u16 depth);
+  State* GetOrInsertState();
 
   Level* _level;
   u32 _moveLimit = 0;

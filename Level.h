@@ -45,6 +45,14 @@ struct State {
   Sausage s0 = {};
   Sausage s1 = {};
 
+  // Used to build the tree
+  State* next = nullptr;
+  State* u = nullptr;
+  State* d = nullptr;
+  State* l = nullptr;
+  State* r = nullptr;
+  u16 winDistance = 0xFFFF;
+
   bool operator==(const State& other) const;
 };
 
@@ -78,7 +86,7 @@ struct Level {
   void Print() const;
 
   State GetState() const;
-  void SetState(const State& state);
+  void SetState(const State* state);
 
 private:
   bool MoveThroughSpace(s8 x, s8 y, Direction dir);
