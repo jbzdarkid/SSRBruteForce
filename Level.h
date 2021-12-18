@@ -3,10 +3,11 @@
 #include "WitnessRNG/StdLib.h"
 
 enum Direction : u8 {
-  Up = 0,
-  Down = 1,
-  Left = 2,
-  Right = 3,
+  Up = 1,
+  Down = 2,
+  Left = 4,
+  Right = 8,
+  Any = Up | Down | Left | Right,
 };
 
 struct Stephen {

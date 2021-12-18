@@ -158,10 +158,10 @@ void Level::Print() const {
       s8 sausageNo = GetSausage(x, y);
 
       if (sausageNo != -1) row[x+1] = '0' + (char)sausageNo;
-      else if (stephen.dir == Up && x == stephen.x && y == stephen.y - 1) row[x+1] = '|';
-      else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
-      else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
-      else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
+      //else if (stephen.dir == Up && x == stephen.x && y == stephen.y - 1) row[x+1] = '|';
+      //else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
+      //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
+      //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
       else if (x == stephen.x && y == stephen.y) {
         if (stephen.dir == Up)          row[x+1] = '^';
         else if (stephen.dir == Down)   row[x+1] = 'v';
@@ -272,7 +272,7 @@ bool Level::IsWithinGrid(s8 x, s8 y) const {
 
 bool Level::CanWalkOnto(s8 x, s8 y) const {
   if (!IsWithinGrid(x, y)) return false;
-  return _grid[x][y] == Ground; // We'll deal with burned steps later, for now -- you cannot walk onto a grill.
+  return _grid[x][y] == Ground || _grid[x][y] == Grill; // Stephen *can* walk onto a grill, he just has to walk off again. But walking on can spear...
 }
 
 bool Level::CanTurnThrough(s8 x, s8 y) const {

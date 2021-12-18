@@ -22,10 +22,21 @@ int main() {
   "_00"
   "_>_");
 
-  Level* level = &Test;
+  Level* level = &MaidensWalk;
 
-  Vector<Direction> solution = Solver(level).Solve(10);
-  printf("Best solver solution: %d\n", solution.Size());
+  if (true) {
+    Vector<Direction> solution = Solver(level).Solve(10);
+    printf("Best solver solution: %d\n", solution.Size());
+    //const char* dirs = " UD L   R";
+    //for (Direction dir : solution) {
+    //  level->Print();
+    //  putchar(dirs[dir]);
+    //  (void)getchar();
+    //  level->Move(dir);
+    //}
+    //level->Print();
+    //return 0;
+  }
 
   level->Print();
   printf("ULDR: ");
