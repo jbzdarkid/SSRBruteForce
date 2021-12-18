@@ -1,6 +1,6 @@
 #include "Level.h"
+#include "Solver.h"
 #include <cstdio>
-
 
 int main() {
   Level MaidensWalk(4, 4,
@@ -16,22 +16,31 @@ int main() {
   "   1^"
   "   1_");
 
-  Level& level = MaidensWalk;
+  Level Test(3, 4,
+  "##_"
+  "##_"
+  "_00"
+  "_>_");
 
-  level.Print();
+  Level* level = &Test;
+
+  Vector<Direction> solution = Solver(level).Solve(10);
+  printf("Best solver solution: %d\n", solution.Size());
+
+  level->Print();
   printf("ULDR: ");
   int moves = 0;
-  while (!level.Won()) {
+  while (!level->Won()) {
     int ch = getchar();
     if (ch == '\n') {
-      level.Print();
+      level->Print();
       printf("ULDR: ");
       continue;
     }
-    else if (ch == 'u') level.Move(Up);
-    else if (ch == 'd') level.Move(Down);
-    else if (ch == 'l') level.Move(Left);
-    else if (ch == 'r') level.Move(Right);
+    else if (ch == 'u') level->Move(Up);
+    else if (ch == 'd') level->Move(Down);
+    else if (ch == 'l') level->Move(Left);
+    else if (ch == 'r') level->Move(Right);
     moves++;
   }
 
