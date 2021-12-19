@@ -8,36 +8,21 @@ Solver::Solver(Level* level) {
 }
 
 Vector<Direction> Solver::Solve(u16 maxDepth) {
-  _maxDepth = maxDepth;
-  _visitedNodes.clear();
-
   State* initialState = GetOrInsertState(0);
   _unexploredH = initialState;
   _unexploredT = _unexploredH;
 
   while (_unexploredH != nullptr) {
     State* state = _unexploredH;
+
     _level->SetState(state);
-
-    if (_level->Move(Up)) {
-      state->u = GetOrInsertState(state->depth);
-      _level->SetState(state);
-    }
-
-    if (_level->Move(Down)) {
-      state->d = GetOrInsertState(state->depth);
-      _level->SetState(state);
-    }
-
-    if (_level->Move(Left)) {
-      state->l = GetOrInsertState(state->depth);
-      _level->SetState(state);
-    }
-
-    if (_level->Move(Right)) {
-      state->r = GetOrInsertState(state->depth);
-      // _level->SetState(state);
-    }
+    if (_level->Move(Up))    state->u = GetOrInsertState(state->depth);
+    _level->SetState(state);
+    if (_level->Move(Down))  state->d = GetOrInsertState(state->depth);
+    _level->SetState(state);
+    if (_level->Move(Left))  state->l = GetOrInsertState(state->depth);
+    _level->SetState(state);
+    if (_level->Move(Right)) state->r = GetOrInsertState(state->depth);
 
     _unexploredH = state->next;
 
@@ -103,24 +88,22 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
 
 State* Solver::GetOrInsertState(u16 depth) {
   State state = _level->GetState();
-  if (state.stephen.x == 1 && state.stephen.y == 3) {
-    int k = 1;
-  }
   auto search = _visitedNodes.find(state);
   if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
 
   if (_level->Won()) { // No need to do further exploration if it's a winning state
-    if (depth + 1 < _maxDepth) {
-      _maxDepth = depth + 1;
-      printf("Improved maxDepth: %d\n", _maxDepth);
-    }
+    //if (depth < _maxDepth) {
+    //  _maxDepth = depth;
+    //  printf("Improved maxDepth: %d\n", _maxDepth); // Why are we computing this? Idk.
+    //}
     state.winDistance = 0;
     return const_cast<State*>(&*_visitedNodes.insert(state).first);
-  } else if (depth + 1 >= _maxDepth) {
-    // This state wasn't a victory, and has reached maxDepth.
-    // Do not bother adding it to the visited nodes, since it cannot win.
-    // If someone else reaches it faster, they will add it.
-    return nullptr;
+
+//  } else if (depth + 1 >= _maxDepth) {
+//    // This state wasn't a victory, and has reached maxDepth.
+//    // Do not bother adding it to the visited nodes, since it cannot win.
+//    // If someone else reaches it faster, they will add it.
+//    return nullptr;
   } else {
     state.depth = depth + 1;
     State* newState = const_cast<State*>(&*_visitedNodes.insert(state).first);

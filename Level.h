@@ -13,7 +13,14 @@ enum Direction : u8 {
 struct Stephen {
   s8 x;
   s8 y;
-  Direction dir;
+  enum Flags {
+    // Speared = 0x10,
+  };
+  union {
+    Direction dir;
+    Flags flags;
+  };
+
   s8 sausageSpeared = -1;
 };
 
@@ -79,7 +86,7 @@ struct Level {
     Wall = 3,
   };
 
-  Level(u8 width, u8 height, const char* asciiGrid);
+  Level(u8 width, u8 height, const char* name, const char* asciiGrid);
   ~Level();
   // Returns false if the move fails
   bool Move(Direction dir);
@@ -88,6 +95,9 @@ struct Level {
 
   State GetState() const;
   void SetState(const State* state);
+
+  const char* name;
+  bool _explain = false;
 
 private:
   bool MoveThroughSpace(s8 x, s8 y, Direction dir);

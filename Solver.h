@@ -12,7 +12,7 @@ private:
   State* GetOrInsertState(u16 depth);
 
   Level* _level = nullptr;
-  u16 _maxDepth = 0;
+  // u16 _maxDepth = 0;
   std::unordered_set<State> _visitedNodes;
 
   State* _unexploredH = nullptr;
