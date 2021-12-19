@@ -178,12 +178,10 @@ bool Level::Move(Direction dir) {
     if (_stephen.dir == Up) {
       if (dir == Left) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Left)) return false;
-        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) return false;
-        _stephen.dir = Left;
+        if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) _stephen.dir = Left;
       } else if (dir == Right) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Right)) return false;
-        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) return false;
-        _stephen.dir = Right;
+        if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) _stephen.dir = Right;
       } else if (dir == Up) {
         if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x, _stephen.y - 2, Up, true)) return false;
@@ -196,12 +194,10 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Down) {
       if (dir == Left) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Left)) return false;
-        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) return false;
-        _stephen.dir = Left;
+        if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) _stephen.dir = Left;
       } else if (dir == Right) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Right)) return false;
-        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) return false;
-        _stephen.dir = Right;
+        if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) _stephen.dir = Right;
       } else if (dir == Down) {
         if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x, _stephen.y + 2, Down, true)) return false;
@@ -214,12 +210,10 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Left) {
       if (dir == Up) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Up)) return false;
-        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) return false;
-        _stephen.dir = Up;
+        if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) _stephen.dir = Up;
       } else if (dir == Down) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Down)) return false;
-        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) return false;
-        _stephen.dir = Down;
+        if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) _stephen.dir = Down;
       } else if (dir == Left) {
         if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x - 2, _stephen.y, Left, true))  return false;
@@ -232,12 +226,10 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Right) {
       if (dir == Up) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Up)) return false;
-        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) return false;
-        _stephen.dir = Up;
+        if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) _stephen.dir = Up;
       } else if (dir == Down) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Down)) return false;
-        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) return false;
-        _stephen.dir = Down;
+        if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) _stephen.dir = Down;
       } else if (dir == Right) {
         if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x + 2, _stephen.y, Right, true)) return false;

@@ -233,8 +233,8 @@ int main() {
     levels.Push(&TheAnchorage);
   }
 
-  bool stepThrough = true;
-  /*
+  bool stepThrough = false;
+  //*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
     Vector<Direction> solution = Solver(level).Solve(100);
@@ -257,5 +257,5 @@ int main() {
     "_a##_"
     "^____"
     "_____");
-  test.InteractiveSolver();
+  EmersonJetty.InteractiveSolver();
 }
