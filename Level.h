@@ -88,13 +88,14 @@ struct Level {
 
   Level(u8 width, u8 height, const char* name, const char* asciiGrid);
   ~Level();
-  // Returns false if the move fails
-  bool Move(Direction dir);
-  bool Won() const;
   void Print() const;
+  bool Won() const;
 
   State GetState() const;
   void SetState(const State* state);
+
+  // Returns false if the move fails
+  bool Move(Direction dir);
 
   const char* name;
   bool _explain = false;

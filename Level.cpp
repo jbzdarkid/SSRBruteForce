@@ -56,6 +56,78 @@ Level::~Level() {
   DeleteDoubleArray2(_grid);
 }
 
+
+void Level::Print() const {
+  putchar('+');
+  for (u8 x=0; x<_width; x++) putchar('-');
+  putchar('+');
+  putchar('\n');
+
+  for (u8 y=0; y<_height; y++) {
+    putchar('|');
+    for (u8 x=0; x<_width; x++) {
+      s8 sausageNo = GetSausage(x, y);
+
+      if (sausageNo != -1 && _grid[x][y] == Empty) putchar('A' + (char)sausageNo);
+      else if (sausageNo != -1)                    putchar('a' + (char)sausageNo);
+      //else if (stephen.dir == Up && x == stephen.x && y == stephen.y - 1) row[x+1] = '|';
+      //else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
+      //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
+      //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
+      else if (x == stephen.x && y == stephen.y) {
+        if (stephen.dir == Up)          putchar('^');
+        else if (stephen.dir == Down)   putchar('v');
+        else if (stephen.dir == Left)   putchar('<');
+        else if (stephen.dir == Right)  putchar('>');
+      }
+      else if (_grid[x][y] == Empty)  putchar(' ');
+      else if (_grid[x][y] == Ground) putchar('_');
+      else if (_grid[x][y] == Grill)  putchar('#');
+      else if (_grid[x][y] == Wall)   putchar('1') ;
+    }
+    putchar('|');
+    putchar('\n');
+  }
+
+  putchar('+');
+  for (u8 x=0; x<_width; x++) putchar('-');
+  putchar('+');
+  putchar('\n');
+}
+
+bool Level::Won() const {
+  if (stephen.x != _start.x) return false;
+  if (stephen.y != _start.y) return false;
+  if (stephen.dir != _start.dir) return false;
+  for (const Sausage& sausage : sausages) {
+    if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
+  }
+  return true;
+}
+
+State Level::GetState() const {
+  State s;
+  s.stephen = stephen;
+#define o(x) s.s##x = sausages[x];
+  SAUSAGES
+#undef o
+  return s;
+}
+
+void Level::SetState(const State* s) {
+  stephen = s->stephen;
+#define o(x) sausages[x] = s->s##x;
+  SAUSAGES
+#undef o
+}
+
+#if _DEBUG
+const char* dirs = " UD L   R";
+#define EXPLAIN(reason) if (_explain) printf("Stephen cannot move %c because sausage %c at (%d, %d) %s", dirs[dir], 'a' + sausageNo, x, y, reason)
+#else
+#define EXPLAIN(reason) 
+#endif
+
 // No longer promising 'no side effects', now just returns "was move valid"
 bool Level::Move(Direction dir) {
   if (stephen.dir == Up) {
@@ -125,77 +197,6 @@ bool Level::Move(Direction dir) {
 
   return true;
 }
-
-bool Level::Won() const {
-  if (stephen.x != _start.x) return false;
-  if (stephen.y != _start.y) return false;
-  if (stephen.dir != _start.dir) return false;
-  for (const Sausage& sausage : sausages) {
-    if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
-  }
-  return true;
-}
-
-void Level::Print() const {
-  putchar('+');
-  for (u8 x=0; x<_width; x++) putchar('-');
-  putchar('+');
-  putchar('\n');
-
-  for (u8 y=0; y<_height; y++) {
-    putchar('|');
-    for (u8 x=0; x<_width; x++) {
-      s8 sausageNo = GetSausage(x, y);
-
-      if (sausageNo != -1 && _grid[x][y] == Empty) putchar('A' + (char)sausageNo);
-      else if (sausageNo != -1)                    putchar('a' + (char)sausageNo);
-      //else if (stephen.dir == Up && x == stephen.x && y == stephen.y - 1) row[x+1] = '|';
-      //else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
-      //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
-      //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
-      else if (x == stephen.x && y == stephen.y) {
-        if (stephen.dir == Up)          putchar('^');
-        else if (stephen.dir == Down)   putchar('v');
-        else if (stephen.dir == Left)   putchar('<');
-        else if (stephen.dir == Right)  putchar('>');
-      }
-      else if (_grid[x][y] == Empty)  putchar(' ');
-      else if (_grid[x][y] == Ground) putchar('_');
-      else if (_grid[x][y] == Grill)  putchar('#');
-      else if (_grid[x][y] == Wall)   putchar('1') ;
-    }
-    putchar('|');
-    putchar('\n');
-  }
-
-  putchar('+');
-  for (u8 x=0; x<_width; x++) putchar('-');
-  putchar('+');
-  putchar('\n');
-}
-
-State Level::GetState() const {
-  State s;
-  s.stephen = stephen;
-#define o(x) s.s##x = sausages[x];
-  SAUSAGES
-#undef o
-  return s;
-}
-
-void Level::SetState(const State* s) {
-  stephen = s->stephen;
-#define o(x) sausages[x] = s->s##x;
-  SAUSAGES
-#undef o
-}
-
-#if _DEBUG
-const char* dirs = " UD L   R";
-#define EXPLAIN(reason) if (_explain) printf("Stephen cannot move %c because sausage %c at (%d, %d) %s", dirs[dir], 'a' + sausageNo, x, y, reason)
-#else
-#define EXPLAIN(reason) 
-#endif
 
 bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
   if (!CanTurnThrough(x, y)) {
@@ -297,18 +298,18 @@ bool Level::IsWithinGrid(s8 x, s8 y) const {
   return x >= 0 && x <= _width - 1 && y >= 0 && y <= _height - 1;
 }
 
+bool Level::CanTurnThrough(s8 x, s8 y) const {
+  if (!IsWithinGrid(x, y)) return true;
+  Tile cell = _grid[x][y];
+  return cell == Empty || cell == Ground || cell == Grill;
+}
+
 bool Level::CanWalkOnto(s8 x, s8 y) const {
   if (!IsWithinGrid(x, y)) return false;
   Tile cell = _grid[x][y];
   // Stephen *can* walk onto a grill, he just has to walk off again.
   // But, walking onto a grill can spear a sausage, so we handle that by forcing a move where he walks off.
   return cell == Ground || cell == Grill;
-}
-
-bool Level::CanTurnThrough(s8 x, s8 y) const {
-  if (!IsWithinGrid(x, y)) return true;
-  Tile cell = _grid[x][y];
-  return cell == Empty || cell == Ground || cell == Grill;
 }
 
 bool Level::IsGrill(s8 x, s8 y) const {
