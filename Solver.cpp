@@ -67,9 +67,9 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
 
   _level->SetState(initialState);
   State* state = initialState;
-  Vector<Direction> solution(state->winDistance);
-  if (state->winDistance == 0xFFFF) return solution; // Unsolvable
+  if (state->winDistance == 0xFFFF) return Vector<Direction>(); // Unsolvable
 
+  Vector<Direction> solution(state->winDistance);
   printf("Found the shortest path %d\n", state->winDistance);
 
   // TODO: Compute all winning, fastest paths (do a DFS using the logic below)
@@ -88,6 +88,8 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
     } else if (state->r && state->r->winDistance == state->winDistance - 1) {
       solution.UnsafePush(Right);
       state = state->r;
+    } else {
+      return Vector<Direction>(); // Somehow our tree lead to a dead end.
     }
   }
 
@@ -112,7 +114,7 @@ State* Solver::GetOrInsertState(u16 depth) {
   } else {
     state.depth = depth + 1;
     State* newState = const_cast<State*>(&*_visitedNodes.insert(state).first);
-    if (_unexploredT) _unexploredT->next = newState;
+    if (_unexploredT != nullptr) _unexploredT->next = newState;
     _unexploredT = newState;
     return newState;
   }

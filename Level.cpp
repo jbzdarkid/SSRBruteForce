@@ -81,11 +81,13 @@ void Level::Print() const {
         else if (_stephen.dir == Down)   putchar('v');
         else if (_stephen.dir == Left)   putchar('<');
         else if (_stephen.dir == Right)  putchar('>');
+        else assert(false);
       }
       else if (_grid[x][y] == Empty)  putchar(' ');
       else if (_grid[x][y] == Ground) putchar('_');
       else if (_grid[x][y] == Grill)  putchar('#');
-      else if (_grid[x][y] == Wall)   putchar('1') ;
+      else if (_grid[x][y] == Wall)   putchar('1');
+      else assert(false);
     }
     putchar('|');
     putchar('\n');
