@@ -92,18 +92,8 @@ State* Solver::GetOrInsertState(u16 depth) {
   if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
 
   if (_level->Won()) { // No need to do further exploration if it's a winning state
-    //if (depth < _maxDepth) {
-    //  _maxDepth = depth;
-    //  printf("Improved maxDepth: %d\n", _maxDepth); // Why are we computing this? Idk.
-    //}
     state.winDistance = 0;
     return const_cast<State*>(&*_visitedNodes.insert(state).first);
-
-//  } else if (depth + 1 >= _maxDepth) {
-//    // This state wasn't a victory, and has reached maxDepth.
-//    // Do not bother adding it to the visited nodes, since it cannot win.
-//    // If someone else reaches it faster, they will add it.
-//    return nullptr;
   } else {
     state.depth = depth + 1;
     State* newState = const_cast<State*>(&*_visitedNodes.insert(state).first);

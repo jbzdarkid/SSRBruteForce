@@ -198,5 +198,5 @@ int main() {
     "_a#_<"
     "_____"
     "_____");
-  test.InteractiveSolver();
+  Cove.InteractiveSolver();
 }

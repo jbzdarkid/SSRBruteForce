@@ -42,7 +42,7 @@ struct Sausage {
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B,
   };
 
-  u8 flags;
+  u8 flags; // TODO: Type?
 
   inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
   inline bool IsVertical() const { return !IsHorizontal(); }
@@ -104,9 +104,8 @@ struct Level {
   bool _explain = false;
 
 private:
-  // NO SIDE EFFECTS. Collects a list of sausages that would move into _temp
   Vector<s8> _movedSausages;
-  bool CanPhysicallyMove(s8 x, s8 y, Direction dir);
+  bool CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausages = nullptr);
   // Returns true if the move was possible (the object was moved as a result)
   // Returns false if the move was impossible / blocked (may have side effects)
   bool MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear=false);
