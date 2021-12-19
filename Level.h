@@ -121,6 +121,6 @@ private:
   s8 _width = 0;
   s8 _height = 0;
   Stephen _start = {};
-  Vector<Sausage> sausages;
-  Stephen stephen = {};
+  Stephen _stephen = {};
+  Vector<Sausage> _sausages;
 };

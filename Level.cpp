@@ -8,7 +8,7 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
   _grid = NewDoubleArray2<Tile>(width, height);
 
 #define o(x) +1
-  while (sausages.Size() < SAUSAGES + 1) sausages.Push({-127, -127, -127, -127, 0});
+  while (_sausages.Size() < SAUSAGES + 1) _sausages.Push({-127, -127, -127, -127, 0});
   _movedSausages = Vector<s8>(SAUSAGES);
 #undef o
 
@@ -22,12 +22,12 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
     else if (c == '1') _grid[x][y] = Wall;
     else if (c == '^' || c == 'v' || c == '<' || c == '>') {
       _grid[x][y] = Ground;
-      stephen.x = x;
-      stephen.y = y;
-      if (c == '^')      stephen.dir = Up;
-      else if (c == 'v') stephen.dir = Down;
-      else if (c == '<') stephen.dir = Left;
-      else if (c == '>') stephen.dir = Right;
+      _stephen.x = x;
+      _stephen.y = y;
+      if (c == '^')      _stephen.dir = Up;
+      else if (c == 'v') _stephen.dir = Down;
+      else if (c == '<') _stephen.dir = Left;
+      else if (c == '>') _stephen.dir = Right;
     } else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
       if (c >= 'A' && c <= 'Z') {
@@ -38,21 +38,21 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
         num = c - 'a';
       }
 
-      if (sausages[num].x1 == x-1 && sausages[num].y1 == y) {
-        sausages[num].x2 = x;
-        sausages[num].y2 = y;
-        sausages[num].flags |= Sausage::Flags::Horizontal;
-      } else if (sausages[num].x1 == x && sausages[num].y1 == y-1) {
-        sausages[num].x2 = x;
-        sausages[num].y2 = y;
-        sausages[num].flags &= ~Sausage::Flags::Horizontal;
+      if (_sausages[num].x1 == x-1 && _sausages[num].y1 == y) {
+        _sausages[num].x2 = x;
+        _sausages[num].y2 = y;
+        _sausages[num].flags |= Sausage::Flags::Horizontal;
+      } else if (_sausages[num].x1 == x && _sausages[num].y1 == y-1) {
+        _sausages[num].x2 = x;
+        _sausages[num].y2 = y;
+        _sausages[num].flags &= ~Sausage::Flags::Horizontal;
       } else {
-        sausages[num].x1 = x;
-        sausages[num].y1 = y;
+        _sausages[num].x1 = x;
+        _sausages[num].y1 = y;
       }
     } else assert(false); // Unknown tile
   }
-  _start = stephen;
+  _start = _stephen;
 }
 
 Level::~Level() {
@@ -76,11 +76,11 @@ void Level::Print() const {
       //else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
       //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
       //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
-      else if (x == stephen.x && y == stephen.y) {
-        if (stephen.dir == Up)          putchar('^');
-        else if (stephen.dir == Down)   putchar('v');
-        else if (stephen.dir == Left)   putchar('<');
-        else if (stephen.dir == Right)  putchar('>');
+      else if (x == _stephen.x && y == _stephen.y) {
+        if (_stephen.dir == Up)          putchar('^');
+        else if (_stephen.dir == Down)   putchar('v');
+        else if (_stephen.dir == Left)   putchar('<');
+        else if (_stephen.dir == Right)  putchar('>');
       }
       else if (_grid[x][y] == Empty)  putchar(' ');
       else if (_grid[x][y] == Ground) putchar('_');
@@ -136,10 +136,10 @@ bool Level::InteractiveSolver() {
 }
 
 bool Level::Won() const {
-  if (stephen.x != _start.x) return false;
-  if (stephen.y != _start.y) return false;
-  if (stephen.dir != _start.dir) return false;
-#define o(x) if ((sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
+  if (_stephen.x != _start.x) return false;
+  if (_stephen.y != _start.y) return false;
+  if (_stephen.dir != _start.dir) return false;
+#define o(x) if ((_sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   SAUSAGES
 #undef o
   return true;
@@ -147,16 +147,16 @@ bool Level::Won() const {
 
 State Level::GetState() const {
   State s;
-  s.stephen = stephen;
-#define o(x) s.s##x = sausages[x];
+  s.stephen = _stephen;
+#define o(x) s.s##x = _sausages[x];
   SAUSAGES
 #undef o
   return s;
 }
 
 void Level::SetState(const State* s) {
-  stephen = s->stephen;
-#define o(x) sausages[x] = s->s##x;
+  _stephen = s->stephen;
+#define o(x) _sausages[x] = s->s##x;
   SAUSAGES
 #undef o
 }
@@ -174,134 +174,134 @@ const char* dirs = " UD L   R";
 
 // No longer promising 'no side effects', now just returns "was move valid"
 bool Level::Move(Direction dir) {
-  if (stephen.sausageSpeared == -1) {
-    if (stephen.dir == Up) {
+  if (_stephen.sausageSpeared == -1) {
+    if (_stephen.dir == Up) {
       if (dir == Left) {
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y - 1, Left)) return false;
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y, Down)) return false;
-        stephen.dir = Left;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Left)) return false;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) return false;
+        _stephen.dir = Left;
       } else if (dir == Right) {
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y - 1, Right)) return false;
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y, Down)) return false;
-        stephen.dir = Right;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Right)) return false;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) return false;
+        _stephen.dir = Right;
       } else if (dir == Up) {
-        if (!CanWalkOnto(stephen.x, stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x, stephen.y - 2, Up, true)) return false;
-        stephen.y--;
+        if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 2, Up, true)) return false;
+        _stephen.y--;
       } else if (dir == Down) {
-        if (!CanWalkOnto(stephen.x, stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x, stephen.y + 1, Down)) return false;
-        stephen.y++;
+        if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Down)) return false;
+        _stephen.y++;
       }
-    } else if (stephen.dir == Down) {
+    } else if (_stephen.dir == Down) {
       if (dir == Left) {
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y + 1, Left)) return false;
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y, Up)) return false;
-        stephen.dir = Left;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Left)) return false;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) return false;
+        _stephen.dir = Left;
       } else if (dir == Right) {
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y + 1, Right)) return false;
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y, Up)) return false;
-        stephen.dir = Right;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Right)) return false;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) return false;
+        _stephen.dir = Right;
       } else if (dir == Down) {
-        if (!CanWalkOnto(stephen.x, stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x, stephen.y + 2, Down, true)) return false;
-        stephen.y++;
+        if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 2, Down, true)) return false;
+        _stephen.y++;
       } else if (dir == Up) {
-        if (!CanWalkOnto(stephen.x, stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x, stephen.y - 1, Up)) return false;
-        stephen.y--;
+        if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Up)) return false;
+        _stephen.y--;
       }
-    } else if (stephen.dir == Left) {
+    } else if (_stephen.dir == Left) {
       if (dir == Up) {
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y - 1, Up)) return false;
-        if (!MoveThroughSpace(stephen.x, stephen.y - 1, Right)) return false;
-        stephen.dir = Up;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Up)) return false;
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) return false;
+        _stephen.dir = Up;
       } else if (dir == Down) {
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y + 1, Down)) return false;
-        if (!MoveThroughSpace(stephen.x, stephen.y + 1, Right)) return false;
-        stephen.dir = Down;
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Down)) return false;
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) return false;
+        _stephen.dir = Down;
       } else if (dir == Left) {
-        if (!CanWalkOnto(stephen.x - 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x - 2, stephen.y, Left, true))  return false;
-        stephen.x--;
+        if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x - 2, _stephen.y, Left, true))  return false;
+        _stephen.x--;
       } else if (dir == Right) {
-        if (!CanWalkOnto(stephen.x + 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y, Right))  return false;
-        stephen.x++;
+        if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Right))  return false;
+        _stephen.x++;
       }
-    } else if (stephen.dir == Right) {
+    } else if (_stephen.dir == Right) {
       if (dir == Up) {
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y - 1, Up)) return false;
-        if (!MoveThroughSpace(stephen.x, stephen.y - 1, Left)) return false;
-        stephen.dir = Up;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Up)) return false;
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) return false;
+        _stephen.dir = Up;
       } else if (dir == Down) {
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y + 1, Down)) return false;
-        if (!MoveThroughSpace(stephen.x, stephen.y + 1, Left)) return false;
-        stephen.dir = Down;
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Down)) return false;
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) return false;
+        _stephen.dir = Down;
       } else if (dir == Right) {
-        if (!CanWalkOnto(stephen.x + 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x + 2, stephen.y, Right, true)) return false;
-        stephen.x++;
+        if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x + 2, _stephen.y, Right, true)) return false;
+        _stephen.x++;
       } else if (dir == Left) {
-        if (!CanWalkOnto(stephen.x - 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y, Left)) return false;
-        stephen.x--;
+        if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Left)) return false;
+        _stephen.x--;
       }
     }
-  } else if (stephen.sausageSpeared != -1) {
+  } else if (_stephen.sausageSpeared != -1) {
     // First, see if stephen can move
     if (dir == Up) {
-      if (!CanPhysicallyMove(stephen.x, stephen.y - 1, dir)) return false;
+      if (!CanPhysicallyMove(_stephen.x, _stephen.y - 1, dir)) return false;
     } else if (dir == Down) {
-      if (!CanPhysicallyMove(stephen.x, stephen.y + 1, dir)) return false;
+      if (!CanPhysicallyMove(_stephen.x, _stephen.y + 1, dir)) return false;
     } else if (dir == Left) {
-      if (!CanPhysicallyMove(stephen.x - 1, stephen.y, dir)) return false;
+      if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y, dir)) return false;
     } else if (dir == Right) {
-      if (!CanPhysicallyMove(stephen.x + 1, stephen.y, dir)) return false;
+      if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y, dir)) return false;
     }
     // Then, check to see if our sausage gets unspeared
-    if (dir == Up && stephen.dir == Down) {
-      if (!CanPhysicallyMove(stephen.x, stephen.y + 1, dir)) stephen.sausageSpeared = -1;
-    } else if (dir == Down && stephen.dir == Up) {
-      if (!CanPhysicallyMove(stephen.x, stephen.y - 1, dir)) stephen.sausageSpeared = -1;
-    } else if (dir == Left && stephen.dir == Right) {
-      if (!CanPhysicallyMove(stephen.x + 1, stephen.y, dir)) stephen.sausageSpeared = -1;
-    } else if (dir == Right && stephen.dir == Left) {
-      if (!CanPhysicallyMove(stephen.x - 1, stephen.y, dir)) stephen.sausageSpeared = -1;
+    if (dir == Up && _stephen.dir == Down) {
+      if (!CanPhysicallyMove(_stephen.x, _stephen.y + 1, dir)) _stephen.sausageSpeared = -1;
+    } else if (dir == Down && _stephen.dir == Up) {
+      if (!CanPhysicallyMove(_stephen.x, _stephen.y - 1, dir)) _stephen.sausageSpeared = -1;
+    } else if (dir == Left && _stephen.dir == Right) {
+      if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y, dir)) _stephen.sausageSpeared = -1;
+    } else if (dir == Right && _stephen.dir == Left) {
+      if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y, dir)) _stephen.sausageSpeared = -1;
     }
     // If the sausage is still speared, try to move it, and fail the movement is invalid
-    if (stephen.sausageSpeared != -1) {
-      if (stephen.dir == Up) {
-        if (!MoveThroughSpace(stephen.x, stephen.y - 1, dir)) return false;
-      } else if (stephen.dir == Down) {
-        if (!MoveThroughSpace(stephen.x, stephen.y + 1, dir)) return false;
-      } else if (stephen.dir == Left) {
-        if (!MoveThroughSpace(stephen.x - 1, stephen.y, dir)) return false;
-      } else if (stephen.dir == Right) {
-        if (!MoveThroughSpace(stephen.x + 1, stephen.y, dir)) return false;
+    if (_stephen.sausageSpeared != -1) {
+      if (_stephen.dir == Up) {
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, dir)) return false;
+      } else if (_stephen.dir == Down) {
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, dir)) return false;
+      } else if (_stephen.dir == Left) {
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, dir)) return false;
+      } else if (_stephen.dir == Right) {
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, dir)) return false;
       }
     }
     // Finally, move stephen, now that our sausage has moved out of the way
     if (dir == Up) {
-      if (!CanWalkOnto(stephen.x, stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-      if (!MoveThroughSpace(stephen.x, stephen.y - 1, Up)) return false;
-      stephen.y--;
+      if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+      if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Up)) return false;
+      _stephen.y--;
     } else if (dir == Down) {
-      if (!CanWalkOnto(stephen.x, stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
-      if (!MoveThroughSpace(stephen.x, stephen.y + 1, Down)) return false;
-      stephen.y++;
+      if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
+      if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Down)) return false;
+      _stephen.y++;
     } else if (dir == Left) {
-      if (!CanWalkOnto(stephen.x - 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-      if (!MoveThroughSpace(stephen.x - 1, stephen.y, Left)) return false;
-      stephen.x--;
+      if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+      if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Left)) return false;
+      _stephen.x--;
     } else if (dir == Right) {
-      if (!CanWalkOnto(stephen.x + 1, stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
-      if (!MoveThroughSpace(stephen.x + 1, stephen.y, Right)) return false;
-      stephen.x++;
+      if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
+      if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Right)) return false;
+      _stephen.x++;
     }
   }
 
-  if (IsGrill(stephen.x, stephen.y)) { // Stepped onto a grill, forcibly step back
+  if (IsGrill(_stephen.x, _stephen.y)) { // Stepped onto a grill, forcibly step back
     bool success = false;
     if (dir == Up) success = Move(Down);
     else if (dir == Down) success = Move(Up);
@@ -328,7 +328,7 @@ bool Level::CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausag
     }
     movedSausages->UnsafePush(sausageNo);
   }
-  Sausage sausage = sausages[sausageNo];
+  Sausage sausage = _sausages[sausageNo];
 
   // Sausages can move if the tiles beyond them can move (either other sausages or empty space)
   if (dir == Up) {
@@ -355,7 +355,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
 
   if (!canPhysicallyMove) {
     if (spear && _movedSausages.Size() > 0) {
-      stephen.sausageSpeared = _movedSausages[0];
+      _stephen.sausageSpeared = _movedSausages[0];
       // This location cannot move, but we can stil move into it (by spearing).
       return true;
     }
@@ -365,7 +365,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
 
   // Currently not worrying about side-effects. Wouldn't be too hard to prevent, though.
   for (s8 sausageNo : _movedSausages) {
-    Sausage sausage = sausages[sausageNo];
+    Sausage sausage = _sausages[sausageNo];
 
     // Move the sausage
     if (dir == Up) {
@@ -383,7 +383,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
     }
 
     // Speared sausages do not roll nor fall off cliffs
-    if (sausageNo != stephen.sausageSpeared) {
+    if (sausageNo != _stephen.sausageSpeared) {
       // Check if the sausage would fall off a cliff
       if (!CanWalkOnto(sausage.x1, sausage.y1)
        && !CanWalkOnto(sausage.x2, sausage.y2)) {
@@ -409,15 +409,15 @@ bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
     }
 
     // If nothing has gone wrong, save the updated sausage
-    sausages[sausageNo] = sausage;
+    _sausages[sausageNo] = sausage;
   }
 
   return true;
 }
 
 s8 Level::GetSausage(s8 x, s8 y) const {
-  for (u8 i=0; i<sausages.Size(); i++) {
-    Sausage sausage = sausages[i];
+  for (u8 i=0; i<_sausages.Size(); i++) {
+    Sausage sausage = _sausages[i];
     if ((x == sausage.x1 && y == sausage.y1) || (x == sausage.x2 && y == sausage.y2)) return i;
   }
   return -1;
