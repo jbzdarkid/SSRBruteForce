@@ -7,74 +7,53 @@ Solver::Solver(Level* level) {
   _level = level;
 }
 
-std::unordered_set<State> visitedNodes;
-std::unordered_map<State, u16> winningNodes;
-std::unordered_set<State> losingNodes;
+Vector<Direction> Solver::Solve(u16 maxDepth) {
+  _maxDepth = maxDepth;
+  _visitedNodes.clear();
 
-State* unexploredH;
-State* unexploredT;
-State* exploredH;
-State* exploredT;
+  State* initialState = GetOrInsertState(0);
+  _unexploredH = initialState;
+  _unexploredT = _unexploredH;
 
-State* Solver::GetOrInsertState() {
-  State state = _level->GetState();
-  auto search = visitedNodes.find(state);
-  if (search != visitedNodes.end()) return const_cast<State*>(&*search);
-
-  State* newState = const_cast<State*>(&*visitedNodes.insert(state).first);
-  if (_level->Won()) {
-    newState->winDistance = 0;
-  } else { // No need to explore if it's a winning state
-    if (unexploredT) unexploredT->next = newState;
-    unexploredT = newState;
-  }
-  return newState;
-}
-
-Vector<Direction> Solver::Solve(u32 moveLimit) {
-  State* initialState = GetOrInsertState();
-  unexploredH = initialState;
-  unexploredT = unexploredH;
-
-  while (unexploredH != nullptr) {
-    State* state = unexploredH;
-    // TODO: Check depth here and continue
-
+  while (_unexploredH != nullptr) {
+    State* state = _unexploredH;
     _level->SetState(state);
 
     if (_level->Move(Up)) {
-      state->u = GetOrInsertState();
+      state->u = GetOrInsertState(state->depth);
       _level->SetState(state);
     }
 
     if (_level->Move(Down)) {
-      state->d = GetOrInsertState();
+      state->d = GetOrInsertState(state->depth);
       _level->SetState(state);
     }
 
     if (_level->Move(Left)) {
-      state->l = GetOrInsertState();
+      state->l = GetOrInsertState(state->depth);
       _level->SetState(state);
     }
 
     if (_level->Move(Right)) {
-      state->r = GetOrInsertState();
+      state->r = GetOrInsertState(state->depth);
       // _level->SetState(state);
     }
 
-    unexploredH = state->next;
+    _unexploredH = state->next;
 
-    state->next = exploredH;
-    exploredH = state;
-    if (!exploredT) exploredT = exploredH;
+    state->next = _exploredH;
+    _exploredH = state;
+    if (!_exploredT) _exploredT = _exploredH;
   }
+
+  printf("Traversal done\n");
 
   // We are done traversing and building the graph.
   // Now, determine the victory routes:
 
-  State* startOfLoop = exploredH;
+  State* startOfLoop = _exploredH;
   while (true) {
-    State* state = exploredH;
+    State* state = _exploredH;
     if (state->next == startOfLoop) break;
 
     u16 winDistance = 0xFFFF;
@@ -89,15 +68,20 @@ Vector<Direction> Solver::Solve(u32 moveLimit) {
       state->winDistance = winDistance + 1;
       startOfLoop = state->next; // If we come back around to the element after this one, and make no further progress, stop.
     } else { // Return it to the queue, maybe it's winning later.
-      exploredT->next = state;
-      exploredT = state;
+      _exploredT->next = state;
+      _exploredT = state;
     }
 
-    exploredH = exploredH->next;
+    _exploredH = _exploredH->next;
   }
 
+  _level->SetState(initialState);
   State* state = initialState;
   Vector<Direction> solution(state->winDistance);
+  if (state->winDistance == 0xFFFF) return solution; // Cannot be solved within this maxDepth
+
+  printf("Found the shortest path %d\n", state->winDistance);
+
   while (state->winDistance > 0) {
     if (state->u && state->u->winDistance == state->winDistance - 1) {
       solution.UnsafePush(Up);
@@ -114,6 +98,34 @@ Vector<Direction> Solver::Solve(u32 moveLimit) {
     }
   }
 
-  _level->SetState(initialState);
   return solution;
+}
+
+State* Solver::GetOrInsertState(u16 depth) {
+  State state = _level->GetState();
+  if (state.stephen.x == 1 && state.stephen.y == 3) {
+    int k = 1;
+  }
+  auto search = _visitedNodes.find(state);
+  if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
+
+  if (_level->Won()) { // No need to do further exploration if it's a winning state
+    if (depth + 1 < _maxDepth) {
+      _maxDepth = depth + 1;
+      printf("Improved maxDepth: %d\n", _maxDepth);
+    }
+    state.winDistance = 0;
+    return const_cast<State*>(&*_visitedNodes.insert(state).first);
+  } else if (depth + 1 >= _maxDepth) {
+    // This state wasn't a victory, and has reached maxDepth.
+    // Do not bother adding it to the visited nodes, since it cannot win.
+    // If someone else reaches it faster, they will add it.
+    return nullptr;
+  } else {
+    state.depth = depth + 1;
+    State* newState = const_cast<State*>(&*_visitedNodes.insert(state).first);
+    if (_unexploredT) _unexploredT->next = newState;
+    _unexploredT = newState;
+    return newState;
+  }
 }

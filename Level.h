@@ -14,6 +14,7 @@ struct Stephen {
   s8 x;
   s8 y;
   Direction dir;
+  s8 sausageSpeared = -1;
 };
 
 struct Sausage {
@@ -35,39 +36,38 @@ struct Sausage {
 
   u8 flags;
 
-  inline bool IsHorizontal() { return (flags & Horizontal) != 0; }
-  inline bool IsVertical() { return !IsHorizontal(); }
-  inline bool IsRolled() { return (flags & Rolled) != 0; }
+  inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
+  inline bool IsVertical() const { return !IsHorizontal(); }
+  inline bool IsRolled() const { return (flags & Rolled) != 0; }
+  bool operator==(const Sausage& other) const {
+    return flags == other.flags && x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2;
+  }
 };
+
+#define SAUSAGES o(0) o(1) o(2)
 
 struct State {
   Stephen stephen;
-  Sausage s0 = {};
-  Sausage s1 = {};
+#define o(x) Sausage s##x = {};
+  SAUSAGES
+#undef o
 
-  // Used to build the tree
+  // Used to build the tree, ergo not part of the hashing or comparison algos
   State* next = nullptr;
   State* u = nullptr;
   State* d = nullptr;
   State* l = nullptr;
   State* r = nullptr;
   u16 winDistance = 0xFFFF;
+  u16 depth = 0;
 
   bool operator==(const State& other) const;
+  u32 Hash() const;
 };
 
-u32 triple32_hash(u32 a, u32 b, u32 c, u32 d);
-
 namespace std {
-template<>
-struct hash<State> {
-  size_t operator()(const State& state) const {
-    u32 a = *(u32*)&state.stephen;
-    u32 b = *(u32*)&state.s0;
-    u32 c = *(u32*)&state.s1;
-    u32 d = state.s0.flags << 4 | state.s1.flags;
-    return triple32_hash(a, b, c, d);
-  }
+template<> struct hash<State> {
+  size_t operator()(const State& state) const { return state.Hash(); }
 };
 }
 
@@ -76,6 +76,7 @@ struct Level {
     Empty = 0,
     Ground = 1,
     Grill = 2,
+    Wall = 3,
   };
 
   Level(u8 width, u8 height, const char* asciiGrid);
@@ -96,6 +97,7 @@ private:
   bool CanTurnThrough(s8 x, s8 y) const;
   bool CanWalkOnto(s8 x, s8 y) const;
   bool IsGrill(s8 x, s8 y) const;
+  bool IsSupported(const Sausage& sausage) const;
 
   Tile** _grid;
   s8 _width = 0;
