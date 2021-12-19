@@ -161,20 +161,56 @@ Level BeautifulHorizon(8, 5, "Beautiful Horizon",
   "1ab__>_#"
   "  1     ");
 
-Level BarrowSet(
+Level BarrowSet(18, 6, "Barrow Set",
+  "   ___            "
+  "   ___1___________"
+  "_________111_aa___"
+  "_##__>__1111_bb_1_"
+  "_##_____ __ ______"
+  "________1111______");
+
+Level RoughField(9, 5, "Rough Field",
+  "________ "
+  "__>_____ "
+  "____1_111"
+  "_ab____#1"
+  "_ab____#1");
+
+Level FallowEarth(7, 4, "Fallow Earth",
+  "_a#11__"
+  "_A#_1__"
+  "___>___"
+  "  ___  ");
+
+Level TwistyFarm(10, 14, "Twisty Farm",
+  "       11 "
+  "      1_##"
+  "     1__##"
+  "    1____ "
+  "1_____  # "
+  "1____   ##"
+  "1__       "
+  " 1__      "
+  "  1__     "
+  "   1_____ "
+  "  >__a  _ "
+  "  ___a 1_ "
+  "  _bb_  _ "
+  "     ____ ");
 
 int main() {
 #define o(x) + 1
   u32 sausages = SAUSAGES;
 #undef o
   Vector<Level*> levels;
-  if (sausages <= 1) {
+  if (sausages == 1) {
     //levels.Push(&BaysNeck);
     //levels.Push(&HappyPool);
     //levels.Push(&MaidensWalk);
     levels.Push(&EmersonJetty);
     levels.Push(&SadFarm);
-  } else if (sausages <= 2) {
+    levels.Push(&FallowEarth);
+  } else if (sausages == 2) {
     //levels.Push(&Southjaunt);
     //levels.Push(&InfantsBreak);
     //levels.Push(&ComelyHearth);
@@ -188,14 +224,17 @@ int main() {
     levels.Push(&Cove);
     levels.Push(&ThePaddock);
     levels.Push(&BeautifulHorizon);
-  } else if (sausages <= 3) {
-    levels.Push(&LachrymoseHead);
-    levels.Push(&TheClover);
+    levels.Push(&BarrowSet);
+    levels.Push(&RoughField);
+    levels.Push(&TwistyFarm);
+  } else if (sausages == 3) {
+    // levels.Push(&LachrymoseHead);
+    // levels.Push(&TheClover);
     levels.Push(&TheAnchorage);
   }
 
   bool stepThrough = true;
-  //*
+  /*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
     Vector<Direction> solution = Solver(level).Solve(100);
@@ -207,17 +246,16 @@ int main() {
       if (stepThrough) getchar();
       if (stepThrough) level->Move(dir);
     }
-    if (!stepThrough) putchar('\n');
-    level->Print();
-    if (stepThrough) putchar('\n');
+    if (stepThrough) level->Print();
+    putchar('\n');
   }
   return 0;
   //*/
 
   Level test(5, 4, "Test",
-    "1a#__"
-    "_a#_<"
-    "_____"
+    "1a##_"
+    "_a##_"
+    "^____"
     "_____");
-  Cove.InteractiveSolver();
+  test.InteractiveSolver();
 }

@@ -68,9 +68,12 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
   _level->SetState(initialState);
   State* state = initialState;
   Vector<Direction> solution(state->winDistance);
-  if (state->winDistance == 0xFFFF) return solution; // Cannot be solved within this maxDepth
+  if (state->winDistance == 0xFFFF) return solution; // Unsolvable
 
   printf("Found the shortest path %d\n", state->winDistance);
+
+  // TODO: Compute all winning, fastest paths (do a DFS using the logic below)
+  // TODO: Evaluate additional costs for winning paths (# burned steps, # sausage pushes, # rotations?)
 
   while (state->winDistance > 0) {
     if (state->u && state->u->winDistance == state->winDistance - 1) {
@@ -96,10 +99,10 @@ State* Solver::GetOrInsertState(u16 depth) {
   auto search = _visitedNodes.find(state);
   if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
 
-  if (_visitedNodes.size() % 1'000'000 == 0) {
-    printf("%lld million nodes\n", _visitedNodes.size() / 1'000'000);
-    _level->Print();
-  }
+  //if (_visitedNodes.size() % 1'000'000 == 0) {
+  //  printf("%lld million nodes\n", _visitedNodes.size() / 1'000'000);
+  //  _level->Print();
+  //}
 
   if (_level->Won()) { // No need to do further exploration if it's a winning state
     state.winDistance = 0;

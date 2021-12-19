@@ -131,7 +131,7 @@ bool Level::InteractiveSolver() {
     }
   }
 
-  printf("Level completed in %d moves\n", undoHistory.Size());
+  printf("Level completed in %d moves\n", undoHistory.Size() - 1);
   return true;
 }
 
