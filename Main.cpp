@@ -146,15 +146,34 @@ Level Cove(8, 6, "Cove",
   "    _ab_"
   "    ____");
 
+Level ThePaddock(10, 6, "The Paddock",
+  " 11____111"
+  "1_#_aa_# 1"
+  "1_#_bb_# 1"
+  "111__v_111"
+  " ________ "
+  " ________ ");
+
+Level BeautifulHorizon(8, 5, "Beautiful Horizon",
+  "   ____#"
+  "  1__1_#"
+  " ab____#"
+  "1ab__>_#"
+  "  1     ");
+
+Level BarrowSet(
+
 int main() {
 #define o(x) + 1
   u32 sausages = SAUSAGES;
 #undef o
   Vector<Level*> levels;
   if (sausages <= 1) {
-    levels.Push(&BaysNeck);
-    levels.Push(&HappyPool);
-    levels.Push(&MaidensWalk);
+    //levels.Push(&BaysNeck);
+    //levels.Push(&HappyPool);
+    //levels.Push(&MaidensWalk);
+    levels.Push(&EmersonJetty);
+    levels.Push(&SadFarm);
   } else if (sausages <= 2) {
     //levels.Push(&Southjaunt);
     //levels.Push(&InfantsBreak);
@@ -167,6 +186,8 @@ int main() {
     //levels.Push(&Seafinger);
     //levels.Push(&InletShore);
     levels.Push(&Cove);
+    levels.Push(&ThePaddock);
+    levels.Push(&BeautifulHorizon);
   } else if (sausages <= 3) {
     levels.Push(&LachrymoseHead);
     levels.Push(&TheClover);
@@ -174,7 +195,7 @@ int main() {
   }
 
   bool stepThrough = true;
-
+  //*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
     Vector<Direction> solution = Solver(level).Solve(100);
@@ -191,6 +212,7 @@ int main() {
     if (stepThrough) putchar('\n');
   }
   return 0;
+  //*/
 
   Level test(5, 4, "Test",
     "1a#__"

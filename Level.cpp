@@ -352,17 +352,15 @@ bool Level::CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausag
 bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
   _movedSausages.Resize(0);
   bool canPhysicallyMove = CanPhysicallyMove(x, y, dir, &_movedSausages);
-  if (_movedSausages.Size() == 0) return true; // The move succeeds because there's nothing in the way.
 
   if (!canPhysicallyMove) {
-    if (!spear) {
-      // This location cannot move (because some part of it pushes into a wall).
-      return false;
-    } else {
+    if (spear && _movedSausages.Size() > 0) {
       stephen.sausageSpeared = _movedSausages[0];
       // This location cannot move, but we can stil move into it (by spearing).
       return true;
     }
+    // This location cannot move (because some part of it pushes into a wall).
+    return false;
   }
 
   // Currently not worrying about side-effects. Wouldn't be too hard to prevent, though.
