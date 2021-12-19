@@ -156,27 +156,27 @@ int main() {
     levels.Push(&HappyPool);
     levels.Push(&MaidensWalk);
   } else if (sausages <= 2) {
-    levels.Push(&Southjaunt);
-    levels.Push(&InfantsBreak);
-    levels.Push(&ComelyHearth);
-    levels.Push(&LittleFire);
-    levels.Push(&Eastreach);
-    levels.Push(&BurningWharf);
-    levels.Push(&FieryJut);
-    levels.Push(&MerchantsElegy);
-    levels.Push(&Seafinger);
-    levels.Push(&InletShore);
+    //levels.Push(&Southjaunt);
+    //levels.Push(&InfantsBreak);
+    //levels.Push(&ComelyHearth);
+    //levels.Push(&LittleFire);
+    //levels.Push(&Eastreach);
+    //levels.Push(&BurningWharf);
+    //levels.Push(&FieryJut);
+    //levels.Push(&MerchantsElegy);
+    //levels.Push(&Seafinger);
+    //levels.Push(&InletShore);
     levels.Push(&Cove);
   } else if (sausages <= 3) {
     levels.Push(&LachrymoseHead);
     levels.Push(&TheClover);
     levels.Push(&TheAnchorage);
   }
-  /*
+
   bool stepThrough = true;
 
   for (Level* level : levels) {
-    puts(level->name);
+    printf("Solving %s\n", level->name);
     Vector<Direction> solution = Solver(level).Solve(100);
     printf("Best solver solution: %d\n", solution.Size());
     const char* dirs = " UD L   R";
@@ -192,7 +192,6 @@ int main() {
   }
   return 0;
 
-  */
   Level test(5, 4, "Test",
     "1a#__"
     "_a#_<"

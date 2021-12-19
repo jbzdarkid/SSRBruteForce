@@ -9,11 +9,16 @@ Solver::Solver(Level* level) {
 
 Vector<Direction> Solver::Solve(u16 maxDepth) {
   State* initialState = GetOrInsertState(0);
+  _maxDepth = 0xFFFF; // maxDepth;
   _unexploredH = initialState;
   _unexploredT = _unexploredH;
 
   while (_unexploredH != nullptr) {
     State* state = _unexploredH;
+    if (state->depth * state->depth > _maxDepth) {
+      _unexploredH = state->next;
+      continue; // This should be safe.
+    }
 
     _level->SetState(state);
     if (_level->Move(Up))    state->u = GetOrInsertState(state->depth);
@@ -91,8 +96,15 @@ State* Solver::GetOrInsertState(u16 depth) {
   auto search = _visitedNodes.find(state);
   if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
 
+  if (_visitedNodes.size() % 1'000'000 == 0) {
+    printf("%lld million nodes\n", _visitedNodes.size() / 1'000'000);
+    _level->Print();
+  }
+
   if (_level->Won()) { // No need to do further exploration if it's a winning state
     state.winDistance = 0;
+    _maxDepth = depth;
+    printf("Improved maxDepth to %d\n", depth);
     return const_cast<State*>(&*_visitedNodes.insert(state).first);
   } else {
     state.depth = depth + 1;

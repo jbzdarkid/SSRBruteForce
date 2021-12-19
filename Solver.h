@@ -13,6 +13,7 @@ private:
 
   Level* _level = nullptr;
   std::unordered_set<State> _visitedNodes;
+  u16 _maxDepth = 0;
 
   State* _unexploredH = nullptr;
   State* _unexploredT = nullptr;

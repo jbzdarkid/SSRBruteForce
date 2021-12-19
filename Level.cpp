@@ -139,7 +139,7 @@ bool Level::Won() const {
   if (stephen.x != _start.x) return false;
   if (stephen.y != _start.y) return false;
   if (stephen.dir != _start.dir) return false;
-#define o(x) if ((sausages[x].flags && Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
+#define o(x) if ((sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   SAUSAGES
 #undef o
   return true;
@@ -259,15 +259,15 @@ bool Level::Move(Direction dir) {
     } else if (dir == Right) {
       if (!CanPhysicallyMove(stephen.x + 1, stephen.y, dir)) return false;
     }
-    // Then, check to see if our sausage can move (unspear it if it can't)
-    if (stephen.dir == Up) {
-      if (!CanPhysicallyMove(stephen.x, stephen.y - 1, dir)) stephen.sausageSpeared = -1;
-    } else if (stephen.dir == Down) {
+    // Then, check to see if our sausage gets unspeared
+    if (dir == Up && stephen.dir == Down) {
       if (!CanPhysicallyMove(stephen.x, stephen.y + 1, dir)) stephen.sausageSpeared = -1;
-    } else if (stephen.dir == Left) {
-      if (!CanPhysicallyMove(stephen.x - 1, stephen.y, dir)) stephen.sausageSpeared = -1;
-    } else if (stephen.dir == Right) {
+    } else if (dir == Down && stephen.dir == Up) {
+      if (!CanPhysicallyMove(stephen.x, stephen.y - 1, dir)) stephen.sausageSpeared = -1;
+    } else if (dir == Left && stephen.dir == Right) {
       if (!CanPhysicallyMove(stephen.x + 1, stephen.y, dir)) stephen.sausageSpeared = -1;
+    } else if (dir == Right && stephen.dir == Left) {
+      if (!CanPhysicallyMove(stephen.x - 1, stephen.y, dir)) stephen.sausageSpeared = -1;
     }
     // If the sausage is still speared, try to move it, and fail the movement is invalid
     if (stephen.sausageSpeared != -1) {
