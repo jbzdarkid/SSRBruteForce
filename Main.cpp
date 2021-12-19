@@ -108,16 +108,54 @@ Level TheAnchorage(10, 6, "The Anchorage",
   "          "
   "__##      ");
 
+Level EmersonJetty(19, 17, "Emerson Jetty",
+  "         ___  _    "
+  "____1__________1 1 "
+  "_______1__     __  "
+  "______11_1     1_  "
+  "_aa__  ___      _  "
+  "_____  ___      _  "
+  "        _       _  "
+  "        __>________"
+  "            _   _1_"
+  "            _1  ___"
+  "            _      "
+  "            _      "
+  "           1__     "
+  "             _     "
+  "           ____    "
+  "          ##_1_    "
+  "          ##___    ");
+
+Level SadFarm(11, 9, "Sad Farm",
+  "   11111   "
+  "___1___1   "
+  "___1___1   "
+  "___1_1_1   "
+  "_a___1_1   "
+  "_a___1_1111"
+  "___1_____##"
+  "___1_____##"
+  "^__1111    ");
+
+Level Cove(8, 6, "Cove",
+  "__1__#v_"
+  "_____#__"
+  "________"
+  "   __ab_"
+  "    _ab_"
+  "    ____");
+
 int main() {
 #define o(x) + 1
-  u32 sausages = 0 SAUSAGES;
+  u32 sausages = SAUSAGES;
 #undef o
   Vector<Level*> levels;
-  if (sausages == 1) {
+  if (sausages <= 1) {
     levels.Push(&BaysNeck);
     levels.Push(&HappyPool);
     levels.Push(&MaidensWalk);
-  } else if (sausages == 2) {
+  } else if (sausages <= 2) {
     levels.Push(&Southjaunt);
     levels.Push(&InfantsBreak);
     levels.Push(&ComelyHearth);
@@ -128,7 +166,8 @@ int main() {
     levels.Push(&MerchantsElegy);
     levels.Push(&Seafinger);
     levels.Push(&InletShore);
-  } else if (sausages == 3) {
+    levels.Push(&Cove);
+  } else if (sausages <= 3) {
     levels.Push(&LachrymoseHead);
     levels.Push(&TheClover);
     levels.Push(&TheAnchorage);
@@ -154,28 +193,10 @@ int main() {
   return 0;
 
   */
-  Level* level = new Level(3, 4, "Test",
-    "_1_"
-    "aa_"
-    "___"
-    "_^_");
-
-  level->Print();
-  printf("ULDR: ");
-  int moves = 0;
-  while (!level->Won()) {
-    int ch = getchar();
-    if (ch == '\n') {
-      level->Print();
-      printf("ULDR: ");
-      continue;
-    }
-    else if (ch == 'u' || ch == 'U') level->Move(Up);
-    else if (ch == 'd' || ch == 'D') level->Move(Down);
-    else if (ch == 'l' || ch == 'L') level->Move(Left);
-    else if (ch == 'r' || ch == 'R') level->Move(Right);
-    moves++;
-  }
-
-  printf("Level completed in %d moves\n", moves);
+  Level test(5, 4, "Test",
+    "1a#__"
+    "_a#_<"
+    "_____"
+    "_____");
+  test.InteractiveSolver();
 }

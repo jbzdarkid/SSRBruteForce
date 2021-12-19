@@ -3,6 +3,7 @@
 #include "WitnessRNG/StdLib.h"
 
 enum Direction : u8 {
+  None = 0,
   Up = 1,
   Down = 2,
   Left = 4,
@@ -51,7 +52,7 @@ struct Sausage {
   }
 };
 
-#define SAUSAGES o(0) o(1) o(2)
+#define SAUSAGES o(0) o(1) // o(2)
 
 struct State {
   Stephen stephen;
@@ -89,26 +90,33 @@ struct Level {
   Level(u8 width, u8 height, const char* name, const char* asciiGrid);
   ~Level();
   void Print() const;
+  bool InteractiveSolver();
   bool Won() const;
 
   State GetState() const;
   void SetState(const State* state);
 
-  // Returns false if the move fails
+  // Returns true if the move succeeded
+  // Returns false if the move was illegal for any reason
   bool Move(Direction dir);
 
   const char* name;
   bool _explain = false;
 
 private:
-  bool MoveThroughSpace(s8 x, s8 y, Direction dir);
+  // NO SIDE EFFECTS. Collects a list of sausages that would move into _temp
+  Vector<s8> _movedSausages;
+  bool CanPhysicallyMove(s8 x, s8 y, Direction dir);
+  // Returns true if the move was possible (the object was moved as a result)
+  // Returns false if the move was impossible / blocked (may have side effects)
+  bool MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear=false);
 
   s8 GetSausage(s8 x, s8 y) const;
   bool IsWithinGrid(s8 x, s8 y) const;
+  bool IsWall(s8 x, s8 y) const;
   bool CanTurnThrough(s8 x, s8 y) const;
   bool CanWalkOnto(s8 x, s8 y) const;
   bool IsGrill(s8 x, s8 y) const;
-  bool IsSupported(const Sausage& sausage) const;
 
   Tile** _grid;
   s8 _width = 0;
