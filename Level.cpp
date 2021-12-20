@@ -8,7 +8,6 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
   _grid = NewDoubleArray2<Tile>(width, height);
 
 #define o(x) +1
-  while (_sausages.Size() < SAUSAGES + 1) _sausages.Push({-127, -127, -127, -127, 0});
   _movedSausages = Vector<s8>(SAUSAGES);
 #undef o
 
@@ -38,6 +37,9 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
         num = c - 'a';
       }
 
+      // We need to do this here because, even if we don't *solve* levels
+      // with less than the expected count, we still construct them.
+      while (_sausages.Size() < num + 1) _sausages.Push({-127, -127, -127, -127, 0});
       if (_sausages[num].x1 == x-1 && _sausages[num].y1 == y) {
         _sausages[num].x2 = x;
         _sausages[num].y2 = y;

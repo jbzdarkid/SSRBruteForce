@@ -204,9 +204,9 @@ int main() {
 #undef o
   Vector<Level*> levels;
   if (sausages == 1) {
-    //levels.Push(&BaysNeck);
-    //levels.Push(&HappyPool);
-    //levels.Push(&MaidensWalk);
+    levels.Push(&BaysNeck);
+    levels.Push(&HappyPool);
+    levels.Push(&MaidensWalk);
     levels.Push(&EmersonJetty);
     levels.Push(&SadFarm);
     levels.Push(&FallowEarth);
@@ -228,8 +228,8 @@ int main() {
     levels.Push(&RoughField);
     levels.Push(&TwistyFarm);
   } else if (sausages == 3) {
-    // levels.Push(&LachrymoseHead);
-    // levels.Push(&TheClover);
+    levels.Push(&LachrymoseHead);
+    levels.Push(&TheClover);
     levels.Push(&TheAnchorage);
   }
 
@@ -253,9 +253,10 @@ int main() {
   //*/
 
   Level test(5, 4, "Test",
-    "1a##_"
     "_a##_"
-    "^____"
-    "_____");
-  EmersonJetty.InteractiveSolver();
+    "_a##_"
+    "_____"
+    "__>__");
+  Vector<Direction> solution = Solver(&test).Solve(100);
+  test.InteractiveSolver();
 }

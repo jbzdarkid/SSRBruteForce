@@ -50,9 +50,10 @@ struct Sausage {
   bool operator==(const Sausage& other) const {
     return flags == other.flags && x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2;
   }
+  bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) // o(1) o(2)
+#define SAUSAGES o(0) o(1) o(2)
 
 struct State {
   Stephen stephen;
