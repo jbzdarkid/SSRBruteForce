@@ -511,9 +511,5 @@ u32 State::Hash() const {
   SAUSAGES
 #undef o
 
-#define o(x) + 1
-static_assert(SAUSAGES <= 4); // We cannot create a u32 out of 5 u8s.
-#undef o
-
   return hash;
 }
