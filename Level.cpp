@@ -492,13 +492,23 @@ void combine_hash(u32& a, u32 b) {
   a += (b << 6) + (b >> 2);
 }
 
+u32 triple32_hash(u64 x) {
+  u32 a = (u32)x;
+  combine_hash(a, (u32)(x >> 32));
+  return a;
+}
+
+void combine_hash(u32& a, u64 b) {
+  combine_hash(a, (u32)b);
+  combine_hash(a, (u32)(b >> 32));
+}
+
 u32 State::Hash() const {
-    u32 hash = triple32_hash(*(u32*)&stephen);
-#define o(x) combine_hash(hash, *(u32*)&s##x);
+  static_assert(sizeof(Stephen) == 8);
+  static_assert(sizeof(Sausage) == 8);
+  u32 hash = triple32_hash(*(u64*)&stephen);
+#define o(x) combine_hash(hash, *(u64*)&s##x);
   SAUSAGES
-#undef o
-#define o(x) | (s##x.flags << (4*x))
-    combine_hash(hash, 0 SAUSAGES);
 #undef o
 
 #define o(x) + 1

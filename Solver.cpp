@@ -41,7 +41,7 @@ Vector<Direction> Solver::Solve() {
   State* startOfLoop = _exploredH;
   while (true) {
     State* state = _exploredH;
-    if (state->next == startOfLoop) break;
+    if (state->next == startOfLoop) break; // TODO: Compare # of (shortest) victory paths with and without this early exit.
 
     u16 winDistance = 0xFFFF;
 

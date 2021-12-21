@@ -14,15 +14,11 @@ enum Direction : u8 {
 struct Stephen {
   s8 x;
   s8 y;
-  enum Flags {
-    // Speared = 0x10,
-  };
-  union {
-    Direction dir;
-    Flags flags;
-  };
+  s8 z;
+  Direction dir;
 
   s8 sausageSpeared = -1;
+  u8 _[3]; // Padding
 };
 
 struct Sausage {
@@ -31,6 +27,7 @@ struct Sausage {
   s8 y1;
   s8 x2;
   s8 y2;
+  s8 z;
 
   enum Flags : u8 {
     None = 0,
@@ -44,6 +41,7 @@ struct Sausage {
   };
 
   u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
+  u8 _[2]; // Padding
 
   inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
   inline bool IsVertical() const { return !IsHorizontal(); }
