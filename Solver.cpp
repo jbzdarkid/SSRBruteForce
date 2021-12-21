@@ -86,7 +86,10 @@ Vector<Direction> Solver::Solve() {
   printf("Found %d solution%s of length %d\n", _allSolutions.Size(), _allSolutions.Size() == 1 ? "" : "s",  state->winDistance);
 
   // TODO: I should just compute these while we DFS. This is a waste of RAM (and some CPU).
-  // TODO: Are there other things we care about? Yes, let's optimize backward motion > rotations.
+  // TODO: Are there other things we care about? Yes, let's optimize backward motion and not rotations.
+  // TODO: Time single-sausage push vs double-sausage push.
+  // TODO: Time pushing sausages while speared vs while not speared.
+  // TODO: Time rotation vs movement (again) vs movement while speared
   u8 bestBurned = 0xFF;
   u8 bestPushes = 0xFF;
   u8 bestRotations = 0xFF;
