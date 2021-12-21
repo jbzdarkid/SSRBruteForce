@@ -211,16 +211,16 @@ int main() {
     levels.Push(&SadFarm);
     levels.Push(&FallowEarth);
   } else if (sausages == 2) {
-    //levels.Push(&Southjaunt);
-    //levels.Push(&InfantsBreak);
-    //levels.Push(&ComelyHearth);
-    //levels.Push(&LittleFire);
-    //levels.Push(&Eastreach);
-    //levels.Push(&BurningWharf);
-    //levels.Push(&FieryJut);
-    //levels.Push(&MerchantsElegy);
-    //levels.Push(&Seafinger);
-    //levels.Push(&InletShore);
+    levels.Push(&Southjaunt);
+    levels.Push(&InfantsBreak);
+    levels.Push(&ComelyHearth);
+    levels.Push(&LittleFire);
+    levels.Push(&Eastreach);
+    levels.Push(&BurningWharf);
+    levels.Push(&FieryJut);
+    levels.Push(&MerchantsElegy);
+    levels.Push(&Seafinger);
+    levels.Push(&InletShore);
     levels.Push(&Cove);
     levels.Push(&ThePaddock);
     levels.Push(&BeautifulHorizon);
@@ -233,7 +233,7 @@ int main() {
     levels.Push(&TheAnchorage);
   }
 
-  bool stepThrough = false;
+  bool stepThrough = true;
   //*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
@@ -258,5 +258,5 @@ int main() {
     "_____"
     "__>__");
   Vector<Direction> solution = Solver(&test).Solve();
-  test.InteractiveSolver();
+  LachrymoseHead.InteractiveSolver();
 }

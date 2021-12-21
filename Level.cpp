@@ -39,7 +39,7 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
 
       // We need to do this here because, even if we don't *solve* levels
       // with less than the expected count, we still construct them.
-      while (_sausages.Size() < num + 1) _sausages.Push({-127, -127, -127, -127, 0});
+      while (_sausages.Size() < num + 1) _sausages.Push({-127, -127, -127, -127, Sausage::Flags::None});
       if (_sausages[num].x1 == x-1 && _sausages[num].y1 == y) {
         _sausages[num].x2 = x;
         _sausages[num].y2 = y;
@@ -179,13 +179,18 @@ const char* dirs = " UD L   R";
 // No longer promising 'no side effects', now just returns "was move valid"
 bool Level::Move(Direction dir) {
   if (_stephen.sausageSpeared == -1) {
+    // TODO: Try inverting this if, see if anything gets cleaner.
     if (_stephen.dir == Up) {
       if (dir == Left) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Left)) return false;
-        if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) _stephen.dir = Left;
+        if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y, Down)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Down)) return false;
+        _stephen.dir = Left;
       } else if (dir == Right) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Right)) return false;
-        if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) _stephen.dir = Right;
+        if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y, Down)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Down)) return false;
+        _stephen.dir = Right;
       } else if (dir == Up) {
         if (!CanWalkOnto(_stephen.x, _stephen.y - 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x, _stephen.y - 2, Up, true)) return false;
@@ -198,10 +203,14 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Down) {
       if (dir == Left) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Left)) return false;
-        if (MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) _stephen.dir = Left;
+        if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y, Up)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, Up)) return false;
+        _stephen.dir = Left;
       } else if (dir == Right) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Right)) return false;
-        if (MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) _stephen.dir = Right;
+        if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y, Up)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, Up)) return false;
+        _stephen.dir = Right;
       } else if (dir == Down) {
         if (!CanWalkOnto(_stephen.x, _stephen.y + 1)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x, _stephen.y + 2, Down, true)) return false;
@@ -214,10 +223,14 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Left) {
       if (dir == Up) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y - 1, Up)) return false;
-        if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) _stephen.dir = Up;
+        if (!CanPhysicallyMove(_stephen.x, _stephen.y - 1, Right)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Right)) return false;
+        _stephen.dir = Up;
       } else if (dir == Down) {
         if (!MoveThroughSpace(_stephen.x - 1, _stephen.y + 1, Down)) return false;
-        if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) _stephen.dir = Down;
+        if (!CanPhysicallyMove(_stephen.x, _stephen.y + 1, Right)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Right)) return false;
+        _stephen.dir = Down;
       } else if (dir == Left) {
         if (!CanWalkOnto(_stephen.x - 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x - 2, _stephen.y, Left, true))  return false;
@@ -230,10 +243,14 @@ bool Level::Move(Direction dir) {
     } else if (_stephen.dir == Right) {
       if (dir == Up) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y - 1, Up)) return false;
-        if (MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) _stephen.dir = Up;
+        if (!CanPhysicallyMove(_stephen.x, _stephen.y - 1, Left)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, Left)) return false;
+        _stephen.dir = Up;
       } else if (dir == Down) {
         if (!MoveThroughSpace(_stephen.x + 1, _stephen.y + 1, Down)) return false;
-        if (MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) _stephen.dir = Down;
+        if (!CanPhysicallyMove(_stephen.x, _stephen.y + 1, Left)) return true; // Bonk
+        if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, Left)) return false;
+        _stephen.dir = Down;
       } else if (dir == Right) {
         if (!CanWalkOnto(_stephen.x + 1, _stephen.y)) { EXPLAIN3("he would walk off a cliff"); return false; }
         if (!MoveThroughSpace(_stephen.x + 2, _stephen.y, Right, true)) return false;

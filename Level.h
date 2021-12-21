@@ -33,6 +33,7 @@ struct Sausage {
   s8 y2;
 
   enum Flags : u8 {
+    None = 0,
     Cook1A = 1, // If (x1, y1) is cooked when not rolled over
     Cook1B = 2, // If (x1, y1) is cooked when rolled over
     Cook2A = 4, // If (x2, y2) is cooked when not rolled over
@@ -42,7 +43,7 @@ struct Sausage {
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B,
   };
 
-  u8 flags; // TODO: Type?
+  u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
 
   inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
   inline bool IsVertical() const { return !IsHorizontal(); }
@@ -53,7 +54,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2)
+#define SAUSAGES o(0) o(1) //o(2)
 
 struct State {
   Stephen stephen;
