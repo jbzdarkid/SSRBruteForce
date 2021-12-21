@@ -33,7 +33,7 @@ Vector<Direction> Solver::Solve() {
     if (!_exploredT) _exploredT = _exploredH;
   }
 
-  printf("Traversal done\n");
+  printf("Traversal done in %ld nodes\n", _visitedNodes.size());
 
   // We are done traversing and building the graph.
   // Now, determine the victory routes:
@@ -45,10 +45,21 @@ Vector<Direction> Solver::Solve() {
 
     u16 winDistance = 0xFFFF;
 
-    for (State* nextState : {state->u, state->d, state->l, state->r}) {
-      if (nextState == nullptr) continue;
-      u16 distance = nextState->winDistance;
-      if (distance < winDistance) winDistance = distance;
+    State* nextState = state->u;
+    if (nextState != nullptr && nextState->winDistance < winDistance) {
+      winDistance = nextState->winDistance;
+    }
+    nextState = state->d;
+    if (nextState != nullptr && nextState->winDistance < winDistance) {
+      winDistance = nextState->winDistance;
+    }
+    nextState = state->l;
+    if (nextState != nullptr && nextState->winDistance < winDistance) {
+      winDistance = nextState->winDistance;
+    }
+    nextState = state->r;
+    if (nextState != nullptr && nextState->winDistance < winDistance) {
+      winDistance = nextState->winDistance;
     }
 
     if (winDistance != 0xFFFF) {
@@ -74,8 +85,8 @@ Vector<Direction> Solver::Solve() {
 
   printf("Found %d solution%s of length %d\n", _allSolutions.Size(), _allSolutions.Size() == 1 ? "" : "s",  state->winDistance);
 
-  // TODO: I should just compute these while we DFS. This is a waste.
-  // TODO: Are there other things we care about?
+  // TODO: I should just compute these while we DFS. This is a waste of RAM (and some CPU).
+  // TODO: Are there other things we care about? Yes, let's optimize backward motion > rotations.
   u8 bestBurned = 0xFF;
   u8 bestPushes = 0xFF;
   u8 bestRotations = 0xFF;

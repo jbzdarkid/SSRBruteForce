@@ -233,16 +233,26 @@ int main() {
     levels.Push(&TheAnchorage);
   }
 
-  bool stepThrough = true;
+  bool stepThrough = false;
   //*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
     Vector<Direction> solution = Solver(level).Solve();
     printf("Best solver solution: %d\n", solution.Size());
-    const char* dirs = " UD L   R";
+    const char* dirs[] = {
+      "",
+      "North",
+      "South",
+      "",
+      "West",
+      "",
+      "",
+      "",
+      "East",
+    };
     for (Direction dir : solution) {
       if (stepThrough) level->Print();
-      putchar(dirs[dir]);
+      puts(dirs[dir]);
       if (stepThrough) getchar();
       if (stepThrough) level->Move(dir);
     }
@@ -257,6 +267,6 @@ int main() {
     "_a##_"
     "_____"
     "__>__");
-  Vector<Direction> solution = Solver(&test).Solve();
+  Vector<Direction> solution = Solver(&LachrymoseHead).Solve();
   LachrymoseHead.InteractiveSolver();
 }

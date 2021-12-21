@@ -429,10 +429,14 @@ bool Level::MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear) {
 }
 
 s8 Level::GetSausage(s8 x, s8 y) const {
-  for (u8 i=0; i<_sausages.Size(); i++) {
-    Sausage sausage = _sausages[i];
-    if ((x == sausage.x1 && y == sausage.y1) || (x == sausage.x2 && y == sausage.y2)) return i;
-  }
+  Sausage sausage;
+#define o(num) \
+  sausage = _sausages[num]; \
+  if (x == sausage.x1 && y == sausage.y1) return num; \
+  if (x == sausage.x2 && y == sausage.y2) return num;
+  SAUSAGES
+#undef o
+
   return -1;
 }
 
