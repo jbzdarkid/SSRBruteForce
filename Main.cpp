@@ -237,7 +237,7 @@ int main() {
   //*
   for (Level* level : levels) {
     printf("Solving %s\n", level->name);
-    Vector<Direction> solution = Solver(level).Solve(100);
+    Vector<Direction> solution = Solver(level).Solve();
     printf("Best solver solution: %d\n", solution.Size());
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {
@@ -257,6 +257,6 @@ int main() {
     "_a##_"
     "_____"
     "__>__");
-  Vector<Direction> solution = Solver(&test).Solve(100);
+  Vector<Direction> solution = Solver(&test).Solve();
   test.InteractiveSolver();
 }

@@ -7,26 +7,24 @@ Solver::Solver(Level* level) {
   _level = level;
 }
 
-Vector<Direction> Solver::Solve(u16 maxDepth) {
-  State* initialState = GetOrInsertState(0);
+Vector<Direction> Solver::Solve() {
+  State* initialState = GetOrInsertState();
   _maxDepth = 0xFFFF; // maxDepth;
   _unexploredH = initialState;
   _unexploredT = _unexploredH;
 
+  bool foundWinningState = false;
   while (_unexploredH != nullptr) {
     State* state = _unexploredH;
-    if (state->depth > _maxDepth + 10) { // I hope this is right. I've been wrong here before. Being cautious.
-      break; // Because we are doing BFS, we are done once we reach the first node that's too deep.
-    }
 
     _level->SetState(state);
-    if (_level->Move(Up))    state->u = GetOrInsertState(state->depth);
+    if (_level->Move(Up))    state->u = GetOrInsertState();
     _level->SetState(state);
-    if (_level->Move(Down))  state->d = GetOrInsertState(state->depth);
+    if (_level->Move(Down))  state->d = GetOrInsertState();
     _level->SetState(state);
-    if (_level->Move(Left))  state->l = GetOrInsertState(state->depth);
+    if (_level->Move(Left))  state->l = GetOrInsertState();
     _level->SetState(state);
-    if (_level->Move(Right)) state->r = GetOrInsertState(state->depth);
+    if (_level->Move(Right)) state->r = GetOrInsertState();
 
     _unexploredH = state->next;
 
@@ -77,7 +75,7 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
   printf("Found %d solution%s of length %d\n", _allSolutions.Size(), _allSolutions.Size() == 1 ? "" : "s",  state->winDistance);
 
   // TODO: I should just compute these while we DFS. This is a waste.
-  // TODO: Evaluate additional costs for winning paths (# burned steps, # sausage pushes, # rotations?)
+  // TODO: Are there other things we care about?
   u8 bestBurned = 0xFF;
   u8 bestPushes = 0xFF;
   u8 bestRotations = 0xFF;
@@ -122,31 +120,24 @@ Vector<Direction> Solver::Solve(u16 maxDepth) {
   return bestSolution;
 }
 
-State* Solver::GetOrInsertState(u16 depth) {
-  State state = _level->GetState();
-  auto search = _visitedNodes.find(state);
-  if (search != _visitedNodes.end()) return const_cast<State*>(&*search);
-
-  //if (_visitedNodes.size() % 1'000'000 == 0) {
-  //  printf("%lld million nodes\n", _visitedNodes.size() / 1'000'000);
-  //  _level->Print();
-  //}
-
-  if (_level->Won()) { // No need to do further exploration if it's a winning state
-    state.winDistance = 0;
-    if (depth < _maxDepth) {
-      _maxDepth = depth;
-      printf("Improved maxDepth to %d\n", depth);
+State* Solver::GetOrInsertState() {
+  auto it = _visitedNodes.insert(_level->GetState());
+  State* state = const_cast<State*>(&*it.first);
+  if (it.second) { // State was not yet analyzed
+    if (_level->Won()) {
+       state->winDistance = 0;
+       _foundWinningState = true;
     }
-    return const_cast<State*>(&*_visitedNodes.insert(state).first);
-  } else {
-    state.depth = depth + 1; // TODO: I bet there's a simpler approach here -- like we could put a signal state into the list, instead of repeatedly computing depth.
-    // Then, also take the unexploredT logic out -- just do that in the main block. And keep a boolean for 'this is the last loop, guys'
-    State* newState = const_cast<State*>(&*_visitedNodes.insert(state).first);
-    if (_unexploredT != nullptr) _unexploredT->next = newState;
-    _unexploredT = newState;
-    return newState;
+
+    // Once we find a winning state, we have reached the minimum depth for a solution.
+    // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
+    // that means we should drain the unexplored queue but not add new nodes.
+    if (!_foundWinningState) {
+      if (_unexploredT != nullptr) _unexploredT->next = state;
+      _unexploredT = state;
+    }
   }
+  return state;
 }
 
 void Solver::DFSWinStates(State* state) {

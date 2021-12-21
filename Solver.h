@@ -6,16 +6,17 @@
 struct Solver {
   Solver(Level* level);
 
-  Vector<Direction> Solve(u16 maxDepth);
+  Vector<Direction> Solve();
 
 private:
-  State* GetOrInsertState(u16 depth);
+  State* GetOrInsertState();
   void DFSWinStates(State* state);
 
   Level* _level = nullptr;
   std::unordered_set<State> _visitedNodes;
   u16 _maxDepth = 0;
 
+  bool _foundWinningState = false;
   State* _unexploredH = nullptr;
   State* _unexploredT = nullptr;
   State* _exploredH = nullptr;

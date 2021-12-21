@@ -68,7 +68,6 @@ struct State {
   State* l = nullptr;
   State* r = nullptr;
   u16 winDistance = 0xFFFF;
-  u16 depth = 0;
 
   bool operator==(const State& other) const;
   u32 Hash() const;
