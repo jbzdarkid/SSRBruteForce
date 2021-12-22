@@ -165,6 +165,17 @@ void Level::SetState(const State* s) {
 #undef o
 }
 
+bool Level::WouldStepOnGrill(s8 x, s8 y, Direction dir) {
+  if (dir == Up)         return IsGrill(x, y-1);
+  else if (dir == Down)  return IsGrill(x, y+1);
+  else if (dir == Left)  return IsGrill(x-1, y);
+  else if (dir == Right) return IsGrill(x+1, y);
+  else {
+    assert(false);
+    return false;
+  }
+}
+
 #if _DEBUG
 const char* dirs = " UD L   R";
 #define EXPLAIN(reason)  if (_explain) printf("Stephen cannot move %c because sausage %c at (%d, %d) %s\n", dirs[dir], 'a' + sausageNo, x, y, reason)

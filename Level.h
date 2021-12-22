@@ -94,6 +94,7 @@ struct Level {
 
   State GetState() const;
   void SetState(const State* state);
+  bool WouldStepOnGrill(s8 x, s8 y, Direction dir); // Used by Solver to compute movement durations.
 
   // Returns true if the move succeeded
   // Returns false if the move was illegal for any reason

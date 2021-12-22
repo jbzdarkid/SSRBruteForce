@@ -78,60 +78,16 @@ Vector<Direction> Solver::Solve() {
   if (state->winDistance == 0xFFFF) return Vector<Direction>(); // Unsolvable
 
   printf("Found the shortest path %d\n", state->winDistance);
+  printf("Done computing victory states\n");
 
-  _allSolutions.Resize(0);
-  _solution = Vector<Direction>(state->winDistance);
-  DFSWinStates(state);
+  if (initialState->winDistance == 0xFFFF) return Vector<Direction>(); // Puzzle is unsolvable
 
-  printf("Found %d solution%s of length %d\n", _allSolutions.Size(), _allSolutions.Size() == 1 ? "" : "s",  state->winDistance);
+  DFSWinStates(initialState, 0);
+  u64 expectedMillis = _bestSolution.Size() * 160;
+  printf("Delta duration: %lld\n", _bestMillis - expectedMillis);
+  printf("Solution duration: %lld.%02lld seconds", _bestMillis / 1000, _bestMillis % 1000);
 
-  // TODO: I should just compute these while we DFS. This is a waste of RAM (and some CPU).
-  // TODO: Are there other things we care about? Yes, let's optimize backward motion and not rotations.
-  // TODO: Time single-sausage push vs double-sausage push.
-  // TODO: Time pushing sausages while speared vs while not speared.
-  // TODO: Time rotation vs movement (again) vs movement while speared
-  u8 bestBurned = 0xFF;
-  u8 bestPushes = 0xFF;
-  u8 bestRotations = 0xFF;
-  Vector<Direction> bestSolution;
-  for (const Vector<Direction>& solution : _allSolutions) {
-    u8 burned = 0;
-    u8 pushes = 0;
-    u8 rotations = 0;
-    Direction lastDir = None;
-    State* state = initialState;
-    for (Direction dir : solution) {
-      if (dir != lastDir) {
-        rotations++;
-        lastDir = dir;
-      }
-
-      // TODO: Time pushing two sausages, one at a time, vs pushing two at once. And update this cost to match.
-      State* nextState;
-      if (dir == Up) nextState = state->u;
-      else if (dir == Down) nextState = state->d;
-      else if (dir == Left) nextState = state->l;
-      else if (dir == Right) nextState = state->r;
-      assert(nextState);
-#define o(x) if (state->s##x != nextState->s##x) pushes++;
-      SAUSAGES;
-#undef o
-      state = nextState;
-      
-      // TODO: Burned steps.
-    }
-
-    if ((burned < bestBurned)
-     || (burned == bestBurned && pushes < bestPushes)
-     || (burned == bestBurned && pushes == bestPushes && rotations < bestRotations)) {
-      bestBurned = burned;
-      bestPushes = pushes;
-      bestRotations = rotations;
-      bestSolution = solution.Copy();
-    }
-  }
-
-  return bestSolution;
+  return _bestSolution.Copy();
 }
 
 State* Solver::GetOrInsertState() {
@@ -154,30 +110,43 @@ State* Solver::GetOrInsertState() {
   return state;
 }
 
-void Solver::DFSWinStates(State* state) {
-  if (state->winDistance == 0) {
-    _allSolutions.Emplace(_solution.Copy());
+void Solver::DFSWinStates(State* state, u64 totalMillis) {
+  if (state->winDistance == 0 && totalMillis < _bestMillis) {
+    _bestSolution = _solution.Copy();
+    _bestMillis = totalMillis;
     return;
   }
 
-  if (state->u && state->u->winDistance == state->winDistance - 1) {
-    _solution.UnsafePush(Up);
-    DFSWinStates(state->u);
-    _solution.Pop();
+  ComputePenaltyAndRecurse(state, state->u, Up, totalMillis);
+  ComputePenaltyAndRecurse(state, state->d, Down, totalMillis);
+  ComputePenaltyAndRecurse(state, state->l, Left, totalMillis);
+  ComputePenaltyAndRecurse(state, state->r, Right, totalMillis);
+}
+
+void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis) {
+  if (!nextState) return; // Move would be illegal
+  if (nextState->winDistance >= state->winDistance) return; // Move leads away from victory *or* is not winning.
+
+  // Compute the duration of this motion
+  if (state->stephen.sausageSpeared == -1) {
+    totalMillis += 160;
+
+#define o(x) if (state->s##x != nextState->s##x) totalMillis += 38;
+    SAUSAGES;
+#undef o
+  } else { // No sausage speared
+    totalMillis += 158;
+
+#define o(x) if (state->s##x != nextState->s##x) totalMillis += 4;
+    SAUSAGES;
+#undef o
   }
-  if (state->d && state->d->winDistance == state->winDistance - 1) {
-    _solution.UnsafePush(Down);
-    DFSWinStates(state->d);
-    _solution.Pop();
-  }
-  if (state->l && state->l->winDistance == state->winDistance - 1) {
-    _solution.UnsafePush(Left);
-    DFSWinStates(state->l);
-    _solution.Pop();
-  }
-  if (state->r && state->r->winDistance == state->winDistance - 1) {
-    _solution.UnsafePush(Right);
-    DFSWinStates(state->r);
-    _solution.Pop();
-  }
+
+  if (_level->WouldStepOnGrill(state->stephen.x, state->stephen.y, dir)) totalMillis += 152; // TODO: Does this change while speared?
+
+  if (totalMillis > _bestMillis) return; // This solution is not faster than the known best path.
+
+  _solution.Push(dir);
+  DFSWinStates(nextState, totalMillis);
+  _solution.Pop();
 }
