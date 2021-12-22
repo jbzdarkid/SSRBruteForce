@@ -146,6 +146,12 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   }
 
   if (_level->WouldStepOnGrill(state->stephen.x, state->stephen.y, dir)) totalMillis += 152; // TODO: Does this change while speared?
+  // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
+  // TODO: Time motion w/ sausage hat
+  // TODO: Time motion w/ fork carry
+  // TODO: Time motion as forkless -> rotations *and* lateral motion
+  // TODO: Time motion when pushing a block
+  // TODO: Ladder climbs while speared / non-speared?
 
   if (totalMillis > _bestMillis) return; // This solution is not faster than the known best path.
 
