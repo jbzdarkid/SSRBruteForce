@@ -1,58 +1,60 @@
 #include "Level.h"
 #include "Solver.h"
 #include <cstdio>
+#include <string>
+#include <fstream>
 
-Level LachrymoseHead(5, 4, "Lachrymose Head",
+Level LachrymoseHead(5, 4, "1-1 Lachrymose Head",
   "_###_"
   "aab__"
   "__bcc"
   "^###_");
 
-Level Southjaunt(4, 5, "Southjaunt",
+Level Southjaunt(4, 5, "1-2 Southjaunt",
   " >_ "
   "____"
   "a##b"
   "a##b"
   "____");
 
-Level InfantsBreak(7, 4, "Infant's Break",
+Level InfantsBreak(7, 4, "1-3 Infant's Break",
   "  ___  "
   "  aab  "
   "##_<b# "
   "##   ##");
 
-Level ComelyHearth(5, 5, "Comely Hearth",
+Level ComelyHearth(5, 5, "1-4 Comely Hearth",
   "  ___"
   "__<_ "
   "aa#bB"
   "_##_ "
   "___  ");
 
-Level LittleFire(4, 4, "Little Fire",
+Level LittleFire(4, 4, "1-5 Little Fire",
   "____"
   "aa#b"
   "_#_b"
   "_>__");
 
-Level Eastreach(5, 5, "Eastreach",
+Level Eastreach(5, 5, "1-6 Eastreach",
   "a__# "
   "abb##"
   "_<_  "
   "_##  "
   " ##  ");
 
-Level BaysNeck(4, 4, "Bay's Neck",
+Level BaysNeck(4, 4, "1-7 Bay's Neck",
   "__#_"
   " _ _"
   "a#_<"
   "a__ ");
 
-Level BurningWharf(6, 3, "Burning Wharf",
+Level BurningWharf(6, 3, "1-8 Burning Wharf",
   ">_aa__"
   "_b## _"
   " B## _");
 
-Level HappyPool(6, 6, "Happy Pool",
+Level HappyPool(6, 6, "1-9 Happy Pool",
   " _aa__"
   "__   _"
   "_  # _"
@@ -60,32 +62,32 @@ Level HappyPool(6, 6, "Happy Pool",
   "v   __"
   "_____ ");
 
-Level MaidensWalk(4, 4, "Maiden's Walk",
+Level MaidensWalk(4, 4, "1-10 Maiden's Walk",
   "#a_#"
   "#a__"
   " _^_"
   "__  ");
 
-Level FieryJut(6, 4, "Fiery Jut",
+Level FieryJut(6, 4, "1-11 Fiery Jut",
   "###  _"
   "###ab_"
   "###abv"
   "###  _");
 
-Level MerchantsElegy(5, 4, "Merchant's Elegy",
+Level MerchantsElegy(5, 4, "1-12 Merchant's Elegy",
   "_____"
   "_#ab#"
   "^#ab#"
   "_____");
 
-Level Seafinger(5, 5, "Seafinger",
+Level Seafinger(5, 5, "1-13 Seafinger",
   "_##A "
   "_##a_"
   "_##  "
   "   b^"
   "   b_");
 
-Level TheClover(7, 7, "The Clover",
+Level TheClover(7, 7, "1-14 The Clover",
   " aa____"
   " ##   _"
   " ## ##b"
@@ -94,13 +96,13 @@ Level TheClover(7, 7, "The Clover",
   " ##_   "
   " cc_   ");
 
-Level InletShore(4, 4, "Inlet Shore",
+Level InletShore(4, 4, "1-15 Inlet Shore",
   "__a_"
   "^_a#"
   "#b__"
   "_b__");
 
-Level TheAnchorage(10, 6, "The Anchorage",
+Level TheAnchorage(10, 6, "1-16 The Anchorage",
   "   _______"
   "   _ _   _"
   " ####ABC _"
@@ -108,7 +110,7 @@ Level TheAnchorage(10, 6, "The Anchorage",
   "          "
   "__##      ");
 
-Level EmersonJetty(19, 17, "Emerson Jetty",
+Level EmersonJetty(19, 17, "2-1 Emerson Jetty",
   "         ___  _    "
   "____1__________1 1 "
   "_______1__     __  "
@@ -127,7 +129,7 @@ Level EmersonJetty(19, 17, "Emerson Jetty",
   "          ##_1_    "
   "          ##___    ");
 
-Level SadFarm(11, 9, "Sad Farm",
+Level SadFarm(11, 9, "2-2 Sad Farm",
   "   11111   "
   "___1___1   "
   "___1___1   "
@@ -138,7 +140,7 @@ Level SadFarm(11, 9, "Sad Farm",
   "___1_____##"
   "^__1111    ");
 
-Level Cove(8, 6, "Cove",
+Level Cove(8, 6, "2-3 Cove",
   "__1__#v_"
   "_____#__"
   "________"
@@ -146,7 +148,7 @@ Level Cove(8, 6, "Cove",
   "    _ab_"
   "    ____");
 
-Level ThePaddock(10, 6, "The Paddock",
+Level ThePaddock(10, 6, "2-5 The Paddock",
   " 11____111"
   "1_#_aa_# 1"
   "1_#_bb_# 1"
@@ -154,14 +156,14 @@ Level ThePaddock(10, 6, "The Paddock",
   " ________ "
   " ________ ");
 
-Level BeautifulHorizon(8, 5, "Beautiful Horizon",
+Level BeautifulHorizon(8, 5, "2-6 Beautiful Horizon",
   "   ____#"
   "  1__1_#"
   " ab____#"
   "1ab__>_#"
   "  1     ");
 
-Level BarrowSet(18, 6, "Barrow Set",
+Level BarrowSet(18, 6, "2-7 Barrow Set",
   "   ___            "
   "   ___1___________"
   "_________111_aa___"
@@ -169,20 +171,20 @@ Level BarrowSet(18, 6, "Barrow Set",
   "_##_____ __ ______"
   "________1111______");
 
-Level RoughField(9, 5, "Rough Field",
+Level RoughField(9, 5, "2-8 Rough Field",
   "________ "
   "__>_____ "
   "____1_111"
   "_ab____#1"
   "_ab____#1");
 
-Level FallowEarth(7, 4, "Fallow Earth",
+Level FallowEarth(7, 4, "2-9 Fallow Earth",
   "_a#11__"
   "_A#_1__"
   "___>___"
   "  ___  ");
 
-Level TwistyFarm(10, 14, "Twisty Farm",
+Level TwistyFarm(10, 14, "2-10 Twisty Farm",
   "       11 "
   "      1_##"
   "     1__##"
@@ -233,12 +235,13 @@ int main() {
     levels.Push(&TheAnchorage);
   }
 
-  bool stepThrough = false;
   //*
   for (Level* level : levels) {
-    printf("Solving %s\n", level->name);
+    std::string levelName(level->name);
+    levelName = levelName.substr(0, levelName.find_first_of(' '));
+    std::ofstream file(levelName + ".dem");
+
     Vector<Direction> solution = Solver(level).Solve();
-    printf("Best solver solution: %d\n", solution.Size());
     const char* dirs[] = {
       "",
       "North",
@@ -250,14 +253,8 @@ int main() {
       "",
       "East",
     };
-    for (Direction dir : solution) {
-      if (stepThrough) level->Print();
-      puts(dirs[dir]);
-      if (stepThrough) getchar();
-      if (stepThrough) level->Move(dir);
-    }
-    if (stepThrough) level->Print();
-    putchar('\n');
+    for (Direction dir : solution) file << dirs[dir] << '\n';
+    file.close();
   }
   return 0;
   //*/

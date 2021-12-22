@@ -10,8 +10,8 @@ struct Solver {
 
 private:
   State* GetOrInsertState();
-  void DFSWinStates(State* state, u64 totalMillis);
-  void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis);
+  void DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements);
+  void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements);
 
   Level* _level = nullptr;
   std::unordered_set<State> _visitedNodes;
@@ -26,4 +26,5 @@ private:
   Vector<Direction> _solution;
   Vector<Direction> _bestSolution;
   u64 _bestMillis = (u64)-1;
+  u16 _bestBackwardsMovements = 0;
 };
