@@ -10,13 +10,26 @@ Solver::Solver(Level* level) {
 Vector<Direction> Solver::Solve() {
   printf("Solving %s\n", _level->name);
   State* initialState = GetOrInsertState();
-  _maxDepth = 0xFFFF; // maxDepth;
+  _maxDepth = 0xFFFF;
   _unexploredH = initialState;
   _unexploredT = _unexploredH;
+
+  State* dummy = new State();
+  _unexploredT->next = dummy;
+  _unexploredT = dummy;
+  u32 depth = 0;
 
   bool foundWinningState = false;
   while (_unexploredH != nullptr) {
     State* state = _unexploredH;
+
+    if (state == dummy && !_foundWinningState) {
+      printf("Reached depth %d\n", depth++);
+      _unexploredT->next = state;
+      _unexploredT = state;
+      _unexploredH = state->next;
+      continue;
+    }
 
     _level->SetState(state);
     if (_level->Move(Up))    state->u = GetOrInsertState();
@@ -34,7 +47,7 @@ Vector<Direction> Solver::Solve() {
     if (!_exploredT) _exploredT = _exploredH;
   }
 
-  printf("Traversal done in %ld nodes\n", _visitedNodes.size());
+  printf("Traversal done in %zd nodes\n", _visitedNodes.size());
 
   // We are done traversing and building the graph.
   // Now, determine the victory routes:
@@ -90,23 +103,28 @@ Vector<Direction> Solver::Solve() {
 }
 
 State* Solver::GetOrInsertState() {
-  auto it = _visitedNodes.insert(_level->GetState());
-  State* state = const_cast<State*>(&*it.first);
-  if (it.second) { // State was not yet analyzed
-    if (_level->Won()) {
-       state->winDistance = 0;
-       _foundWinningState = true;
-    }
+  try {
+    auto it = _visitedNodes.insert(_level->GetState());
+    State* state = const_cast<State*>(&*it.first);
+    if (it.second) { // State was not yet analyzed
+      if (_level->Won()) {
+         state->winDistance = 0;
+         _foundWinningState = true;
+      }
 
-    // Once we find a winning state, we have reached the minimum depth for a solution.
-    // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
-    // that means we should drain the unexplored queue but not add new nodes.
-    if (!_foundWinningState) {
-      if (_unexploredT != nullptr) _unexploredT->next = state;
-      _unexploredT = state;
+      // Once we find a winning state, we have reached the minimum depth for a solution.
+      // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
+      // that means we should drain the unexplored queue but not add new nodes.
+      if (!_foundWinningState) {
+        if (_unexploredT != nullptr) _unexploredT->next = state;
+        _unexploredT = state;
+      }
     }
+    return state;
+  } catch (std::bad_alloc&) {
+    putchar('k');
+    return nullptr;
   }
-  return state;
 }
 
 void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements) {

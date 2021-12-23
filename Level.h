@@ -8,17 +8,20 @@ enum Direction : u8 {
   Down = 2,
   Left = 4,
   Right = 8,
+  Jump = 16,
+  Crouch = 32,
   Any = Up | Down | Left | Right,
 };
 
 struct Stephen {
-  s8 x;
-  s8 y;
+  s8 x = -1;
+  s8 y = -1;
   s8 z = 0;
   Direction dir;
 
   s8 sausageSpeared = -1;
-  u8 _[3] = {0}; // Padding
+  s8 sausageStand = -1;
+  u8 _[2] = {0}; // Padding
 };
 
 struct Sausage {
@@ -47,12 +50,12 @@ struct Sausage {
   inline bool IsVertical() const { return !IsHorizontal(); }
   inline bool IsRolled() const { return (flags & Rolled) != 0; }
   bool operator==(const Sausage& other) const {
-    return flags == other.flags && x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2;
+    return /*flags == other.flags && */ x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2 && z == other.z;
   }
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) // o(1) // o(2)
+#define SAUSAGES o(0) o(1) o(2)
 
 struct State {
   Stephen stephen;
@@ -82,11 +85,20 @@ struct Level {
   enum Tile : u8 {
     Empty = 0,
     Ground = 1,
-    Grill = 2,
-    Wall = 3,
+    Wall1  = Ground << 1,
+    Wall2  = Ground << 2,
+    Wall3  = Ground << 3,
+    Elevation = Empty | Ground | Wall1 | Wall2 | Wall3,
+    Grill = 16,
+    // TODO:
+    // LadderUp = 32,
+    // LadderDown = 64,
+    // LadderLeft = 128,
+    // LadderRight = 256,
   };
 
   Level(u8 width, u8 height, const char* name, const char* asciiGrid);
+  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen);
   ~Level();
   void Print() const;
   bool InteractiveSolver();
@@ -106,18 +118,24 @@ struct Level {
 private:
   Vector<s8> _movedSausages;
   bool CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausages = nullptr);
+  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages = nullptr);
   // Returns true if the move was possible (the object was moved as a result)
   // Returns false if the move was impossible / blocked (may have side effects)
   bool MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear=false);
+  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false);
 
-  s8 GetSausage(s8 x, s8 y) const;
+  s8 GetSausage(s8 x, s8 y, s8 z) const;
   bool IsWithinGrid(s8 x, s8 y) const;
-  bool IsWall(s8 x, s8 y) const;
+  bool IsWithinGrid(s8 x, s8 y, s8 z) const;
+  bool IsWall(s8 x, s8 y, s8 z) const;
   bool CanTurnThrough(s8 x, s8 y) const;
   bool CanWalkOnto(s8 x, s8 y) const;
+  bool CanWalkOnto(s8 x, s8 y, s8 z) const;
   bool IsGrill(s8 x, s8 y) const;
+  bool IsGrill(s8 x, s8 y, s8 z) const;
+  bool IsLadder(s8 x, s8 y, s8 z, Direction dir) const;
 
-  Tile** _grid;
+  u8** _grid;
   s8 _width = 0;
   s8 _height = 0;
   Stephen _start = {};

@@ -200,6 +200,28 @@ Level TwistyFarm(10, 14, "2-10 Twisty Farm",
   "  _bb_  _ "
   "     ____ ");
 
+Level ColdLadder(13, 8, "3-10 Cold Ladder",
+  "__1111111    "
+  "__1111111    "
+  "__1111111    "
+  "____aa___    "
+  "____bc___##__"
+  "____bc___##__"
+  "__________   "
+  "__________   ",
+  Stephen{4, 2, 1, Right});
+
+Level ColdLadder2(13, 8, "3-10 Cold Ladder part 2",
+  "__1111111    "
+  "__1111111    "
+  "aa1111111    "
+  "__b______    "
+  "__b___c__##__"
+  "______c__##__"
+  "__________   "
+  "__________   ",
+  Stephen{2, 2, 1, Right});
+
 int main() {
 #define o(x) + 1
   u32 sausages = SAUSAGES;
@@ -213,29 +235,30 @@ int main() {
     levels.Push(&SadFarm);
     levels.Push(&FallowEarth);
   } else if (sausages == 2) {
-    levels.Push(&Southjaunt);
-    levels.Push(&InfantsBreak);
-    levels.Push(&ComelyHearth);
-    levels.Push(&LittleFire);
-    levels.Push(&Eastreach);
-    levels.Push(&BurningWharf);
-    levels.Push(&FieryJut);
-    levels.Push(&MerchantsElegy);
-    levels.Push(&Seafinger);
-    levels.Push(&InletShore);
-    levels.Push(&Cove);
-    levels.Push(&ThePaddock);
-    levels.Push(&BeautifulHorizon);
-    levels.Push(&BarrowSet);
-    levels.Push(&RoughField);
-    levels.Push(&TwistyFarm);
+    // levels.Push(&Southjaunt);
+    // levels.Push(&InfantsBreak);
+    // levels.Push(&ComelyHearth);
+    // levels.Push(&LittleFire);
+    // levels.Push(&Eastreach);
+    // levels.Push(&BurningWharf);
+    // levels.Push(&FieryJut);
+    // levels.Push(&MerchantsElegy);
+    // levels.Push(&Seafinger);
+    // levels.Push(&InletShore);
+    // levels.Push(&Cove);
+    // levels.Push(&ThePaddock);
+    // levels.Push(&BeautifulHorizon);
+    // levels.Push(&BarrowSet);
+    // levels.Push(&RoughField);
+    // levels.Push(&TwistyFarm);
   } else if (sausages == 3) {
-    levels.Push(&LachrymoseHead);
-    levels.Push(&TheClover);
-    levels.Push(&TheAnchorage);
+    // levels.Push(&LachrymoseHead);
+    // levels.Push(&TheClover);
+    // levels.Push(&TheAnchorage);
+    levels.Push(&ColdLadder2);
   }
 
-  //*
+  /*
   for (Level* level : levels) {
     std::string levelName(level->name);
     levelName = levelName.substr(0, levelName.find_first_of(' '));
@@ -259,11 +282,26 @@ int main() {
   return 0;
   //*/
 
+  //*
+  for (Level* level : levels) {
+    Vector<Direction> solution = Solver(level).Solve();
+    const char* dirs = " UD L   R";
+    for (Direction dir : solution) {
+      level->Print();
+      putchar(dirs[dir]);
+      getchar();
+      level->Move(dir);
+    }
+    level->Print();
+  }
+  return 0;
+  //*/
+
+
   Level test(5, 4, "Test",
     "_a##_"
     "_a##_"
     "_____"
     "__>__");
-  Vector<Direction> solution = Solver(&LachrymoseHead).Solve();
-  LachrymoseHead.InteractiveSolver();
+  test.InteractiveSolver();
 }
