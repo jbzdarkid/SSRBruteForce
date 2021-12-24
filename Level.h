@@ -50,15 +50,19 @@ struct Sausage {
   inline bool IsVertical() const { return !IsHorizontal(); }
   inline bool IsRolled() const { return (flags & Rolled) != 0; }
   bool operator==(const Sausage& other) const {
-    return /*flags == other.flags && */ x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2 && z == other.z;
+    return flags == other.flags && x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2 && z == other.z;
   }
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2)
+#define SAUSAGES o(0) o(1) // o(2)
 
 struct State {
   Stephen stephen;
+// TODO: Would be cleaner
+// #define o(x) +1
+//   Sausage sausages[SAUSAGES];
+// #undef o;
 #define o(x) Sausage s##x = {};
   SAUSAGES
 #undef o

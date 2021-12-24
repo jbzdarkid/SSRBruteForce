@@ -235,22 +235,22 @@ int main() {
     levels.Push(&SadFarm);
     levels.Push(&FallowEarth);
   } else if (sausages == 2) {
-    // levels.Push(&Southjaunt);
-    // levels.Push(&InfantsBreak);
-    // levels.Push(&ComelyHearth);
-    // levels.Push(&LittleFire);
-    // levels.Push(&Eastreach);
-    // levels.Push(&BurningWharf);
-    // levels.Push(&FieryJut);
-    // levels.Push(&MerchantsElegy);
-    // levels.Push(&Seafinger);
-    // levels.Push(&InletShore);
-    // levels.Push(&Cove);
-    // levels.Push(&ThePaddock);
-    // levels.Push(&BeautifulHorizon);
-    // levels.Push(&BarrowSet);
-    // levels.Push(&RoughField);
-    // levels.Push(&TwistyFarm);
+    //levels.Push(&Southjaunt);
+    //levels.Push(&InfantsBreak);
+    //levels.Push(&ComelyHearth);
+    //levels.Push(&LittleFire);
+    //levels.Push(&Eastreach);
+    //levels.Push(&BurningWharf);
+    //levels.Push(&FieryJut);
+    //levels.Push(&MerchantsElegy);
+    //levels.Push(&Seafinger);
+    //levels.Push(&InletShore);
+    levels.Push(&Cove);
+    levels.Push(&ThePaddock);
+    levels.Push(&BeautifulHorizon);
+    levels.Push(&BarrowSet);
+    levels.Push(&RoughField);
+    levels.Push(&TwistyFarm);
   } else if (sausages == 3) {
     // levels.Push(&LachrymoseHead);
     // levels.Push(&TheClover);
@@ -282,7 +282,7 @@ int main() {
   return 0;
   //*/
 
-  //*
+  /*
   for (Level* level : levels) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
@@ -297,11 +297,5 @@ int main() {
   return 0;
   //*/
 
-
-  Level test(5, 4, "Test",
-    "_a##_"
-    "_a##_"
-    "_____"
-    "__>__");
-  test.InteractiveSolver();
+  Cove.InteractiveSolver();
 }

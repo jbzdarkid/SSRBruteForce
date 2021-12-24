@@ -169,6 +169,10 @@ State Level::GetState() const {
 #define o(x) s.s##x = _sausages[x];
   SAUSAGES
 #undef o
+//  if (s.s0.x1 < s.s1.x1 || s.s0.y1 < s.s1.y1) {
+//    s.s0 = s.s1;
+//    s.s1 = _sausages[0];
+//  }
   return s;
 }
 
@@ -657,11 +661,7 @@ u32 State::Hash() const {
   static_assert(sizeof(Stephen) == 8);
   static_assert(sizeof(Sausage) == 8);
   u32 hash = triple32_hash(*(u64*)&stephen);
-  u64 tmp;
-#define o(x) \
-  tmp = *(u64*)&s##x; \
-  tmp &= 0x000000FFFFFFFFFF; \
-  combine_hash(hash, tmp);
+#define o(x) combine_hash(hash, *(u64*)&s##x);
   SAUSAGES
 #undef o
 

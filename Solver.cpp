@@ -9,25 +9,47 @@ Solver::Solver(Level* level) {
 
 Vector<Direction> Solver::Solve() {
   printf("Solving %s\n", _level->name);
-  State* initialState = GetOrInsertState();
-  _maxDepth = 0xFFFF;
-  _unexploredH = initialState;
-  _unexploredT = _unexploredH;
 
+  auto it = _visitedNodes.insert(_level->GetState());
+  State* initialState = const_cast<State*>(&*it.first);
+  _unexplored = LinkedList<State>(initialState);
+
+  _maxDepth = 0xFFFF;
+
+  BFSStateGraph();
+
+  printf("Traversal done in %zd nodes\n", _visitedNodes.size());
+
+  ComputeWinningStates();
+
+  _level->SetState(initialState); // Be polite and make sure we restore the original level state
+  if (initialState->winDistance == 0xFFFF) return Vector<Direction>(); // Puzzle is unsolvable
+
+  printf("Found the shortest # of moves: %d\n", initialState->winDistance);
+  printf("Done computing victory states\n");
+
+  DFSWinStates(initialState, 0, 0);
+
+  u64 delta = _bestMillis - (_bestSolution.Size() * 160);
+  printf("Delta duration: %lld.%lld seconds\n", delta / 1000, delta % 1000);
+  printf("Solution duration: %lld.%02lld seconds\n", _bestMillis / 1000, _bestMillis % 1000);
+
+  return _bestSolution.Copy();
+}
+
+void Solver::BFSStateGraph() {
   State* dummy = new State();
-  _unexploredT->next = dummy;
-  _unexploredT = dummy;
+  _unexplored.AddToTail(dummy);
   u32 depth = 0;
 
-  bool foundWinningState = false;
-  while (_unexploredH != nullptr) {
-    State* state = _unexploredH;
+  while (_unexplored.Head() != nullptr) {
+    State* state = _unexplored.Head();
 
     if (state == dummy && !_foundWinningState) {
-      printf("Reached depth %d\n", depth++);
-      _unexploredT->next = state;
-      _unexploredT = state;
-      _unexploredH = state->next;
+      printf("Finished processing depth %d, there are %d nodes to explore at depth %d\n", depth, _unexplored.Size() - 1, depth + 1);
+      depth++;
+      _unexplored.AddToTail(dummy);
+      _unexplored.AdvanceHead();
       continue;
     }
 
@@ -40,23 +62,49 @@ Vector<Direction> Solver::Solve() {
     _level->SetState(state);
     if (_level->Move(Right)) state->r = GetOrInsertState();
 
-    _unexploredH = state->next;
+    _unexplored.AdvanceHead();
+    _explored.AddToHead(state);
+  }
+}
 
-    state->next = _exploredH;
-    _exploredH = state;
-    if (!_exploredT) _exploredT = _exploredH;
+State* Solver::GetOrInsertState() {
+  std::pair<std::unordered_set<State>::iterator, bool> it;
+  try {
+    it = _visitedNodes.insert(_level->GetState());
+  } catch (std::bad_alloc&) {
+    putchar('k');
+    return nullptr;
   }
 
-  printf("Traversal done in %zd nodes\n", _visitedNodes.size());
+  State* state = const_cast<State*>(&*it.first);
+  if (it.second) { // State was not yet analyzed
+    if (_level->Won()) {
+        state->winDistance = 0;
+        _foundWinningState = true;
+    }
 
-  // We are done traversing and building the graph.
-  // Now, determine the victory routes:
-  _exploredT->next = _exploredH;
-  State* endOfLoop = _exploredT; // If (somehow) we make it through the entire loop and find no win states
+    // Once we find a winning state, we have reached the minimum depth for a solution.
+    // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
+    // that means we should drain the unexplored queue but not add new nodes.
+    if (!_foundWinningState) {
+      _unexplored.AddToTail(state);
+    }
+  }
+  return state;
+}
 
-  State* state = _exploredH;
-  State* previousState = _exploredT;
+void Solver::ComputeWinningStates() {
+  // If (somehow) we make it through the entire loop and find no win states, this is the correct exit condition.
+  // It is very likely that this value will be updated during iteration.
+  State* endOfLoop = _explored.Previous();
+
   while (true) {
+    State* state = _explored.Current();
+    if (state == nullptr) {
+      // Level is unsolvable, I think
+      break;
+    }
+
     u16 winDistance = 0xFFFF;
 
     State* nextState = state->u;
@@ -78,52 +126,13 @@ Vector<Direction> Solver::Solve() {
 
     if (winDistance != 0xFFFF) {
       state->winDistance = winDistance + 1;
-      previousState->next = state->next; // Remove ourselves from the loop
-      endOfLoop = previousState; // If we come back around without making any progress, stop.
+      _explored.Pop(); // Remove ourselves from the loop
+      endOfLoop = _explored.Previous(); // If we come back around without making any progress, stop.
     }
 
     if (state == endOfLoop) break; // We just processed the last node, and it wasn't winning.
 
-    previousState = state;
-    state = state->next;
-  }
-
-  _level->SetState(initialState); // Be polite and make sure we restore the original level state
-  if (initialState->winDistance == 0xFFFF) return Vector<Direction>(); // Puzzle is unsolvable
-
-  printf("Found the shortest path %d\n", initialState->winDistance);
-  printf("Done computing victory states\n");
-
-  DFSWinStates(initialState, 0, 0);
-  u64 delta = _bestMillis - (_bestSolution.Size() * 160);
-  printf("Delta duration: %lld.%lld seconds\n", delta / 1000, delta % 1000);
-  printf("Solution duration: %lld.%02lld seconds\n", _bestMillis / 1000, _bestMillis % 1000);
-
-  return _bestSolution.Copy();
-}
-
-State* Solver::GetOrInsertState() {
-  try {
-    auto it = _visitedNodes.insert(_level->GetState());
-    State* state = const_cast<State*>(&*it.first);
-    if (it.second) { // State was not yet analyzed
-      if (_level->Won()) {
-         state->winDistance = 0;
-         _foundWinningState = true;
-      }
-
-      // Once we find a winning state, we have reached the minimum depth for a solution.
-      // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
-      // that means we should drain the unexplored queue but not add new nodes.
-      if (!_foundWinningState) {
-        if (_unexploredT != nullptr) _unexploredT->next = state;
-        _unexploredT = state;
-      }
-    }
-    return state;
-  } catch (std::bad_alloc&) {
-    putchar('k');
-    return nullptr;
+    _explored.Advance();
   }
 }
 

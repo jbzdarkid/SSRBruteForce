@@ -9,7 +9,11 @@ struct Solver {
   Vector<Direction> Solve();
 
 private:
+  void BFSStateGraph();
   State* GetOrInsertState();
+
+  void ComputeWinningStates();
+
   void DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements);
   void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements);
 
@@ -18,10 +22,8 @@ private:
   u16 _maxDepth = 0;
 
   bool _foundWinningState = false;
-  State* _unexploredH = nullptr;
-  State* _unexploredT = nullptr;
-  State* _exploredH = nullptr;
-  State* _exploredT = nullptr;
+  LinkedList<State> _unexplored;
+  LinkedLoop<State> _explored;
 
   Vector<Direction> _solution;
   Vector<Direction> _bestSolution;
