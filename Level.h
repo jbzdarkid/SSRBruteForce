@@ -24,6 +24,13 @@ struct Stephen {
   u8 _[2] = {0}; // Padding
 };
 
+struct Ladder {
+  s8 x = -1;
+  s8 y = -1;
+  s8 z = -1;
+  Direction dir;
+};
+
 struct Sausage {
   // I expect x1, y1 to be the left- or upper- half of the sausage. This means future work if we rotate sausages.
   s8 x1;
@@ -90,15 +97,15 @@ struct Level {
     Wall3  = Ground << 3,
     Elevation = Empty | Ground | Wall1 | Wall2 | Wall3,
     Grill = 16,
-    // TODO:
-    // LadderUp = 32,
-    // LadderDown = 64,
-    // LadderLeft = 128,
-    // LadderRight = 256,
+    // Ladder = 32,
+    // LadderUp = Ladder * Direction::Up,
+    // LadderDown = Ladder * Direction::Down,
+    // LadderLeft = Ladder * Direction::Left,
+    // LadderRight = Ladder * Direction::Right,
   };
 
+  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen, std::initializer_list<Sausage> sausages = {}, std::initializer_list<Ladder> ladders = {});
   Level(u8 width, u8 height, const char* name, const char* asciiGrid);
-  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen);
   ~Level();
   void Print() const;
   bool InteractiveSolver();
@@ -106,7 +113,7 @@ struct Level {
 
   State GetState() const;
   void SetState(const State* state);
-  bool WouldStepOnGrill(s8 x, s8 y, Direction dir); // Used by Solver to compute movement durations.
+  bool WouldStephenStepOnGrill(const Stephen& stephen, Direction dir); // Used by Solver to compute movement durations.
 
   // Returns true if the move succeeded
   // Returns false if the move was illegal for any reason
@@ -125,12 +132,10 @@ private:
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
-  bool CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausages = nullptr);
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages = nullptr);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
-  bool MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear=false);
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false);
   // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for when stephen is moving,
   // and we are just trying to figure out if that motion results in an invalid state
@@ -140,21 +145,18 @@ private:
 
   // Also move helpers, but smaller (and const)
   s8 GetSausage(s8 x, s8 y, s8 z) const;
-  bool IsWithinGrid(s8 x, s8 y) const;
   bool IsWithinGrid(s8 x, s8 y, s8 z) const;
   bool IsWall(s8 x, s8 y, s8 z) const;
-  bool CanTurnThrough(s8 x, s8 y) const;
-  bool CanWalkOnto(s8 x, s8 y) const;
   bool CanWalkOnto(s8 x, s8 y, s8 z) const;
-  bool IsGrill(s8 x, s8 y) const;
   bool IsGrill(s8 x, s8 y, s8 z) const;
   bool IsLadder(s8 x, s8 y, s8 z, Direction dir) const;
 
-  u8** _grid;
+  Tile** _grid;
   s8 _width = 0;
   s8 _height = 0;
   Stephen _start = {};
   Stephen _stephen = {};
   Vector<Sausage> _sausages;
+  Vector<Ladder> _ladders;
   bool _explain = false;
 };

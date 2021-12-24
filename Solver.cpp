@@ -172,7 +172,7 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
 #undef o
   }
 
-  if (_level->WouldStepOnGrill(state->stephen.x, state->stephen.y, dir)) totalMillis += 152; // TODO: Does this change while speared?
+  if (_level->WouldStephenStepOnGrill(state->stephen, dir)) totalMillis += 152; // TODO: Does this change while speared?
   // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
   // TODO: Time motion w/ sausage hat
   // TODO: Time motion w/ fork carry

@@ -222,11 +222,42 @@ Level ColdLadder2(13, 8, "3-10 Cold Ladder part 2",
   "__________   ",
   Stephen{2, 2, 1, Right});
 
+Level ColdFinger(17, 6, "3-? Cold Finger",
+  "___a________     "
+  "___ac_______     "
+  "1__bc_______1    "
+  "__^b______1__    "
+  "__________1__##__"
+  "         __ _##__");
+
+Level NotReallySludgeCoast(9, 8, "NotReallySludgeCoast",
+  "11111^___"
+  "11111aa__"
+  "11___bb__"
+  "_________"
+  "_________"
+  "    ##   "
+  "    ##   "
+  "    __   ");
+
+Level LandsEnd(13, 7, "Land's End",
+  "      _1     "
+  "_1___ __  3  "
+  "____ ___223__"
+  "_____ __223__"
+  "____ ________"
+  "   ##________"
+  "   ##________",
+  Stephen{10, 2, 3, Left},
+  {Sausage{9, 2, 9, 3, 2}},
+  {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}});
+
 int main() {
 #define o(x) + 1
   u32 sausages = SAUSAGES;
 #undef o
   Vector<Level*> levels;
+  /*
   if (sausages == 1) {
     levels.Push(&BaysNeck);
     levels.Push(&HappyPool);
@@ -257,7 +288,7 @@ int main() {
     // levels.Push(&TheAnchorage);
     levels.Push(&ColdLadder2);
   }
-
+  */
   /*
   for (Level* level : levels) {
     std::string levelName(level->name);
@@ -283,7 +314,7 @@ int main() {
   //*/
 
   /*
-  for (Level* level : levels) {
+  for (Level* level : {&NotReallySludgeCoast}) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {
@@ -297,5 +328,5 @@ int main() {
   return 0;
   //*/
 
-  BaysNeck.InteractiveSolver();
+  LandsEnd.InteractiveSolver();
 }
