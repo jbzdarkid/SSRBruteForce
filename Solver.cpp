@@ -161,13 +161,13 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   if (state->stephen.sausageSpeared == -1) {
     totalMillis += 160;
 
-#define o(x) if (state->s##x != nextState->s##x) totalMillis += 38;
+#define o(x) if (state->sausages[x] != nextState->sausages[x]) totalMillis += 38;
     SAUSAGES;
 #undef o
   } else { // No sausage speared
     totalMillis += 158;
 
-#define o(x) if (state->s##x != nextState->s##x) totalMillis += 4;
+#define o(x) if (state->sausages[x] != nextState->sausages[x]) totalMillis += 4;
     SAUSAGES;
 #undef o
   }

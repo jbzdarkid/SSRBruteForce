@@ -166,21 +166,13 @@ bool Level::Won() const {
 State Level::GetState() const {
   State s;
   s.stephen = _stephen;
-#define o(x) s.s##x = _sausages[x];
-  SAUSAGES
-#undef o
-//  if (s.s0.x1 < s.s1.x1 || s.s0.y1 < s.s1.y1) {
-//    s.s0 = s.s1;
-//    s.s1 = _sausages[0];
-//  }
+  _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
   return s;
 }
 
 void Level::SetState(const State* s) {
   _stephen = s->stephen;
-#define o(x) _sausages[x] = s->s##x;
-  SAUSAGES
-#undef o
+  _sausages.CopyFromArray(s->sausages, sizeof(s->sausages));
 }
 
 bool Level::WouldStepOnGrill(s8 x, s8 y, Direction dir) {
@@ -625,7 +617,7 @@ bool State::operator==(const State& other) const {
   return stephen.x == other.stephen.x
       && stephen.y == other.stephen.y
       && stephen.dir == other.stephen.dir
-#define o(x) && s##x == other.s##x
+#define o(x) && sausages[x] == other.sausages[x]
     SAUSAGES;
 #undef o
 }
@@ -661,7 +653,7 @@ u32 State::Hash() const {
   static_assert(sizeof(Stephen) == 8);
   static_assert(sizeof(Sausage) == 8);
   u32 hash = triple32_hash(*(u64*)&stephen);
-#define o(x) combine_hash(hash, *(u64*)&s##x);
+#define o(x) combine_hash(hash, *(u64*)&sausages[x]);
   SAUSAGES
 #undef o
 

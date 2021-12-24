@@ -59,12 +59,8 @@ struct Sausage {
 
 struct State {
   Stephen stephen;
-// TODO: Would be cleaner
-// #define o(x) +1
-//   Sausage sausages[SAUSAGES];
-// #undef o;
-#define o(x) Sausage s##x = {};
-  SAUSAGES
+#define o(x) +1
+  Sausage sausages[SAUSAGES];
 #undef o
 
   // Used to build the tree, ergo not part of the hashing or comparison algos
