@@ -8,8 +8,8 @@ enum Direction : u8 {
   Down = 2,
   Left = 4,
   Right = 8,
-  Jump = 16,
-  Crouch = 32,
+  Crouch = 16,
+  Jump = 32,
   Any = Up | Down | Left | Right,
 };
 
@@ -55,7 +55,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) // o(2)
+#define SAUSAGES o(0) // o(1) // o(2)
 
 struct State {
   Stephen stephen;
@@ -113,17 +113,32 @@ struct Level {
   bool Move(Direction dir);
 
   const char* name;
-  bool _explain = false;
-
 private:
+  // Move() helpers
+  bool HandleLogRolling(const Sausage& sausage, Direction dir, bool& handled);
+  bool HandleSpearedMotion(Direction dir);
+  bool HandleLadderMotion(Direction dir, bool& handled);
+  bool HandleBurnedStep(Direction dir);
+  bool HandleDefaultMotion(Direction dir);
+
   Vector<s8> _movedSausages;
+  // CanPhysicallyMove is for when you want to check if motion is possible,
+  // and if it isn't, stephen will enact a different kind of motion.
+  // It has no side-effects.
   bool CanPhysicallyMove(s8 x, s8 y, Direction dir, Vector<s8>* movedSausages = nullptr);
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages = nullptr);
-  // Returns true if the move was possible (the object was moved as a result)
-  // Returns false if the move was impossible / blocked (may have side effects)
+  // MoveThroughSpace is for when stephen is supposed to make a certain motion,
+  // and if the motion fails, the move should not have been taken.
+  // It may have side effects.
   bool MoveThroughSpace(s8 x, s8 y, Direction dir, bool spear=false);
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false);
+  // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for when stephen is moving,
+  // and we are just trying to figure out if that motion results in an invalid state
+  // (such as losing or burning a sausage).
+  // It will have side effects even if the move is invalid.
+  bool MoveStephenThroughSpace(Direction dir);
 
+  // Also move helpers, but smaller (and const)
   s8 GetSausage(s8 x, s8 y, s8 z) const;
   bool IsWithinGrid(s8 x, s8 y) const;
   bool IsWithinGrid(s8 x, s8 y, s8 z) const;
@@ -141,4 +156,5 @@ private:
   Stephen _start = {};
   Stephen _stephen = {};
   Vector<Sausage> _sausages;
+  bool _explain = false;
 };
