@@ -253,6 +253,13 @@ Level LandsEnd(13, 7, "Land's End",
   {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}});
 
 int main() {
+  Level Unsolvable(2, 3, "",
+    "##"
+    "aa"
+    ">_");
+  Solver(&Unsolvable).Solve();
+  Cove.InteractiveSolver();
+
 #define o(x) + 1
   u32 sausages = SAUSAGES;
 #undef o
@@ -327,6 +334,4 @@ int main() {
   }
   return 0;
   //*/
-
-  LandsEnd.InteractiveSolver();
 }

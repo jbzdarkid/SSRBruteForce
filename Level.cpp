@@ -171,6 +171,10 @@ State Level::GetState() const {
   State s;
   s.stephen = _stephen;
   _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
+//  if (s.stephen.speared == -1 && s.s0.x1 < s.s1.x1 || s.s0.y1 < s.s1.y1) {
+//    s.s0 = s.s1;
+//    s.s1 = _sausages[0];
+//  }
   return s;
 }
 
