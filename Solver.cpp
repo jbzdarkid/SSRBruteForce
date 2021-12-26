@@ -30,7 +30,7 @@ Vector<Direction> Solver::Solve() {
 
   DFSWinStates(initialState, 0, 0);
 
-  u64 delta = _bestMillis - (_bestSolution.Size() * 160);
+  s64 delta = _bestMillis - (_bestSolution.Size() * 160);
   printf("Delta duration: %lld.%lld seconds\n", delta / 1000, delta % 1000);
   printf("Solution duration: %lld.%02lld seconds\n", _bestMillis / 1000, _bestMillis % 1000);
 
@@ -38,17 +38,22 @@ Vector<Direction> Solver::Solve() {
 }
 
 void Solver::BFSStateGraph() {
-  State* dummy = new State();
-  _unexplored.AddToTail(dummy);
+  State* signal = new State();
+  _unexplored.AddToTail(signal);
   u32 depth = 0;
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
 
-    if (state == dummy && !_foundWinningState) {
-      printf("Finished processing depth %d, there are %d nodes to explore at depth %d\n", depth, _unexplored.Size() - 1, depth + 1);
+    if (state == signal) {
+      printf("Finished processing depth %d", depth);
+      if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
+        printf(".\nBFS exploration finished, no more nodes to find.\n");
+        break;
+      }
       depth++;
-      _unexplored.AddToTail(dummy);
+      printf(", there are %d nodes to explore at depth %d\n", _unexplored.Size() - 1, depth);
+      _unexplored.AddToTail(signal);
       _unexplored.AdvanceHead();
       continue;
     }
@@ -86,9 +91,9 @@ State* Solver::GetOrInsertState() {
     // Once we find a winning state, we have reached the minimum depth for a solution.
     // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
     // that means we should drain the unexplored queue but not add new nodes.
-    if (!_foundWinningState) {
+    //if (!_foundWinningState) {
       _unexplored.AddToTail(state);
-    }
+    //}
   }
   return state;
 }

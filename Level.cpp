@@ -158,9 +158,9 @@ bool Level::InteractiveSolver() {
 }
 
 bool Level::Won() const {
-//  if (_stephen.x != _start.x) return false;
-//  if (_stephen.y != _start.y) return false;
-//  if (_stephen.dir != _start.dir) return false;
+  if (_stephen.x != _start.x) return false;
+  if (_stephen.y != _start.y) return false;
+  if (_stephen.dir != _start.dir) return false;
 #define o(x) if ((_sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   SAUSAGES
 #undef o
@@ -560,6 +560,7 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
   else if (_stephen.dir == Left)  forkX = -1;
   else if (_stephen.dir == Right) forkX = +1;
   // Move stephen's fork, then stephen.
+  if (!CanWalkOnto(_stephen.x, _stephen.y, _stephen.z)) return false;
   if (!MoveThroughSpace(_stephen.x + forkX, _stephen.y + forkY, _stephen.z, dir)) return false;
   if (!MoveThroughSpace(_stephen.x, _stephen.y, _stephen.z, dir)) return false;
   return true;
