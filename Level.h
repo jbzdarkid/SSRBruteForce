@@ -62,7 +62,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) // o(1) // o(2)
+#define SAUSAGES o(0) o(1) // o(2)
 
 struct State {
   Stephen stephen;

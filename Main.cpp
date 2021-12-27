@@ -333,7 +333,7 @@ int main() {
     ">_");
 
   //*
-  for (Level* level : {&OnlySolvable}) {
+  for (Level* level : {&Cove}) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {

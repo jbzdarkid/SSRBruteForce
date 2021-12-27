@@ -18,9 +18,17 @@ Vector<Direction> Solver::Solve() {
 
   BFSStateGraph();
 
-  printf("Traversal done in %zd nodes\n", _visitedNodes.size());
+  printf("Traversal done in %zd nodes.\n", _visitedNodes.size());
 
   ComputeWinningStates();
+
+  u32 winning = 0;
+  u32 losing = 0;
+  for (State* state : _explored) {
+    if (state->winDistance == 0xFFFF) losing++;
+    else winning++;
+  }
+  printf("Of the %d states, %d are winning and %d are losing.\n", _explored.Size(), winning, losing);
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
   if (initialState->winDistance == 0xFFFF) return Vector<Direction>(); // Puzzle is unsolvable
@@ -40,7 +48,7 @@ Vector<Direction> Solver::Solve() {
 void Solver::BFSStateGraph() {
   State* signal = new State();
   _unexplored.AddToTail(signal);
-  u32 depth = 0;
+  u32 depth = 1;
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
@@ -85,6 +93,7 @@ State* Solver::GetOrInsertState() {
   if (it.second) { // State was not yet analyzed
     if (_level->Won()) {
         state->winDistance = 0;
+        printf("Found a winning state\n");
         _foundWinningState = true;
     }
 
@@ -110,7 +119,7 @@ void Solver::ComputeWinningStates() {
       break;
     }
 
-    u16 winDistance = 0xFFFF;
+    u16 winDistance = state->winDistance;
 
     State* nextState = state->u;
     if (nextState != nullptr && nextState->winDistance < winDistance) {
@@ -129,9 +138,9 @@ void Solver::ComputeWinningStates() {
       winDistance = nextState->winDistance;
     }
 
-    if (winDistance != 0xFFFF) {
+    if (winDistance + 1 < state->winDistance) {
       state->winDistance = winDistance + 1;
-      _explored.Pop(); // Remove ourselves from the loop
+      //_explored.Pop(); // Remove ourselves from the loop -- seems to be slightly inaccurate.
       endOfLoop = _explored.Previous(); // If we come back around without making any progress, stop.
     }
 
