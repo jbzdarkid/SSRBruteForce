@@ -10,7 +10,7 @@ struct Solver {
 
 private:
   void BFSStateGraph();
-  State* GetOrInsertState();
+  State* GetOrInsertState(u16 depth);
 
   void ComputeWinningStates();
 

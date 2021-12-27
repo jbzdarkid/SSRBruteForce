@@ -22,13 +22,24 @@ Vector<Direction> Solver::Solve() {
 
   ComputeWinningStates();
 
-  u32 winning = 0;
-  u32 losing = 0;
+  s16 shortestDeadEnd = -0x7FFE;
   for (State* state : _explored) {
-    if (state->winDistance == 0xFFFF) losing++;
-    else winning++;
+    if (state->depth < 0 && state->depth > shortestDeadEnd) {
+      shortestDeadEnd = state->depth;
+    }
   }
-  printf("Of the %d states, %d are winning and %d are losing.\n", _explored.Size(), winning, losing);
+  Vector<State*> deadEnds;
+  for (State* state : _explored) {
+    if (state->depth >= shortestDeadEnd - 3) deadEnds.Push(state);
+  }
+
+  putchar('\a');
+  for (State* state : deadEnds) {
+    _level->SetState(state);
+    _level->Print();
+    putchar('>');
+    getchar();
+  }
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
   if (initialState->winDistance == 0xFFFF) return Vector<Direction>(); // Puzzle is unsolvable
@@ -59,6 +70,10 @@ void Solver::BFSStateGraph() {
         printf(".\nBFS exploration finished, no more nodes to find.\n");
         break;
       }
+      if (depth == 150) {
+        printf(".\nCapping out at depth 150.\n");
+        break;
+      }
       depth++;
       printf(", there are %d nodes to explore at depth %d\n", _unexplored.Size() - 1, depth);
       _unexplored.AddToTail(signal);
@@ -67,20 +82,20 @@ void Solver::BFSStateGraph() {
     }
 
     _level->SetState(state);
-    if (_level->Move(Up))    state->u = GetOrInsertState();
+    if (_level->Move(Up))    state->u = GetOrInsertState(state->depth + 1);
     _level->SetState(state);
-    if (_level->Move(Down))  state->d = GetOrInsertState();
+    if (_level->Move(Down))  state->d = GetOrInsertState(state->depth + 1);
     _level->SetState(state);
-    if (_level->Move(Left))  state->l = GetOrInsertState();
+    if (_level->Move(Left))  state->l = GetOrInsertState(state->depth + 1);
     _level->SetState(state);
-    if (_level->Move(Right)) state->r = GetOrInsertState();
+    if (_level->Move(Right)) state->r = GetOrInsertState(state->depth + 1);
 
     _unexplored.AdvanceHead();
     _explored.AddToHead(state);
   }
 }
 
-State* Solver::GetOrInsertState() {
+State* Solver::GetOrInsertState(u16 depth) {
   std::pair<std::unordered_set<State>::iterator, bool> it;
   try {
     it = _visitedNodes.insert(_level->GetState());
@@ -90,20 +105,25 @@ State* Solver::GetOrInsertState() {
   }
 
   State* state = const_cast<State*>(&*it.first);
-  if (it.second) { // State was not yet analyzed
-    if (_level->Won()) {
-        state->winDistance = 0;
-        printf("Found a winning state\n");
-        _foundWinningState = true;
-    }
+  if (!it.second) return state; // State was already analyzed
 
-    // Once we find a winning state, we have reached the minimum depth for a solution.
-    // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
-    // that means we should drain the unexplored queue but not add new nodes.
-    //if (!_foundWinningState) {
-      _unexplored.AddToTail(state);
-    //}
+  state->depth = depth;
+  if (_level->Won()) {
+      state->winDistance = 0;
+      if (!_foundWinningState) {
+        printf("Found the first winning state!\n");
+        _foundWinningState = true;
+      }
+      _explored.AddToHead(state); // No further exploration needed for winning states.
+      return state;
   }
+
+  // Once we find a winning state, we have reached the minimum depth for a solution.
+  // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
+  // that means we should drain the unexplored queue but not add new nodes.
+  //if (!_foundWinningState) {
+    _unexplored.AddToTail(state);
+  //}
   return state;
 }
 
@@ -142,6 +162,25 @@ void Solver::ComputeWinningStates() {
       state->winDistance = winDistance + 1;
       //_explored.Pop(); // Remove ourselves from the loop -- seems to be slightly inaccurate.
       endOfLoop = _explored.Previous(); // If we come back around without making any progress, stop.
+    }
+
+    if (winDistance == 0xFFFF) { // Any node that is winning cannot be a dead end.
+      s16 depth = state->depth;
+      if (depth >= 0) { // Not already known to be a dead end
+        bool isDeadEnd = true;
+        if (state->u != nullptr && state->u->depth > depth) {
+          isDeadEnd = false;
+        } else if (state->d != nullptr && state->d->depth > depth) {
+          isDeadEnd = false;
+        } else if (state->l != nullptr && state->l->depth > depth) {
+          isDeadEnd = false;
+        } else if (state->r != nullptr && state->r->depth > depth) {
+          isDeadEnd = false;
+        } else {
+          state->depth = -depth; // Appear as "backwards progress" to everyone else.
+          endOfLoop = _explored.Previous(); // Aaaand update the exit condition.
+        }
+      }
     }
 
     if (state == endOfLoop) break; // We just processed the last node, and it wasn't winning.

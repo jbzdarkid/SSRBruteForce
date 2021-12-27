@@ -158,9 +158,10 @@ bool Level::InteractiveSolver() {
 }
 
 bool Level::Won() const {
-  if (_stephen.x != _start.x) return false;
-  if (_stephen.y != _start.y) return false;
-  if (_stephen.dir != _start.dir) return false;
+  if (_stephen.sausageSpeared != -1) return false;
+  //if (_stephen.x != _start.x) return false;
+  //if (_stephen.y != _start.y) return false;
+  //if (_stephen.dir != _start.dir) return false;
 #define o(x) if ((_sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   SAUSAGES
 #undef o
@@ -170,11 +171,14 @@ bool Level::Won() const {
 State Level::GetState() const {
   State s;
   s.stephen = _stephen;
-  _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
-//  if (s.stephen.speared == -1 && s.s0.x1 < s.s1.x1 || s.s0.y1 < s.s1.y1) {
-//    s.s0 = s.s1;
-//    s.s1 = _sausages[0];
-//  }
+  /*if (_sausages[0].x1 < _sausages[1].x1
+   || (_sausages[0].x1 == _sausages[1].x1 && _sausages[0].y1 < _sausages[1].y1)) {
+    s.sausages[0] = _sausages[1];
+    s.sausages[1] = _sausages[0];
+    if (_stephen.sausageSpeared != -1) s.stephen.sausageSpeared = 1 - _stephen.sausageSpeared;
+  } else */{
+    _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
+  }
   return s;
 }
 
@@ -561,7 +565,9 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
   else if (_stephen.dir == Right) forkX = +1;
   // Move stephen's fork, then stephen.
   if (!CanWalkOnto(_stephen.x, _stephen.y, _stephen.z)) return false;
-  if (!MoveThroughSpace(_stephen.x + forkX, _stephen.y + forkY, _stephen.z, dir)) return false;
+  // TODO: Pull spearing out of MoveThroughSpace and into this? Would make the code much cleaner.
+  bool spear = (dir == _stephen.dir);
+  if (!MoveThroughSpace(_stephen.x + forkX, _stephen.y + forkY, _stephen.z, dir, spear)) return false;
   if (!MoveThroughSpace(_stephen.x, _stephen.y, _stephen.z, dir)) return false;
   return true;
 }
