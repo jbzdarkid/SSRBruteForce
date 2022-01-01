@@ -332,10 +332,10 @@ int main() {
     "__"
     ">_");
 
-  //Cove.InteractiveSolver();
+  // CanLose.InteractiveSolver();
 
   //*
-  for (Level* level : {&CanLose}) {
+  for (Level* level : {&Cove}) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {

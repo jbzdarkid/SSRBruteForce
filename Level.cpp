@@ -398,13 +398,13 @@ bool Level::HandleDefaultMotion(Direction dir) {
   } else if (dir == Down) {
     if (_stephen.dir == Left) {
       if (!MoveThroughSpace( _stephen.x - 1, _stephen.y + 1, _stephen.z, Down)) return false;
-      if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Left)) return true; // Bonk
-      if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Left)) return false;
+      if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Right)) return true; // Bonk
+      if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Right)) return false;
       _stephen.dir = Down;
     } else if (_stephen.dir == Right) {
       if (!MoveThroughSpace( _stephen.x + 1, _stephen.y + 1, _stephen.z, Down)) return false;
-      if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Right)) return true; // Bonk
-      if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Right)) return false;
+      if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Left)) return true; // Bonk
+      if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Left)) return false;
       _stephen.dir = Down;
     } else {
       if (!MoveStephenThroughSpace(Down)) return false;
@@ -503,7 +503,6 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
     if (dir == Up) {
       sausage.y1--;
       sausage.y2--;
-      if (sausage.y1 < 0) return false;
     } else if (dir == Down) {
       sausage.y1++;
       sausage.y2++;
@@ -514,6 +513,8 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.x1++;
       sausage.x2++;
     } else assert(false);
+
+    // if (sausage.x1 != 0) return false; // hack, of course
 
     // Speared sausages do not roll nor fall off cliffs
     if (sausageNo != _stephen.sausageSpeared) {

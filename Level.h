@@ -62,7 +62,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) //o(1) // o(2)
+#define SAUSAGES o(0) o(1) // o(2)
 
 struct State {
   Stephen stephen;
@@ -76,8 +76,9 @@ struct State {
   State* d = nullptr;
   State* l = nullptr;
   State* r = nullptr;
-  u16 winDistance = 0xFFFF;
-  s16 depth = 0;
+#define UNWINNABLE 0xFFFE
+  u16 winDistance = UNWINNABLE;
+  u16 depth = 0;
 
   bool operator==(const State& other) const;
   u32 Hash() const;
