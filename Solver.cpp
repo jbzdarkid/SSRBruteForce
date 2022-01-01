@@ -77,38 +77,37 @@ Vector<Direction> Solver::Solve() {
 }
 
 void Solver::BFSStateGraph() {
-  State* signal = new State();
-  _unexplored.AddToTail(signal);
-  u32 depth = 1;
+  State depthMarker;
+  depthMarker.depth = 1;
+  _unexplored.AddToTail(&depthMarker);
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
 
-    if (state == signal) {
-      printf("Finished processing depth %d", depth);
+    if (state == &depthMarker) {
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
-        printf(".\nBFS exploration finished, no more nodes to find.\n");
+        printf("Finished BFS exploration at depth %d.\n", depthMarker.depth);
+        break;
+      } else if (depthMarker.depth == 100) {
+        printf("Abandoned BFS exploration at depth %d.\n", depthMarker.depth);
         break;
       }
-      if (depth == 100) {
-        printf(".\nCapping out at depth %d.\n", depth);
-        break;
-      }
-      depth++;
-      printf(", there are %d nodes to explore at depth %d\n", _unexplored.Size() - 1, depth);
-      _unexplored.AddToTail(signal);
+
+      printf("Finished processing depth %d, there are %d nodes to explore at depth %d\n", depthMarker.depth, _unexplored.Size() - 1, depthMarker.depth + 1);
+      depthMarker.depth++;
+      _unexplored.AddToTail(&depthMarker);
       _unexplored.AdvanceHead();
       continue;
     }
 
     _level->SetState(state);
-    if (_level->Move(Up))    state->u = GetOrInsertState(state->depth + 1);
+    if (_level->Move(Up))    state->u = GetOrInsertState(depthMarker.depth);
     _level->SetState(state);
-    if (_level->Move(Down))  state->d = GetOrInsertState(state->depth + 1);
+    if (_level->Move(Down))  state->d = GetOrInsertState(depthMarker.depth);
     _level->SetState(state);
-    if (_level->Move(Left))  state->l = GetOrInsertState(state->depth + 1);
+    if (_level->Move(Left))  state->l = GetOrInsertState(depthMarker.depth);
     _level->SetState(state);
-    if (_level->Move(Right)) state->r = GetOrInsertState(state->depth + 1);
+    if (_level->Move(Right)) state->r = GetOrInsertState(depthMarker.depth);
 
     _unexplored.AdvanceHead();
     _explored.AddToHead(state);
