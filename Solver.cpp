@@ -22,6 +22,15 @@ Vector<Direction> Solver::Solve() {
 
   ComputeWinningStates();
 
+  u32 winningStates = 0;
+  for (State* state : _explored) {
+    if (state->winDistance == UNWINNABLE) continue;
+    
+    winningStates++;
+  }
+
+  printf("Of the %zd nodes, %d are winning.\n", _visitedNodes.size(), winningStates);
+  /*
   const char* dirs[] = {
     "",
     "North",
@@ -50,6 +59,7 @@ Vector<Direction> Solver::Solve() {
       printf("\n");
     }
   }
+  */
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
   if (initialState->winDistance == UNWINNABLE) return Vector<Direction>(); // Puzzle is unsolvable
@@ -80,8 +90,8 @@ void Solver::BFSStateGraph() {
         printf(".\nBFS exploration finished, no more nodes to find.\n");
         break;
       }
-      if (depth == 150) {
-        printf(".\nCapping out at depth 150.\n");
+      if (depth == 100) {
+        printf(".\nCapping out at depth %d.\n", depth);
         break;
       }
       depth++;
@@ -167,7 +177,8 @@ void Solver::ComputeWinningStates() {
     }
 
     if (winDistance + 1 < state->winDistance) {
-      assert(state->winDistance == UNWINNABLE);
+      // TODO: I'm pretty sure I can avoid this (expensive) code entirely if I just run the DFS more carefully.
+      // Then I could just have this be a boolean or something and save myself a bit of computation.
       // _explored.Pop(); // TODO: We should only need update the winDistance once (because of BFS traversal).
 
       state->winDistance = winDistance + 1;
@@ -200,6 +211,7 @@ void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements)
 void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements) {
   if (!nextState) return; // Move would be illegal
   if (nextState->winDistance >= state->winDistance) return; // Move leads away from victory *or* is not winning.
+  assert(nextState->depth > state->depth); // Move is sub-optimal, taking it is useless. (This also prevents us from infinite-looping).
 
   // Compute the duration of this motion
   if (state->stephen.sausageSpeared == -1) {

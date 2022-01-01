@@ -504,6 +504,8 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.y1--;
       sausage.y2--;
     } else if (dir == Down) {
+      if (sausage.y2 == 5 && (sausage.flags & Sausage::Flags::Cook2) != Sausage::Flags::Cook2) return false;
+
       sausage.y1++;
       sausage.y2++;
     } else if (dir == Left) {
@@ -513,6 +515,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.x1++;
       sausage.x2++;
     } else assert(false);
+
 
     // if (sausage.x1 != 0) return false; // hack, of course
 

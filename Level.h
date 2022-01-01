@@ -47,6 +47,8 @@ struct Sausage {
     Cook2B = 8, // If (x2, y2) is cooked when rolled over
     Horizontal = 16,
     Rolled = 32,
+    Cook1 = Cook1A | Cook1B, // If (x1, y1) is cooked on both sides
+    Cook2 = Cook2A | Cook2B, // If (x2, y2) is cooked on both sides
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B,
   };
 
