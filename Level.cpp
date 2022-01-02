@@ -18,7 +18,9 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid) {
 
 #define o(x) +1
   _movedSausages = Vector<s8>(SAUSAGES);
+  _sausages.Ensure(SAUSAGES);
 #undef o
+  _sausages.Fill({-127, -127, -127, -127, Sausage::Flags::None});
 
   assert(width * height == strlen(asciiGrid));
 
@@ -158,10 +160,10 @@ bool Level::InteractiveSolver() {
 }
 
 bool Level::Won() const {
-  if (_stephen.sausageSpeared != -1) return false;
-  //if (_stephen.x != _start.x) return false;
-  //if (_stephen.y != _start.y) return false;
-  //if (_stephen.dir != _start.dir) return false;
+  // if (_stephen.sausageSpeared != -1) return false;
+  if (_stephen.x != _start.x) return false;
+  if (_stephen.y != _start.y) return false;
+  if (_stephen.dir != _start.dir) return false;
 #define o(x) if ((_sausages[x].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   SAUSAGES
 #undef o
@@ -504,7 +506,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.y1--;
       sausage.y2--;
     } else if (dir == Down) {
-      if (sausage.y2 == 5 && (sausage.flags & Sausage::Flags::Cook2) != Sausage::Flags::Cook2) return false;
+      //if (sausage.y2 == 5 && (sausage.flags & Sausage::Flags::Cook2) != Sausage::Flags::Cook2) return false;
 
       sausage.y1++;
       sausage.y2++;

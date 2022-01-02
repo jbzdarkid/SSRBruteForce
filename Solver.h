@@ -19,9 +19,7 @@ private:
 
   Level* _level = nullptr;
   std::unordered_set<State> _visitedNodes;
-  u16 _maxDepth = 0;
-
-  bool _foundWinningState = false;
+  u16 _winningDepth = UNWINNABLE;
   LinkedList<State> _unexplored;
   LinkedLoop<State> _explored;
 

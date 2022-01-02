@@ -14,8 +14,6 @@ Vector<Direction> Solver::Solve() {
   State* initialState = const_cast<State*>(&*it.first);
   _unexplored = LinkedList<State>(initialState);
 
-  _maxDepth = 0xFFFF;
-
   BFSStateGraph();
 
   printf("Traversal done in %zd nodes.\n", _visitedNodes.size());
@@ -78,39 +76,50 @@ Vector<Direction> Solver::Solve() {
 
 void Solver::BFSStateGraph() {
   State depthMarker;
-  depthMarker.depth = 1;
+  u16 depth = 0;
   _unexplored.AddToTail(&depthMarker);
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
+    if (state->winDistance == 0) { // Delayed addition of winning nodes to keep _explored in order
+      _unexplored.AdvanceHead();
+      _explored.AddCurrent(state);
+      continue;
+    }
 
     if (state == &depthMarker) {
+      printf("Finished processing depth %d, ", depth);
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
-        printf("Finished BFS exploration at depth %d.\n", depthMarker.depth);
+        printf("BFS exploration complete (no nodes remaining).\n");
         break;
-      } else if (depthMarker.depth == 100) {
-        printf("Abandoned BFS exploration at depth %d.\n", depthMarker.depth);
+      } else if (depth == 100) {
+        printf("giving up.\n");
+        break;
+      } else if (false && depth == _winningDepth + 2) {
+        // I add a small fudge-factor here (2 iterations) to search for solutions
+        // which potentially take more moves, but are faster in realtime.
+        printf("not exploring any further, since the winning state was at depth %d.\n", _winningDepth);
         break;
       }
 
-      printf("Finished processing depth %d, there are %d nodes to explore at depth %d\n", depthMarker.depth, _unexplored.Size() - 1, depthMarker.depth + 1);
-      depthMarker.depth++;
-      _unexplored.AddToTail(&depthMarker);
+      depth++;
       _unexplored.AdvanceHead();
+      printf("there are %d nodes to explore at depth %d\n", _unexplored.Size(), depth);
+      _unexplored.AddToTail(&depthMarker);
       continue;
     }
 
     _level->SetState(state);
-    if (_level->Move(Up))    state->u = GetOrInsertState(depthMarker.depth);
+    if (_level->Move(Up))    state->u = GetOrInsertState(depth);
     _level->SetState(state);
-    if (_level->Move(Down))  state->d = GetOrInsertState(depthMarker.depth);
+    if (_level->Move(Down))  state->d = GetOrInsertState(depth);
     _level->SetState(state);
-    if (_level->Move(Left))  state->l = GetOrInsertState(depthMarker.depth);
+    if (_level->Move(Left))  state->l = GetOrInsertState(depth);
     _level->SetState(state);
-    if (_level->Move(Right)) state->r = GetOrInsertState(depthMarker.depth);
+    if (_level->Move(Right)) state->r = GetOrInsertState(depth);
 
     _unexplored.AdvanceHead();
-    _explored.AddToHead(state);
+    _explored.AddCurrent(state);
   }
 }
 
@@ -126,28 +135,35 @@ State* Solver::GetOrInsertState(u16 depth) {
   State* state = const_cast<State*>(&*it.first);
   if (!it.second) return state; // State was already analyzed
 
-  state->depth = depth;
-
   if (_level->Won()) {
       state->winDistance = 0;
-      if (!_foundWinningState) {
-        printf("Found the first winning state!\n");
-        _foundWinningState = true;
+      if (_winningDepth == UNWINNABLE) {
+        // Once we find a winning state, we have reached the minimum depth for a solution.
+        // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
+        // that means we should finish the current depth, but not explore any further.
+        _winningDepth = depth + 1; // +1 because the winning move is at the *next* depth, not the current one.
+        printf("Found the first winning state at depth %d!\n", _winningDepth);
       }
-      _explored.AddToHead(state); // No further exploration needed for winning states.
-      return state;
+      // Even though this state is winning, we add it to the unexplored list as usual,
+      // in order to keep the _explored list in depth-sorted order.
   }
 
-  // Once we find a winning state, we have reached the minimum depth for a solution.
-  // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
-  // that means we should drain the unexplored queue but not add new nodes.
-  if (true || !_foundWinningState) {
-    _unexplored.AddToTail(state);
-  }
+  _unexplored.AddToTail(state);
   return state;
 }
 
 void Solver::ComputeWinningStates() {
+  /* Even though we generate the list in order, we should not remove states from the loop, and we may need to do multiple loops.
+     For example, consider this graph: A is at depth 0, B and D are at 1, C is at 2.
+     A -> (D)
+       \v   ^\
+         B -> C
+
+    Although C->D is a sub-optimal move (depth is decreasing), C is still a winning state. Since we process in depth order,
+    we will process C, D, B, A -- ergo when we check D the first time it won't be marked winning.
+    But, we do still want to mark C as winning -- since we haven't *truly* computed the costs yet, we don't know if it's faster.
+  */
+  
   // If (somehow) we make it through the entire loop and find no win states, this is the correct exit condition.
   // It is very likely that this value will be updated during iteration.
   State* endOfLoop = _explored.Previous();
@@ -176,10 +192,6 @@ void Solver::ComputeWinningStates() {
     }
 
     if (winDistance + 1 < state->winDistance) {
-      // TODO: I'm pretty sure I can avoid this (expensive) code entirely if I just run the DFS more carefully.
-      // Then I could just have this be a boolean or something and save myself a bit of computation.
-      // _explored.Pop(); // TODO: We should only need update the winDistance once (because of BFS traversal).
-
       state->winDistance = winDistance + 1;
       endOfLoop = _explored.Previous(); // If we come back around without making any progress, stop.
     }
@@ -209,8 +221,8 @@ void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements)
 
 void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements) {
   if (!nextState) return; // Move would be illegal
-  if (nextState->winDistance >= state->winDistance) return; // Move leads away from victory *or* is not winning.
-  assert(nextState->depth > state->depth); // Move is sub-optimal, taking it is useless. (This also prevents us from infinite-looping).
+  if (nextState->winDistance == UNWINNABLE) return; // Move is not winning
+  if (state->winDistance != nextState->winDistance + 1) return; // Move leads away from victory
 
   // Compute the duration of this motion
   if (state->stephen.sausageSpeared == -1) {

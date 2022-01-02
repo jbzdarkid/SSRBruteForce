@@ -80,7 +80,6 @@ struct State {
   State* r = nullptr;
 #define UNWINNABLE 0xFFFE
   u16 winDistance = UNWINNABLE;
-  u16 depth = 0;
 
   bool operator==(const State& other) const;
   u32 Hash() const;
