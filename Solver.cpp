@@ -22,13 +22,11 @@ Vector<Direction> Solver::Solve() {
 
   u32 winningStates = 0;
   for (State* state : _explored) {
-    if (state->winDistance == UNWINNABLE) continue;
-    
-    winningStates++;
+    if (state->winDistance != UNWINNABLE) winningStates++;
   }
 
   printf("Of the %zd nodes, %d are winning.\n", _visitedNodes.size(), winningStates);
-  /*
+
   const char* dirs[] = {
     "",
     "North",
@@ -40,24 +38,6 @@ Vector<Direction> Solver::Solve() {
     "",
     "East",
   };
-
-  for (State* state : _explored) {
-    if (state->winDistance == UNWINNABLE) continue;
-    Vector<Direction> losingMoves;
-    if (state->u && state->u->winDistance == UNWINNABLE) losingMoves.Push(Up);
-    if (state->d && state->d->winDistance == UNWINNABLE) losingMoves.Push(Down);
-    if (state->l && state->l->winDistance == UNWINNABLE) losingMoves.Push(Left);
-    if (state->r && state->r->winDistance == UNWINNABLE) losingMoves.Push(Right);
-    if (losingMoves.Size() > 0) {
-      printf("From this position, moving");
-      for (Direction dir : losingMoves) printf(" %s", dirs[dir]);
-      printf(" would be losing.\n");
-      _level->SetState(state);
-      _level->Print();
-      printf("\n");
-    }
-  }
-  */
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
   if (initialState->winDistance == UNWINNABLE) return Vector<Direction>(); // Puzzle is unsolvable
@@ -92,7 +72,7 @@ void Solver::BFSStateGraph() {
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
         printf("BFS exploration complete (no nodes remaining).\n");
         break;
-      } else if (depth == 100) {
+      } else if (depth == 110) {
         printf("giving up.\n");
         break;
       } else if (false && depth == _winningDepth + 2) {
@@ -240,6 +220,7 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   }
 
   if (_level->WouldStephenStepOnGrill(state->stephen, dir)) totalMillis += 152; // TODO: Does this change while speared?
+  // TODO: Does the sausage movement cost depend on your *current state* or the *next state*? I.e. if you unspear and roll a sausage, do you pay for it?
   // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
   // TODO: Time motion w/ sausage hat
   // TODO: Time motion w/ fork carry

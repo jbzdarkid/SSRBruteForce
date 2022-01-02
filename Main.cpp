@@ -332,10 +332,10 @@ int main() {
     "__"
     ">_");
 
-  // CanLose.InteractiveSolver();
+  LandsEnd.InteractiveSolver();
 
   //*
-  for (Level* level : {&MerchantsElegy}) {
+  for (Level* level : {&Cove}) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {

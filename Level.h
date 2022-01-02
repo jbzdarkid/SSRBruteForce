@@ -20,7 +20,7 @@ struct Stephen {
   Direction dir;
 
   s8 sausageSpeared = -1;
-  s8 sausageStand = -1;
+  s8 sausageStand = -1; // TODO: Remove
   u8 _[2] = {0}; // Padding
 };
 
@@ -64,7 +64,8 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) // o(2)
+#define SAUSAGES o(0) o(1) o(2)
+#define STAY_NEAR_THE_SAUSAGES 1
 
 struct State {
   Stephen stephen;
@@ -100,11 +101,6 @@ struct Level {
     Wall3  = Ground << 3,
     Elevation = Empty | Ground | Wall1 | Wall2 | Wall3,
     Grill = 16,
-    // Ladder = 32,
-    // LadderUp = Ladder * Direction::Up,
-    // LadderDown = Ladder * Direction::Down,
-    // LadderLeft = Ladder * Direction::Left,
-    // LadderRight = Ladder * Direction::Right,
   };
 
   Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen, std::initializer_list<Sausage> sausages = {}, std::initializer_list<Ladder> ladders = {});
@@ -135,7 +131,7 @@ private:
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
-  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages = nullptr);
+  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages=nullptr);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
@@ -144,7 +140,7 @@ private:
   // and we are just trying to figure out if that motion results in an invalid state
   // (such as losing or burning a sausage).
   // It will have side effects even if the move is invalid.
-  bool MoveStephenThroughSpace(Direction dir);
+  bool MoveStephenThroughSpace(Direction dir, bool isLogRoll=false);
 
   // Also move helpers, but smaller (and const)
   s8 GetSausage(s8 x, s8 y, s8 z) const;
@@ -161,5 +157,5 @@ private:
   Stephen _stephen = {};
   Vector<Sausage> _sausages;
   Vector<Ladder> _ladders;
-  bool _explain = false;
+  bool _interactive = false;
 };
