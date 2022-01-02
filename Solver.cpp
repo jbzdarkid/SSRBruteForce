@@ -205,7 +205,24 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   if (state->winDistance != nextState->winDistance + 1) return; // Move leads away from victory
 
   // Compute the duration of this motion
-  if (state->stephen.sausageSpeared == -1) {
+
+  // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.
+  // This is gross. It gets a little cleaner if I can use for-each, but not much.
+  bool sausageSpeared = false;
+  if (state->stephen.HasFork()) {
+#define o(x) +1
+    for (u8 i=0; i<SAUSAGES; i++) {
+#undef o
+      const Sausage& sausage = state->sausages[i];
+      if (state->stephen.z != sausage.z) continue;
+      if ((state->stephen.x == sausage.x1 && state->stephen.y == sausage.y1)
+        || (state->stephen.x == sausage.x2 && state->stephen.y == sausage.y2)) {
+        sausageSpeared = true;
+        break;
+      }
+    }
+  }
+  if (sausageSpeared) {
     totalMillis += 160;
 
 #define o(x) if (state->sausages[x] != nextState->sausages[x]) totalMillis += 38;

@@ -6,22 +6,50 @@ enum Direction : u8 {
   None = 0,
   Up = 1,
   Down = 2,
-  Left = 4,
-  Right = 8,
-  Crouch = 16,
-  Jump = 32,
-  Any = Up | Down | Left | Right,
+  Left = 3,
+  Right = 4,
+  Crouch = 5,
+  Jump = 6,
 };
 
 struct Stephen {
-  s8 x = -1;
-  s8 y = -1;
-  s8 z = 0;
+  s8 x;
+  s8 y;
+  s8 z;
   Direction dir;
 
-  s8 sausageSpeared = -1;
-  s8 sausageStand = -1; // TODO: Remove
-  u8 _[2] = {0}; // Padding
+  s8 forkX;
+  s8 forkY;
+  s8 forkZ;
+  Direction forkDir;
+
+  Stephen() : Stephen(-1, -1, 0, None) {}
+  Stephen(s8 x_, s8 y_, s8 z_, Direction dir_) {
+    x = x_; y = y_; z = z_;
+    dir = dir_;
+    forkX = x_; forkY = y_; forkZ = -1;
+    forkDir = None;
+  }
+
+  // If forkZ is negative, then stephen has his fork -- if it is positive, the fork is disconnected.
+  inline bool HasFork() const { return forkZ < 0; }
+  bool operator==(const Stephen& other) const {
+    // We keep states where stephen has a fork in a normalized form so that we can do a direct u64 comparison.
+#if _DEBUG
+    if (HasFork()) {
+      assert(forkZ == -1);
+      assert(forkDir == None);
+    }
+    if (other.HasFork()) {
+      assert(other.forkZ == -1);
+      assert(other.forkDir == None);
+    }
+#endif
+    u64 a = *(u64*)this;
+    u64 b = *(u64*)&other;
+    return a == b;
+  }
+  bool operator!=(const Stephen& other) const { return !(*this == other); }
 };
 
 struct Ladder {
@@ -64,11 +92,13 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2)
-#define STAY_NEAR_THE_SAUSAGES 1
+#define SAUSAGES o(0) // o(1) o(2)
+#define STAY_NEAR_THE_SAUSAGES 0
 
 struct State {
   Stephen stephen;
+
+  // TODO: Try changing this to just be a Vector<Sausage>? It would save me a lot of headache, I think.
 #define o(x) +1
   Sausage sausages[SAUSAGES];
 #undef o
@@ -95,11 +125,10 @@ template<> struct hash<State> {
 struct Level {
   enum Tile : u8 {
     Empty = 0,
-    Ground = 1,
-    Wall1  = Ground << 1,
-    Wall2  = Ground << 2,
-    Wall3  = Ground << 3,
-    Elevation = Empty | Ground | Wall1 | Wall2 | Wall3,
+    Ground = 0b1,
+    Wall1  = 0b11,
+    Wall2  = 0b111,
+    Wall3  = 0b1111,
     Grill = 16,
   };
 
@@ -125,22 +154,23 @@ private:
   bool HandleSpearedMotion(Direction dir);
   bool HandleLadderMotion(Direction dir, bool& handled);
   bool HandleBurnedStep(Direction dir);
+  bool HandleForklessMotion(Direction dir);
   bool HandleDefaultMotion(Direction dir);
 
   Vector<s8> _movedSausages;
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
-  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages=nullptr);
+  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages=nullptr, s8* sausageWithFork=nullptr);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false);
-  // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for when stephen is moving,
-  // and we are just trying to figure out if that motion results in an invalid state
-  // (such as losing or burning a sausage).
+  // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
+  // and we are just trying to figure out if that motion results in an invalid state,
+  // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.
   // It will have side effects even if the move is invalid.
-  bool MoveStephenThroughSpace(Direction dir, bool isLogRoll=false);
+  bool MoveStephenThroughSpace(Direction dir);
 
   // Also move helpers, but smaller (and const)
   s8 GetSausage(s8 x, s8 y, s8 z) const;
@@ -153,8 +183,9 @@ private:
   Tile** _grid;
   s8 _width = 0;
   s8 _height = 0;
-  Stephen _start = {};
-  Stephen _stephen = {};
+  s8 _sausageSpeared = -1;
+  Stephen _start;
+  Stephen _stephen;
   Vector<Sausage> _sausages;
   Vector<Ladder> _ladders;
   bool _interactive = false;

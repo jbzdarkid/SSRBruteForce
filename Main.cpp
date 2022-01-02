@@ -253,7 +253,7 @@ Level LandsEnd(13, 7, "Land's End",
   {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}});
 
 int main() {
-#define o(x) + 1
+#define o(x) +1
   u32 sausages = SAUSAGES;
 #undef o
   Vector<Level*> levels;
@@ -335,7 +335,7 @@ int main() {
   LandsEnd.InteractiveSolver();
 
   //*
-  for (Level* level : {&Cove}) {
+  for (Level* level : {&LandsEnd}) {
     Vector<Direction> solution = Solver(level).Solve();
     const char* dirs = " UD L   R";
     for (Direction dir : solution) {
