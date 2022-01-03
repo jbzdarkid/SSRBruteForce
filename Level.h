@@ -10,8 +10,8 @@ enum Direction : u8 {
   Crouch = 4,
   Right = 5,
   Down = 6,
-  Invert = 7,
 };
+Direction Inverse(Direction dir);
 
 struct Stephen {
   s8 x;
@@ -97,13 +97,13 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2)
+#define SAUSAGES o(0) o(1) // o(2) o(3) o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
 
 struct State {
   Stephen stephen;
 
-  // TODO: Try changing this to just be a Vector<Sausage>? It would save me a lot of headache, I think.
+  // TODO: Try changing this to just be a Vector<Sausage>? It would save me a lot of headache, I think. But it might cost a lot of memory.
 #define o(x) +1
   Sausage sausages[SAUSAGES];
 #undef o
@@ -129,16 +129,18 @@ template<> struct hash<State> {
 
 struct Level {
   enum Tile : u8 {
-    Empty = 0,
-    Ground = 0b1,
-    Wall1  = 0b11,
-    Wall2  = 0b111,
-    Wall3  = 0b1111,
-    Grill = 16,
+    Empty  = 0,
+    Ground = 0b00000001,
+    Wall1  = 0b00000011,
+    Wall2  = 0b00000111,
+    Wall3  = 0b00001111,
+    Wall4  = 0b00011111,
+    Wall5  = 0b00111111,
+    Grill  = 0b01000000,
+    Unused = 0b10000000,
   };
 
-  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen, std::initializer_list<Sausage> sausages = {}, std::initializer_list<Ladder> ladders = {});
-  Level(u8 width, u8 height, const char* name, const char* asciiGrid);
+  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen = {}, std::initializer_list<Ladder> ladders = {},  std::initializer_list<Sausage> sausages = {});
   ~Level();
   void Print() const;
   bool InteractiveSolver();
@@ -194,4 +196,5 @@ private:
   Vector<Sausage> _sausages;
   Vector<Ladder> _ladders;
   bool _interactive = false;
+  u64 _stackStart = 0;
 };

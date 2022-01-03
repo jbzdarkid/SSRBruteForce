@@ -5,6 +5,7 @@
 
 struct Solver {
   Solver(Level* level);
+  ~Solver();
 
   Vector<Direction> Solve();
 

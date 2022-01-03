@@ -7,6 +7,25 @@ Solver::Solver(Level* level) {
   _level = level;
 }
 
+Solver::~Solver() {
+  printf("Destroying _visitedNodes\n");
+}
+
+u16 Score(State* state) {
+  u16 score = 0;
+  u16 sidesCooked;
+  u8 flags;
+#define o(x) \
+  flags = state->sausages[x].flags; \
+  sidesCooked = (flags & Sausage::Flags::FullyCooked); \
+  if (sidesCooked == Sausage::Flags::FullyCooked) score += 100; \
+  else score += __popcnt16(sidesCooked);
+
+  SAUSAGES;
+#undef o
+  return score;
+}
+
 Vector<Direction> Solver::Solve() {
   printf("Solving %s\n", _level->name);
 
@@ -27,20 +46,22 @@ Vector<Direction> Solver::Solve() {
 
   printf("Of the %zd nodes, %d are winning.\n", _visitedNodes.size(), winningStates);
 
-  const char* dirs[] = {
-    "",
-    "North",
-    "South",
-    "",
-    "West",
-    "",
-    "",
-    "",
-    "East",
-  };
-
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
-  if (initialState->winDistance == UNWINNABLE) return Vector<Direction>(); // Puzzle is unsolvable
+  if (initialState->winDistance == UNWINNABLE) {
+    printf("Automatic solver could not find a solution.\n");
+    u16 bestScore = 0;
+    for (State* state : _explored) {
+      u16 score = Score(state);
+      if (score > bestScore) bestScore = score;
+    }
+    printf("Best score: %d\n", bestScore);
+    for (State* state : _explored) {
+      u16 score = Score(state);
+      if (score == bestScore) state->winDistance = 0;
+    }
+    printf("Recomputing winning states\n");
+    ComputeWinningStates();
+  }
 
   printf("Found the shortest # of moves: %d\n", initialState->winDistance);
   printf("Done computing victory states\n");
@@ -72,10 +93,10 @@ void Solver::BFSStateGraph() {
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
         printf("BFS exploration complete (no nodes remaining).\n");
         break;
-      } else if (depth == 110) {
-        printf("giving up.\n");
+      } else if (_visitedNodes.size() > 100'000'000) {
+        printf("giving up (too many nodes).\n");
         break;
-      } else if (false && depth == _winningDepth + 2) {
+      } else if (depth == _winningDepth + 2) {
         // I add a small fudge-factor here (2 iterations) to search for solutions
         // which potentially take more moves, but are faster in realtime.
         printf("not exploring any further, since the winning state was at depth %d.\n", _winningDepth);
@@ -114,6 +135,10 @@ State* Solver::GetOrInsertState(u16 depth) {
 
   State* state = const_cast<State*>(&*it.first);
   if (!it.second) return state; // State was already analyzed
+
+  if (_visitedNodes.size() % 100'000 == 0) {
+    //_level->Print();
+  }
 
   if (_level->Won()) {
       state->winDistance = 0;

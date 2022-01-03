@@ -200,7 +200,109 @@ Level TwistyFarm(10, 14, "2-10 Twisty Farm",
   "  _bb_  _ "
   "     ____ ");
 
-Level ColdLadder(13, 8, "3-10 Cold Ladder",
+Level ColdJag(12, 5, "3-1 Cold Jag",
+  "    222_3__1"
+  "    1_bc____"
+  "    1_bc____"
+  "__##U_____11"
+  "__##_>______",
+  {},
+  {},
+  {Sausage{11, 0, 11, 1, 1}});
+
+Level ColdFinger(17, 6, "3-2 Cold Finger", // TODO: Overhang!
+  "____________     "
+  "____________     "
+  "3?_c___^____1    "
+  "___c______1__    "
+  "__________1__##__"
+  "         __ _##__",
+  {},
+  {},
+  {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}});
+
+Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
+  "________      "
+  "________      "
+  "_______D      "
+  "__aa__222     "
+  "______232_____"
+  "______222_____"
+  "______ _______"
+  "__b___ _______"
+  "__b___222L_222"
+  "______232  222"
+  "______222__222"
+  "___^     ___U_"
+  "____    1L____"
+  "___R1####_____"
+  "     ####     "
+  "      11      ");
+
+Level ColdTrail(19, 10, "3-4 Cold Trail",
+  "11111_______       "
+  "11111_______       "
+  "11111_______       "
+  "11111________R1111 "
+  "11111L_______ ## # "
+  "11111___>___ _##_##"
+  "____________       "
+  "____________       "
+  "_____________      "
+  "______________     ");
+
+Level ColdCliff(8, 8, "3-5 Cold Cliff",
+  "2222    "
+  "2222    "
+  "2222    "
+  "2222    "
+  "2222__  "
+  "_U__####"
+  "____####"
+  "     111");
+
+Level ColdPit(10, 10, "3-6 Cold Pit",
+  "  11111111"
+  "  11111111"
+  "  11111111"
+  "  111__111"
+  "1_111__111"
+  "1    ##   "
+  "1    ##   "
+  "11$$1__   "
+  "1 $$111   "
+  "11111     ");
+
+Level ColdPlateau(10, 10, "3-7 Cold Plateau",
+  "1111111111"
+  "1111111111"
+  "1111111111"
+  "1222111111"
+  "1232111111"
+  "1222111111"
+  "1111111111"
+  "1111111111"
+  "   _$$    "
+  "   _$$    ");
+
+Level ColdHead(12, 12, "3-8 Cold Head",
+  "        1$$1"
+  "        1111"
+  "        1211"
+  "        1111"
+  "        1111"
+  "     11____ "
+  "     11____ "
+  "     __1111 "
+  "11111__1111 "
+  "1$$11__1111 "
+  "1$$11_R1111 "
+  "11111       ",
+  Stephen{9, 9, 1, Down},
+  {},
+  {Sausage{7, 8, 7, 9, 1}, Sausage{8, 7, 9, 7, 1}});
+
+Level ColdLadder(13, 8, "3-9 Cold Ladder",
   "__1111111    "
   "__1111111    "
   "__1111111    "
@@ -209,49 +311,111 @@ Level ColdLadder(13, 8, "3-10 Cold Ladder",
   "____bc___##__"
   "__________   "
   "__________   ",
-  Stephen{4, 2, 1, Right});
+  Stephen{4, 2, 1, Right},
+  {Ladder{4, 3, 0, Up}});
 
-Level ColdLadder2(13, 8, "3-10 Cold Ladder part 2",
-  "__1111111    "
-  "__1111111    "
-  "aa1111111    "
-  "__b______    "
-  "__b___c__##__"
-  "______c__##__"
-  "__________   "
-  "__________   ",
-  Stephen{2, 2, 1, Right});
+Level ColdSausage(13, 5, "3-10 Cold Sausage",
+  "       111111"
+  "###### 111111"
+  "######1111111"
+  "###### 111111"
+  "       111111",
+  Stephen{10, 4, 1, Left},
+  {},
+  {Sausage{8, 1, 9, 1, 1}, Sausage{10, 1, 11, 1, 1},
+   Sausage{8, 2, 9, 2, 1},
+   Sausage{8, 3, 9, 3, 1}, Sausage{10, 3, 11, 3, 1}});
 
-Level ColdFinger(17, 6, "3-? Cold Finger",
-  "___a________     "
-  "___ac_______     "
-  "1__bc_______1    "
-  "__^b______1__    "
-  "__________1__##__"
-  "         __ _##__");
+Level ColdTerrace(10, 10, "3-11 Cold Terrace",
+  "22211__222"
+  "____U_____"
+  "__1_______"
+  "__Ucc_1___"
+  "__________"
+  "___<______"
+  "     ##   "
+  "     ##   "
+  "     __   "
+  "     __   ",
+  {},
+  {Ladder{2, 1, 2, Up}, Ladder{7, 1, 2, Up}},
+  {Sausage{0, 0, 1, 0, 2}, Sausage{8, 0, 9, 0, 2}});
 
-Level NotReallySludgeCoast(9, 8, "NotReallySludgeCoast",
-  "11111^___"
-  "11111aa__"
-  "11___bb__"
-  "_________"
-  "_________"
-  "    ##   "
-  "    ##   "
-  "    __   ");
+Level ColdHorizon(15, 5, "3-12 Cold Horizon",
+  "222222______111"
+  "2  222______111"
+  "2  222______111"
+  "2##___ _ _ __#_"
+  "2##____ _ _ _##",
+  Stephen{3, 2, 2, Up},
+  {Ladder{1, 4, 2, Left}, Ladder{1, 4, 1, Left}},
+  {Sausage{4, 0, 5, 0, 2}, Sausage{4, 1, 4, 2, 2}});
+
+// Cold Gate doesn't exist. Okay? Okay.
+
+Level ColdFrustration(10, 9, "3-14 Cold Frustration",
+  "2  _____  "
+  "111L_D__  "
+  "1    222  "
+  "U_1_#_U___"
+  "_a_ #___1_"
+  "_a1_#_____"
+  "_b__22____"
+  "^b_L22____"
+  "____22____");
+
+Level WretchsRetreat(11, 8, "4-1 Wretch's Retreat",
+  "     1     "
+  "     #     "
+  "_______111_"
+  "____a__121_"
+  "____a__111_"
+  "__1_____U__"
+  "____bb_>___"
+  "___________");
+
+Level ToadsFolly(10, 10, "4-2 Toad's Folly",
+  "__________"
+  "_##_______"
+  "_##_____2_"
+  "__________"
+  "222L______"
+  "252L_^_cc_"
+  "222_______"
+  "__________"
+  "________1_"
+  " _________",
+  {},
+  {},
+  {Sausage{7, 2, 8, 2, 2}, Sausage{7, 8, 8, 8, 1}});
+
+
+Level SludgeCoast(10, 11, "4-3 Sludge Coast", // TODO: Overhang!
+  "11111_____"
+  "11111_____"
+  "11222?____"
+  "11111_____"
+  "11111_____"
+  "11aU______"
+  "__a_______"
+  "_____bb___"
+  "    ##    "
+  "    ##    "
+  "    __    ",
+  Stephen{3, 0, 1, Right});
 
 Level SlopeView(18, 8, "5-1 Slope View",
-  "        ##     1  "
-  "        ##______1 "
-  "2222222211___11_  "
+  "        $$     1  "
+  "        $$___bb_1 "
+  "2222222211__R11_  "
   "2222322211______  "
-  "2222222211______##"
-  "2222222211______##"
+  "2222222211___cc_##"
+  "2222222211L_____##"
   "           ##     "
   "           ##     ",
   Stephen{4, 5, 2, Left},
-  {Sausage{6, 3, 6, 4}, Sausage{13, 1, 14, 1}, Sausage{13, 4, 14, 4}},
-  {Ladder{4, 3, 2, Down}, Ladder{7, 5, 1, Right}, Ladder{9, 5, 0, Right}, Ladder{13, 2, 0, Left}});
+  {Ladder{4, 3, 2, Down}, Ladder{7, 5, 2, Right}},
+  {Sausage{6, 3, 6, 4}});
 
 
 Level LandsEnd(13, 7, "Land's End",
@@ -263,99 +427,36 @@ Level LandsEnd(13, 7, "Land's End",
   "   ##________"
   "   ##________",
   Stephen{10, 2, 3, Left},
-  {Sausage{9, 2, 9, 3, 2}},
-  {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}});
+  {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}},
+  {Sausage{9, 2, 9, 3, 2}});
 
 
 int main() {
-#define o(x) +1
-  u32 sausages = SAUSAGES;
-#undef o
-  Vector<Level*> levels;
-  /*
-  if (sausages == 1) {
-    levels.Push(&BaysNeck);
-    levels.Push(&HappyPool);
-    levels.Push(&MaidensWalk);
-    levels.Push(&EmersonJetty);
-    levels.Push(&SadFarm);
-    levels.Push(&FallowEarth);
-  } else if (sausages == 2) {
-    //levels.Push(&Southjaunt);
-    //levels.Push(&InfantsBreak);
-    //levels.Push(&ComelyHearth);
-    //levels.Push(&LittleFire);
-    //levels.Push(&Eastreach);
-    //levels.Push(&BurningWharf);
-    //levels.Push(&FieryJut);
-    //levels.Push(&MerchantsElegy);
-    //levels.Push(&Seafinger);
-    //levels.Push(&InletShore);
-    levels.Push(&Cove);
-    levels.Push(&ThePaddock);
-    levels.Push(&BeautifulHorizon);
-    levels.Push(&BarrowSet);
-    levels.Push(&RoughField);
-    levels.Push(&TwistyFarm);
-  } else if (sausages == 3) {
-    // levels.Push(&LachrymoseHead);
-    // levels.Push(&TheClover);
-    // levels.Push(&TheAnchorage);
-    levels.Push(&ColdLadder2);
-  }
-  */
-  /*
-  for (Level* level : levels) {
+  ColdHead.InteractiveSolver();
+
+  //*
+  // ColdHorizon
+  for (Level* level : {&ColdHead}) {
+    Vector<Direction> solution = Solver(level).Solve();
     std::string levelName(level->name);
     levelName = levelName.substr(0, levelName.find_first_of(' '));
     std::ofstream file(levelName + ".dem");
 
-    Vector<Direction> solution = Solver(level).Solve();
     const char* dirs[] = {
-      "",
+      nullptr,
       "North",
-      "South",
-      "",
       "West",
-      "",
-      "",
-      "",
+      nullptr,
+      nullptr,
       "East",
+      "South",
     };
     for (Direction dir : solution) file << dirs[dir] << '\n';
     file.close();
-  }
-  return 0;
-  //*/
 
-  Level Unsolvable(2, 3, "",
-    "##"
-    "aa"
-    ">_");
-
-  Level OnlySolvable(4, 5, "",
-    "1##1"
-    "1##1"
-    "1aa1"
-    "1__1"
-    "1>_1");
-
-  Level CanLose(2, 5, "",
-    "##"
-    "##"
-    "aa"
-    "__"
-    ">_");
-
-  SlopeView.InteractiveSolver();
-
-  //*
-  for (Level* level : {&LandsEnd}) {
-    Vector<Direction> solution = Solver(level).Solve();
-    const char* dirs = " UD L   R";
     for (Direction dir : solution) {
       level->Print();
-      putchar(dirs[dir]);
+      printf("%s\n", dirs[dir]);
       getchar();
       level->Move(dir);
     }
