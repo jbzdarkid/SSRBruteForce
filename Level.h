@@ -5,11 +5,12 @@
 enum Direction : u8 {
   None = 0,
   Up = 1,
-  Down = 2,
-  Left = 3,
-  Right = 4,
-  Crouch = 5,
-  Jump = 6,
+  Left = 2,
+  Jump = 3,
+  Crouch = 4,
+  Right = 5,
+  Down = 6,
+  Invert = 7,
 };
 
 struct Stephen {
