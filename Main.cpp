@@ -348,7 +348,7 @@ Level ColdHorizon(15, 5, "3-12 Cold Horizon",
   "2##___ _ _ __#_"
   "2##____ _ _ _##",
   Stephen{3, 2, 2, Up},
-  {Ladder{1, 4, 2, Left}, Ladder{1, 4, 1, Left}},
+  {Ladder{1, 4, 1, Left}, Ladder{1, 4, 0, Left}},
   {Sausage{4, 0, 5, 0, 2}, Sausage{4, 1, 4, 2, 2}});
 
 // Cold Gate doesn't exist. Okay? Okay.
@@ -432,11 +432,10 @@ Level LandsEnd(13, 7, "Land's End",
 
 
 int main() {
-  ColdHead.InteractiveSolver();
+  // ColdHorizon.InteractiveSolver();
 
   //*
-  // ColdHorizon
-  for (Level* level : {&ColdHead}) {
+  for (Level* level : {&ColdHorizon}) {
     Vector<Direction> solution = Solver(level).Solve();
     std::string levelName(level->name);
     levelName = levelName.substr(0, levelName.find_first_of(' '));

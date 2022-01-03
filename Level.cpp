@@ -225,7 +225,7 @@ bool Level::InteractiveSolver() {
 }
 
 bool Level::Won() const {
-  // if (_stephen != _start) return false;
+  if (_stephen != _start) return false;
   for (const Sausage& sausage : _sausages) {
     if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   }
@@ -296,6 +296,10 @@ bool Level::Move(Direction dir) {
     if (handled) return true;
   }
 
+  bool handled = false;
+  if (!HandleLadderMotion(dir, handled)) return false;
+  if (handled) return true;
+
   if (_sausageSpeared != -1) {
     if (!HandleSpearedMotion(dir)) return false;
     if (IsGrill(_stephen.x, _stephen.y, _stephen.z)) {
@@ -303,10 +307,6 @@ bool Level::Move(Direction dir) {
     }
     return true;
   }
-
-  bool handled = false;
-  if (!HandleLadderMotion(dir, handled)) return false;
-  if (handled) return true;
 
   if (_stephen.HasFork()) {
     if (!HandleDefaultMotion(dir)) return false;
@@ -684,7 +684,6 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.x1--;
       sausage.x2--;
     } else if (dir == Right) {
-      if (sausage.x1 == 11) return false;
       sausage.x1++;
       sausage.x2++;
     } else if (dir == Jump) {
@@ -714,8 +713,6 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
                       || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
         if (supported) break;
         if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
-        if (sausage.x2 == 6 && sausage.y2 == 1) return false;
-        if (sausage.x2 == 6 && sausage.y2 == 3) return false;
         sausage.z--;
       }
     }
