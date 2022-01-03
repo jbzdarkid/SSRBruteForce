@@ -48,7 +48,7 @@ Vector<Direction> Solver::Solve() {
   DFSWinStates(initialState, 0, 0);
 
   s64 delta = _bestMillis - (_bestSolution.Size() * 160);
-  printf("Delta duration: %lld.%lld seconds\n", delta / 1000, delta % 1000);
+  printf("Delta duration: %.03f seconds\n", delta / 1000.0);
   printf("Solution duration: %lld.%02lld seconds\n", _bestMillis / 1000, _bestMillis % 1000);
 
   return _bestSolution.Copy();

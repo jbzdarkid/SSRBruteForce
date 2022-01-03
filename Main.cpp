@@ -240,6 +240,20 @@ Level NotReallySludgeCoast(9, 8, "NotReallySludgeCoast",
   "    ##   "
   "    __   ");
 
+Level SlopeView(18, 8, "5-1 Slope View",
+  "        ##     1  "
+  "        ##______1 "
+  "2222222211___11_  "
+  "2222322211______  "
+  "2222222211______##"
+  "2222222211______##"
+  "           ##     "
+  "           ##     ",
+  Stephen{4, 5, 2, Left},
+  {Sausage{6, 3, 6, 4}, Sausage{13, 1, 14, 1}, Sausage{13, 4, 14, 4}},
+  {Ladder{4, 3, 2, Down}, Ladder{7, 5, 1, Right}, Ladder{9, 5, 0, Right}, Ladder{13, 2, 0, Left}});
+
+
 Level LandsEnd(13, 7, "Land's End",
   "      _1     "
   "_1___ __  3  "
@@ -251,6 +265,7 @@ Level LandsEnd(13, 7, "Land's End",
   Stephen{10, 2, 3, Left},
   {Sausage{9, 2, 9, 3, 2}},
   {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}});
+
 
 int main() {
 #define o(x) +1
@@ -332,7 +347,7 @@ int main() {
     "__"
     ">_");
 
-  LandsEnd.InteractiveSolver();
+  SlopeView.InteractiveSolver();
 
   //*
   for (Level* level : {&LandsEnd}) {

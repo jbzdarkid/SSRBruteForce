@@ -28,6 +28,10 @@ struct Stephen {
     x = x_; y = y_; z = z_;
     dir = dir_;
     forkX = x_; forkY = y_; forkZ = -1;
+    if (dir == Up)         forkY--;
+    else if (dir == Down)  forkY++;
+    else if (dir == Left)  forkX--;
+    else if (dir == Right) forkX++;
     forkDir = None;
   }
 
@@ -92,7 +96,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) // o(1) o(2)
+#define SAUSAGES o(0) o(1) o(2)
 #define STAY_NEAR_THE_SAUSAGES 0
 
 struct State {
