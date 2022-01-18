@@ -435,7 +435,7 @@ int main() {
   // ColdHorizon.InteractiveSolver();
 
   //*
-  for (Level* level : {&ColdHorizon}) {
+  for (Level* level : {&Cove}) {
     Vector<Direction> solution = Solver(level).Solve();
     std::string levelName(level->name);
     levelName = levelName.substr(0, levelName.find_first_of(' '));

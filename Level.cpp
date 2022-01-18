@@ -43,7 +43,7 @@ Level::Level(
     else if (c == 'L') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
     else if (c == 'R') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
     else if (c == '^') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Up); }
-    else if (c == 'b') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Down); }
+    else if (c == 'v') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Down); }
     else if (c == '<') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Left); }
     else if (c == '>') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Right); }
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
