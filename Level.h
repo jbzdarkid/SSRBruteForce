@@ -97,8 +97,9 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) // o(2) o(3) o(4)
+#define SAUSAGES o(0) o(1) o(2) o(3) // o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
+#define HASH_CACHING 1
 
 struct State {
   Stephen stephen;
@@ -117,13 +118,23 @@ struct State {
 #define UNWINNABLE 0xFFFE
   u16 winDistance = UNWINNABLE;
 
+#if HASH_CACHING
+  size_t hash = 0;
+#endif
+
   bool operator==(const State& other) const;
   u32 Hash() const;
 };
 
 namespace std {
 template<> struct hash<State> {
-  size_t operator()(const State& state) const { return state.Hash(); }
+  size_t operator()(const State& state) const { 
+#if HASH_CACHING
+  return state.hash;
+#else 
+  return state.Hash();
+#endif
+  }
 };
 }
 

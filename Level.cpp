@@ -242,6 +242,9 @@ State Level::GetState() const {
   } else */{
     _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
   }
+#if HASH_CACHING
+  s.hash = s.Hash();
+#endif
   return s;
 }
 
