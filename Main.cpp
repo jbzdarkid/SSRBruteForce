@@ -148,6 +148,19 @@ Level Cove(8, 6, "2-3 Cove",
   "    _ab_"
   "    ____");
 
+Level GreatTowerImanex(14, 11, "2-4 Great Tower (after imanex's start) (with no stacked sausages)",
+  "       #  #   "
+  "     1##1##   "
+  "  1111 11 1   "
+  "  1_______U___"
+  "  1___________"
+  "##1___________"
+  " # _______cd__"
+  " 11_____bbcd__"
+  "##1___>__aa___"
+  " # ___________"
+  " 11L__________");
+
 Level ThePaddock(10, 6, "2-5 The Paddock",
   " 11____111"
   "1_#_aa_# 1"
@@ -432,7 +445,7 @@ Level LandsEnd(13, 7, "Land's End",
 
 
 int main() {
-  // ColdHorizon.InteractiveSolver();
+  GreatTowerImanex.InteractiveSolver();
 
   //*
   for (Level* level : {&ColdHorizon}) {
