@@ -50,6 +50,7 @@ struct Stephen {
       assert(other.forkDir == None);
     }
 #endif
+    static_assert(sizeof(Stephen) == 8);
     u64 a = *(u64*)this;
     u64 b = *(u64*)&other;
     return a == b;
@@ -92,7 +93,10 @@ struct Sausage {
   inline bool IsVertical() const { return !IsHorizontal(); }
   inline bool IsRolled() const { return (flags & Rolled) != 0; }
   bool operator==(const Sausage& other) const {
-    return flags == other.flags && x1 == other.x1 && y1 == other.y1 && x2 == other.x2 && y2 == other.y2 && z == other.z;
+    static_assert(sizeof(Sausage) == 8);
+    u64 a = *(u64*)this;
+    u64 b = *(u64*)&other;
+    return a == b; // Assuming the padding bytes are always 0?
   }
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
