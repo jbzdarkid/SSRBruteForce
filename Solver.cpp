@@ -28,14 +28,14 @@ u16 Score(State* state) {
 
 Vector<Direction> Solver::Solve() {
   printf("Solving %s\n", _level->name);
-
-  auto it = _visitedNodes.insert(_level->GetState());
-  State* initialState = const_cast<State*>(&*it.first);
+  
+  State* initialState;
+  _visitedNodes2.CopyAdd(_level->GetState(), &initialState);
   _unexplored = LinkedList<State>(initialState);
 
   BFSStateGraph();
 
-  printf("Traversal done in %zd nodes.\n", _visitedNodes.size());
+  printf("Traversal done in %zd nodes.\n", _visitedNodes2.Size());
 
   ComputeWinningStates();
 
@@ -44,7 +44,7 @@ Vector<Direction> Solver::Solve() {
     if (state->winDistance != UNWINNABLE) winningStates++;
   }
 
-  printf("Of the %zd nodes, %d are winning.\n", _visitedNodes.size(), winningStates);
+  printf("Of the %zd nodes, %d are winning.\n", _visitedNodes2.Size(), winningStates);
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
   if (initialState->winDistance == UNWINNABLE) {
@@ -93,7 +93,7 @@ void Solver::BFSStateGraph() {
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
         printf("BFS exploration complete (no nodes remaining).\n");
         break;
-      } else if (_visitedNodes.size() > 100'000'000) {
+      } else if (_visitedNodes2.Size() > 100'000'000) {
         printf("giving up (too many nodes).\n");
         break;
       } else if (depth == _winningDepth + 2) {
@@ -125,18 +125,11 @@ void Solver::BFSStateGraph() {
 }
 
 State* Solver::GetOrInsertState(u16 depth) {
-  std::pair<std::unordered_set<State>::iterator, bool> it;
-  try {
-    it = _visitedNodes.insert(_level->GetState());
-  } catch (std::bad_alloc&) {
-    putchar('k');
-    return nullptr;
-  }
+  State* state;
+  bool inserted = _visitedNodes2.CopyAdd(_level->GetState(), &state);
+  if (!inserted) return state; // State was already analyzed, or allocation failed
 
-  State* state = const_cast<State*>(&*it.first);
-  if (!it.second) return state; // State was already analyzed
-
-  if (_visitedNodes.size() % 100'000 == 0) {
+  if (_visitedNodes2.Size() % 100'000 == 0) {
     //_level->Print();
   }
 
@@ -247,13 +240,13 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
       }
     }
   }
-  if (sausageSpeared) {
+  if (!sausageSpeared) {
     totalMillis += 160;
 
 #define o(x) if (state->sausages[x] != nextState->sausages[x]) totalMillis += 38;
     SAUSAGES;
 #undef o
-  } else { // No sausage speared
+  } else { // Movements are fater while spearing a sausage
     totalMillis += 158;
 
 #define o(x) if (state->sausages[x] != nextState->sausages[x]) totalMillis += 4;

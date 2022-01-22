@@ -1,7 +1,7 @@
 #pragma once
 #include "Types.h"
 #include "Level.h"
-#include <unordered_set>
+#include "WitnessRNG/StdLib.h"
 
 struct Solver {
   Solver(Level* level);
@@ -19,7 +19,7 @@ private:
   void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements);
 
   Level* _level = nullptr;
-  std::unordered_set<State> _visitedNodes;
+  NodeHashSet<State> _visitedNodes2;
   u16 _winningDepth = UNWINNABLE;
   LinkedList<State> _unexplored;
   LinkedLoop<State> _explored;
