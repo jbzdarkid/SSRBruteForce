@@ -878,14 +878,14 @@ bool State::operator==(const State& other) const {
 }
 
 u32 triple32_hash(u32 x) {
-    x ^= x >> 16;
-    x *= 0x45d9f3bU;
-    x ^= x >> 11;
-    x *= 0xac4c1b51U;
-    x ^= x >> 15;
-    x *= 0x31848babU;
-    x ^= x >> 14;
-    return x;
+  x ^= x >> 16;
+  x *= 0x45d9f3bU;
+  x ^= x >> 11;
+  x *= 0xac4c1b51U;
+  x ^= x >> 15;
+  x *= 0x31848babU;
+  x ^= x >> 14;
+  return x;
 }
 
 void combine_hash(u32& a, u32 b) {

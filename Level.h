@@ -87,7 +87,7 @@ struct Sausage {
   };
 
   u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
-  u8 _[2] = {0}; // Padding
+  u16 _ = 0; // Padding
 
   inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
   inline bool IsVertical() const { return !IsHorizontal(); }
@@ -148,7 +148,9 @@ struct Level {
     Ground = 0b00000001,
     Wall1  = 0b00000011,
     Wall2  = 0b00000111,
+    Over2  = 0b00000101,
     Wall3  = 0b00001111,
+    Over3  = 0b00001001,
     Wall4  = 0b00011111,
     Wall5  = 0b00111111,
     Grill  = 0b01000000,

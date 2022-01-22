@@ -19,7 +19,7 @@ private:
   void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements);
 
   Level* _level = nullptr;
-  NodeHashSet<State> _visitedNodes2 = NodeHashSet<State>(0x7FFFFF); // Choose a relatively large initial size because we'll need it.
+  NodeHashSet<State> _visitedNodes2 = NodeHashSet<State>(0x7FFFFFF); // Choose a relatively large initial size because we'll need it.
   u16 _winningDepth = UNWINNABLE;
   LinkedList<State> _unexplored;
   LinkedLoop<State> _explored;
