@@ -101,7 +101,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2) o(3) // o(4)
+#define SAUSAGES o(0) o(1) o(2) // o(3) // o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
@@ -158,7 +158,11 @@ struct Level {
     Unused = 0b10000000,
   };
 
-  Level(u8 width, u8 height, const char* name, const char* asciiGrid, const Stephen& stephen = {}, std::initializer_list<Ladder> ladders = {},  std::initializer_list<Sausage> sausages = {});
+  Level(u8 width, u8 height, const char* name, const char* asciiGrid,
+    const Stephen& stephen = {},
+    std::initializer_list<Ladder> ladders = {},
+    std::initializer_list<Sausage> sausages = {},
+    std::initializer_list<Tile> tiles = {});
   ~Level();
   void Print() const;
   bool InteractiveSolver();

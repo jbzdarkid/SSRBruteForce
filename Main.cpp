@@ -223,7 +223,7 @@ Level ColdJag(12, 5, "3-1 Cold Jag",
   {},
   {Sausage{11, 0, 11, 1, 1}});
 
-Level ColdFinger(17, 6, "3-2 Cold Finger", // TODO: Overhang!
+Level ColdFinger(17, 6, "3-2 Cold Finger",
   "____________     "
   "____________     "
   "3?_c___^____1    "
@@ -232,7 +232,8 @@ Level ColdFinger(17, 6, "3-2 Cold Finger", // TODO: Overhang!
   "         __ _##__",
   {},
   {},
-  {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}});
+  {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
+  {Level::Tile::Over3});
 
 Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
   "________      "
@@ -403,7 +404,7 @@ Level ToadsFolly(10, 10, "4-2 Toad's Folly",
   {Sausage{7, 2, 8, 2, 2}, Sausage{7, 8, 8, 8, 1}});
 
 
-Level SludgeCoast(10, 11, "4-3 Sludge Coast", // TODO: Overhang!
+Level SludgeCoast(10, 11, "4-3 Sludge Coast",
   "11111_____"
   "11111_____"
   "11222?____"
@@ -415,7 +416,10 @@ Level SludgeCoast(10, 11, "4-3 Sludge Coast", // TODO: Overhang!
   "    ##    "
   "    ##    "
   "    __    ",
-  Stephen{3, 0, 1, Right});
+  Stephen{3, 0, 1, Right},
+  {},
+  {},
+  {Level::Tile::Over2});
 
 Level SlopeView(18, 8, "5-1 Slope View",
   "        $$     1  "
@@ -448,32 +452,30 @@ int main() {
   // GreatTowerImanex.InteractiveSolver();
 
   //*
-  for (Level* level : {&GreatTowerImanex}) {
-    Vector<Direction> solution = Solver(level).Solve();
-    std::string levelName(level->name);
-    levelName = levelName.substr(0, levelName.find_first_of(' '));
-    std::ofstream file(levelName + ".dem");
+  Level* level = &ColdLadder;
+  Vector<Direction> solution = Solver(level).Solve();
+  std::string levelName(level->name);
+  levelName = levelName.substr(0, levelName.find_first_of(' '));
+  std::ofstream file(levelName + ".dem");
 
-    const char* dirs[] = {
-      nullptr,
-      "North",
-      "West",
-      nullptr,
-      nullptr,
-      "East",
-      "South",
-    };
-    for (Direction dir : solution) file << dirs[dir] << '\n';
-    file.close();
+  const char* dirs[] = {
+    nullptr,
+    "North",
+    "West",
+    nullptr,
+    nullptr,
+    "East",
+    "South",
+  };
+  for (Direction dir : solution) file << dirs[dir] << '\n';
+  file.close();
 
-    for (Direction dir : solution) {
-      level->Print();
-      printf("%s\n", dirs[dir]);
-      getchar();
-      level->Move(dir);
-    }
+  for (Direction dir : solution) {
     level->Print();
+    printf("%s\n", dirs[dir]);
+    getchar();
+    level->Move(dir);
   }
-  return 0;
+  level->Print();
   //*/
 }

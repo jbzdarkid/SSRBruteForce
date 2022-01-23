@@ -2,19 +2,17 @@
 #include <cstdio>
 #include <intrin.h>
 
-Level::Level(
-  u8 width,
-  u8 height,
-  const char* name,
-  const char* asciiGrid,
+Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   const Stephen& stephen,
   std::initializer_list<Ladder> ladders,
-  std::initializer_list<Sausage> sausages)
+  std::initializer_list<Sausage> sausages,
+  std::initializer_list<Tile> tiles)
 {
   this->name = name;
   _width = width;
   _height = height;
   _grid = NewDoubleArray2<Tile>(width, height);
+  Vector<Tile> extraTiles(tiles);
 
 #define o(x) +1
   _movedSausages = Vector<s8>(SAUSAGES);
@@ -28,7 +26,8 @@ Level::Level(
     s8 x = i % width;
     s8 y = i / width;
     char c = asciiGrid[i];
-    if (c == ' ') _grid[x][y] = Empty;
+    if (c == '?') _grid[x][y] = extraTiles.PopValue();
+    else if (c == ' ') _grid[x][y] = Empty;
     else if (c == '#') _grid[x][y] = (Tile)(Ground | Grill);
     else if (c == '$') _grid[x][y] = (Tile)(Wall1 | Grill);
     else if (c == '%') _grid[x][y] = (Tile)(Wall2 | Grill);
@@ -115,6 +114,8 @@ Level::Level(
 
   // Ladders from the initializer list do not get the same treatment.
   for (const Ladder& ladder : ladders) _ladders.Push(ladder);
+
+  assert(extraTiles.Size() == 0);
 }
 
 Level::~Level() {
@@ -304,26 +305,20 @@ bool Level::Move(Direction dir) {
 
   bool handled = false;
   if (!HandleLadderMotion(dir, handled)) return false;
-  if (handled) return true;
 
-  if (_sausageSpeared != -1) {
-    if (!HandleSpearedMotion(dir)) return false;
-    if (IsGrill(_stephen.x, _stephen.y, _stephen.z)) {
-      if (!HandleBurnedStep(dir)) return false;
+  if (!handled) {
+    if (_sausageSpeared != -1) {
+      if (!HandleSpearedMotion(dir)) return false;
+    } else if (!_stephen.HasFork()) {
+      if (!HandleForklessMotion(dir)) return false;
+    } else {
+      if (!HandleDefaultMotion(dir)) return false;
     }
-    return true;
-  }
-
-  if (_stephen.HasFork()) {
-    if (!HandleDefaultMotion(dir)) return false;
-  } else {
-    if (!HandleForklessMotion(dir)) return false;
   }
 
   if (IsGrill(_stephen.x, _stephen.y, _stephen.z)) {
     if (!HandleBurnedStep(dir)) return false;
   }
-
   return true;
 }
 
