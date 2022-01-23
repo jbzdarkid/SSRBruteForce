@@ -445,10 +445,10 @@ Level LandsEnd(13, 7, "Land's End",
 
 
 int main() {
-  GreatTowerImanex.InteractiveSolver();
+  // GreatTowerImanex.InteractiveSolver();
 
   //*
-  for (Level* level : {&Cove}) {
+  for (Level* level : {&GreatTowerImanex}) {
     Vector<Direction> solution = Solver(level).Solve();
     std::string levelName(level->name);
     levelName = levelName.substr(0, levelName.find_first_of(' '));

@@ -18,9 +18,9 @@ Level::Level(
 
 #define o(x) +1
   _movedSausages = Vector<s8>(SAUSAGES);
-  _sausages.Ensure(SAUSAGES);
+  // _sausages.Ensure(SAUSAGES);
 #undef o
-  _sausages.Fill({-127, -127, -127, -127, Sausage::Flags::None});
+  // _sausages.Fill({-127, -127, -127, -127, Sausage::Flags::None});
 
   assert(width * height == strlen(asciiGrid));
 
@@ -234,14 +234,17 @@ bool Level::Won() const {
 
 State Level::GetState() const {
   State s{_stephen};
-  /*if (_sausages[0].x1 < _sausages[1].x1
-   || (_sausages[0].x1 == _sausages[1].x1 && _sausages[0].y1 < _sausages[1].y1)) {
-    s.sausages[0] = _sausages[1];
-    s.sausages[1] = _sausages[0];
-    if (_sausageSpeared != -1) _sausageSpeared = 1 - _sausageSpeared;
-  } else */{
-    _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
-  }
+  assert(sizeof(s.sausages) / sizeof(Sausage) == _sausages.Size());
+#if SORT_SAUSAGE_STATE
+  _sausages.SortedCopyIntoArray(s.sausages, sizeof(s.sausages), [](const Sausage& a, const Sausage& b) -> s8 {
+    if (a.x1 > b.x1) return 1;
+    if (a.y1 > b.y1) return 1;
+    return -1;
+  });
+#else
+  _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
+#endif
+
 #if HASH_CACHING
   s.hash = s.Hash();
 #endif
@@ -824,13 +827,17 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
 
 s8 Level::GetSausage(s8 x, s8 y, s8 z) const {
   if (z < 0) return -1;
-  for (u8 i=0; i<_sausages.Size(); i++) {
-    const Sausage& sausage = _sausages[i];
-    if (z == sausage.z) {
-      if (x == sausage.x1 && y == sausage.y1) return i;
-      if (x == sausage.x2 && y == sausage.y2) return i;
-    }
+
+#define o(i) \
+  { \
+    const Sausage& sausage = _sausages[i]; \
+    if (z == sausage.z) { \
+      if (x == sausage.x1 && y == sausage.y1) return i; \
+      if (x == sausage.x2 && y == sausage.y2) return i; \
+    } \
   }
+  SAUSAGES;
+#undef o
 
   return -1;
 }
@@ -877,6 +884,39 @@ bool State::operator==(const State& other) const {
   return true;
 }
 
+// From MSVC's type_traits
+#if defined _WIN64
+constexpr size_t _FNV_offset_basis = 14695981039346656037ULL;
+constexpr size_t _FNV_prime        = 1099511628211ULL;
+constexpr size_t GoldenRatio       = 0x9e3779b97f4a7c15;
+#else
+constexpr size_t _FNV_offset_basis = 2166136261U;
+constexpr size_t _FNV_prime        = 16777619U;
+constexpr size_t GoldenRatio       = 0x9e3779b9;
+#endif
+
+size_t msvc_hash_internal(u8* bytes, size_t length) {
+  size_t h = _FNV_offset_basis;
+  for (size_t i=0; i<length; i++) {
+    h ^= bytes[i];
+    h *= _FNV_prime;
+  }
+  return h;
+}
+
+size_t msvc_hash(u32 value) {
+  return msvc_hash_internal((u8*)&value, sizeof(value));
+}
+
+size_t msvc_hash(u64 value) {
+  return msvc_hash_internal((u8*)&value, sizeof(value));
+}
+
+void combine_hash(size_t& a, u64 b) {
+  a ^= GoldenRatio + (a << 6) + (a >> 2) + msvc_hash(b);
+}
+
+/*
 u32 triple32_hash(u32 x) {
   x ^= x >> 16;
   x *= 0x45d9f3bU;
@@ -889,11 +929,10 @@ u32 triple32_hash(u32 x) {
 }
 
 void combine_hash(u32& a, u32 b) {
-  b = triple32_hash(b);
-  a += (b << 6) + (b >> 2);
+  a ^= 0x9e3779b9 + (a << 6) + (a >> 2) + triple32_hash(b);
 }
 
-u32 triple32_hash(u64 x) {
+size_t triple32_hash(u64 x) {
   u32 a = (u32)x;
   combine_hash(a, (u32)(x >> 32));
   return a;
@@ -903,11 +942,17 @@ void combine_hash(u32& a, u64 b) {
   combine_hash(a, (u32)b);
   combine_hash(a, (u32)(b >> 32));
 }
+*/
 
-u32 State::Hash() const {
+size_t State::Hash() const {
   static_assert(sizeof(Stephen) == 8);
   static_assert(sizeof(Sausage) == 8);
-  u32 hash = triple32_hash(*(u64*)&stephen);
+//   u32 hash = triple32_hash(*(u64*)&stephen);
+// #define o(x) combine_hash(hash, *(u64*)&sausages[x]);
+//   SAUSAGES
+// #undef o
+
+  size_t hash = msvc_hash(*(u64*)&stephen);
 #define o(x) combine_hash(hash, *(u64*)&sausages[x]);
   SAUSAGES
 #undef o

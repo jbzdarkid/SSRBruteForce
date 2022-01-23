@@ -104,6 +104,7 @@ struct Sausage {
 #define SAUSAGES o(0) o(1) o(2) o(3) // o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
 #define HASH_CACHING 1
+#define SORT_SAUSAGE_STATE 0
 
 struct State {
   Stephen stephen;
@@ -127,7 +128,7 @@ struct State {
 #endif
 
   bool operator==(const State& other) const;
-  u32 Hash() const;
+  size_t Hash() const;
 };
 
 namespace std {
