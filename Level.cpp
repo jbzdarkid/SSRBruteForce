@@ -11,7 +11,8 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   this->name = name;
   _width = width;
   _height = height;
-  _grid = NArray<Tile>(width, height);
+  _grid = NArray<Tile>(_width, _height);
+  _grid.Fill(Tile::Empty);
   Vector<Tile> extraTiles(tiles);
 
 #define o(x) +1
@@ -115,7 +116,7 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   // Ladders from the initializer list do not get the same treatment.
   for (const Ladder& ladder : ladders) _ladders.Push(ladder);
 
-  assert(extraTiles.Size() == 0);
+  assert(extraTiles.Size() == 0); // Assert that all excess tiles were consumed
 }
 
 void Level::Print() const {
