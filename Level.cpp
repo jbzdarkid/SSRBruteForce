@@ -11,7 +11,7 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   this->name = name;
   _width = width;
   _height = height;
-  _grid = NewDoubleArray2<Tile>(width, height);
+  _grid = NArray<Tile>(width, height);
   Vector<Tile> extraTiles(tiles);
 
 #define o(x) +1
@@ -26,32 +26,32 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
     s8 x = i % width;
     s8 y = i / width;
     char c = asciiGrid[i];
-    if (c == '?') _grid[x][y] = extraTiles.PopValue();
-    else if (c == ' ') _grid[x][y] = Empty;
-    else if (c == '#') _grid[x][y] = (Tile)(Ground | Grill);
-    else if (c == '$') _grid[x][y] = (Tile)(Wall1 | Grill);
-    else if (c == '%') _grid[x][y] = (Tile)(Wall2 | Grill);
-    else if (c == '_') _grid[x][y] = Ground;
-    else if (c == '1') _grid[x][y] = Wall1;
-    else if (c == '2') _grid[x][y] = Wall2;
-    else if (c == '3') _grid[x][y] = Wall3;
-    else if (c == '4') _grid[x][y] = Wall4;
-    else if (c == '5') _grid[x][y] = Wall5;
-    else if (c == 'U') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
-    else if (c == 'D') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
-    else if (c == 'L') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
-    else if (c == 'R') { _grid[x][y] = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
-    else if (c == '^') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Up); }
-    else if (c == 'v') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Down); }
-    else if (c == '<') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Left); }
-    else if (c == '>') { _grid[x][y] = Ground; _stephen = Stephen(x, y, 0, Right); }
+    if (c == '?') _grid.Get(x, y) = extraTiles.PopValue();
+    else if (c == ' ') _grid.Get(x, y) = Empty;
+    else if (c == '#') _grid.Get(x, y) = (Tile)(Ground | Grill);
+    else if (c == '$') _grid.Get(x, y) = (Tile)(Wall1 | Grill);
+    else if (c == '%') _grid.Get(x, y) = (Tile)(Wall2 | Grill);
+    else if (c == '_') _grid.Get(x, y) = Ground;
+    else if (c == '1') _grid.Get(x, y) = Wall1;
+    else if (c == '2') _grid.Get(x, y) = Wall2;
+    else if (c == '3') _grid.Get(x, y) = Wall3;
+    else if (c == '4') _grid.Get(x, y) = Wall4;
+    else if (c == '5') _grid.Get(x, y) = Wall5;
+    else if (c == 'U') { _grid.Get(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
+    else if (c == 'D') { _grid.Get(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
+    else if (c == 'L') { _grid.Get(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
+    else if (c == 'R') { _grid.Get(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
+    else if (c == '^') { _grid.Get(x, y) = Ground; _stephen = Stephen(x, y, 0, Up); }
+    else if (c == 'v') { _grid.Get(x, y) = Ground; _stephen = Stephen(x, y, 0, Down); }
+    else if (c == '<') { _grid.Get(x, y) = Ground; _stephen = Stephen(x, y, 0, Left); }
+    else if (c == '>') { _grid.Get(x, y) = Ground; _stephen = Stephen(x, y, 0, Right); }
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
       if (c >= 'A' && c <= 'Z') {
-        _grid[x][y] = Empty;
+        _grid.Get(x, y) = Empty;
         num = c - 'A';
       } else {
-        _grid[x][y] = Ground;
+        _grid.Get(x, y) = Ground;
         num = c - 'a';
       }
 
@@ -118,10 +118,6 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   assert(extraTiles.Size() == 0);
 }
 
-Level::~Level() {
-  DeleteDoubleArray2(_grid);
-}
-
 void Level::Print() const {
   putchar('+');
   for (u8 x=0; x<_width; x++) putchar('-');
@@ -161,18 +157,18 @@ void Level::Print() const {
       //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
       //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
       else if (sausageNo != -1) {
-        if (_grid[x][y] == Empty)     putchar('A' + sausageNo);
+        if (_grid.Get(x, y) == Empty)     putchar('A' + sausageNo);
         else                          putchar('a' + sausageNo);
       }
       else if (ladderCh != '\0')      putchar(ladderCh);
-      else if (_grid[x][y] == Empty)  putchar(' ');
-      else if (_grid[x][y] &  Grill)  putchar('#');
-      else if (_grid[x][y] == Ground) putchar('_');
-      else if (_grid[x][y] == Wall1)  putchar('1');
-      else if (_grid[x][y] == Wall2)  putchar('2');
-      else if (_grid[x][y] == Wall3)  putchar('3');
-      else if (_grid[x][y] == Wall4)  putchar('4');
-      else if (_grid[x][y] == Wall5)  putchar('5');
+      else if (_grid.Get(x, y) == Empty)  putchar(' ');
+      else if (_grid.Get(x, y) &  Grill)  putchar('#');
+      else if (_grid.Get(x, y) == Ground) putchar('_');
+      else if (_grid.Get(x, y) == Wall1)  putchar('1');
+      else if (_grid.Get(x, y) == Wall2)  putchar('2');
+      else if (_grid.Get(x, y) == Wall3)  putchar('3');
+      else if (_grid.Get(x, y) == Wall4)  putchar('4');
+      else if (_grid.Get(x, y) == Wall5)  putchar('5');
       else assert(false);
     }
     putchar('|');
@@ -843,14 +839,14 @@ bool Level::IsWithinGrid(s8 x, s8 y, s8 z) const {
 
 bool Level::IsWall(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
-  u8 cell = _grid[x][y];
+  u8 cell = _grid.Get(x, y);
   // At z=0, we are blocked if the cell has the second bit set, i.e. (cell & 0b10).
   return cell & (Ground << 1 << z);
 }
 
 bool Level::CanWalkOnto(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
-  u8 cell = _grid[x][y];
+  u8 cell = _grid.Get(x, y);
   // If you are at z=0, you can walk onto anything at ground level. If you are at z=1, you can walk onto Wall1
   if ((cell & (Ground << z)) != 0) return true; // Ground at our current level
   if (GetSausage(x, y, z-1) != -1) return true; // Sausage at our current level
@@ -859,7 +855,7 @@ bool Level::CanWalkOnto(s8 x, s8 y, s8 z) const {
 
 bool Level::IsGrill(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
-  u8 cell = _grid[x][y];
+  u8 cell = _grid.Get(x, y);
   if ((cell & Grill) == 0) return false;
   return (cell & (Ground << z)) != 0; // There is ground at this level
 }

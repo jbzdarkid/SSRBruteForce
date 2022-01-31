@@ -163,7 +163,6 @@ struct Level {
     std::initializer_list<Ladder> ladders = {},
     std::initializer_list<Sausage> sausages = {},
     std::initializer_list<Tile> tiles = {});
-  ~Level();
   void Print() const;
   bool InteractiveSolver();
   bool Won() const;
@@ -209,7 +208,8 @@ private:
   bool IsGrill(s8 x, s8 y, s8 z) const;
   bool IsLadder(s8 x, s8 y, s8 z, Direction dir) const;
 
-  Tile** _grid;
+  NArray<Tile> _grid;
+  NArray<s8> _sausageGrid;
   s8 _width = 0;
   s8 _height = 0;
   s8 _sausageSpeared = -1;
