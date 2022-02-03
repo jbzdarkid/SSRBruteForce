@@ -185,11 +185,16 @@ private:
   bool HandleForklessMotion(Direction dir);
   bool HandleDefaultMotion(Direction dir);
 
-  Vector<s8> _movedSausages;
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
-  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, Vector<s8>* movedSausages=nullptr, s8* sausageWithFork=nullptr);
+  bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir);
+  bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
+  struct CPMOut { // The more complex output data from CanPhysicallyMove.
+    Vector<bool> movedSausages;
+    s8 sausageToSpear = -1;
+    bool movedFork = false;
+  } _cpmOut;
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
