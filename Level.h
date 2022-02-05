@@ -28,25 +28,27 @@ struct Stephen {
   Stephen(s8 x_, s8 y_, s8 z_, Direction dir_) {
     x = x_; y = y_; z = z_;
     dir = dir_;
-    forkX = x_; forkY = y_; forkZ = -1;
+    forkX = x_; forkY = y_; forkZ = z_;
+    forkDir = None;
+
     if (dir == Up)         forkY--;
     else if (dir == Down)  forkY++;
     else if (dir == Left)  forkX--;
     else if (dir == Right) forkX++;
-    forkDir = None;
   }
 
-  // If forkZ is negative, then stephen has his fork -- if it is positive, the fork is disconnected.
-  inline bool HasFork() const { return forkZ < 0; }
+  // If the fork has no direction, then stephen is holding it (its direction matches stephen's).
+  // If it has any other value, then it is elsewhere in the world.
+  inline bool HasFork() const { return forkDir == None; }
   bool operator==(const Stephen& other) const {
     // We keep states where stephen has a fork in a normalized form so that we can do a direct u64 comparison.
 #if _DEBUG
     if (HasFork()) {
-      assert(forkZ == -1);
+      assert(forkZ == z);
       assert(forkDir == None);
     }
     if (other.HasFork()) {
-      assert(other.forkZ == -1);
+      assert(other.forkZ == other.z);
       assert(other.forkDir == None);
     }
 #endif
@@ -101,7 +103,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) o(2) // o(3) // o(4)
+#define SAUSAGES o(0) o(1) // o(2) // o(3) // o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
@@ -185,16 +187,14 @@ private:
   bool HandleForklessMotion(Direction dir);
   bool HandleDefaultMotion(Direction dir);
 
+  // TODO: Maybe another layer here? There's some quite complex stuff happening with CPM/MTS. Not sure how to cleanly split it up, though.
+
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir);
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
-  struct CPMOut { // The more complex output data from CanPhysicallyMove.
-    Vector<bool> movedSausages;
-    s8 sausageToSpear = -1;
-    bool movedFork = false;
-  } _cpmOut;
+  void CheckForSausageCarry(Direction dir, s8 z);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
@@ -223,5 +223,4 @@ private:
   Vector<Sausage> _sausages;
   Vector<Ladder> _ladders;
   bool _interactive = false;
-  u64 _stackStart = 0;
 };

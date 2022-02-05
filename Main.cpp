@@ -451,8 +451,17 @@ Level LandsEnd(13, 7, "Land's End",
 int main() {
   // GreatTowerImanex.InteractiveSolver();
 
+  Level Test(5, 6, "Test",
+    "__111"
+    "a_121"
+    "a_111"
+    "<__U_"
+    "_____"
+    "_bb__");
+  WretchsRetreat.InteractiveSolver();
+
   //*
-  Level* level = &ColdLadder;
+  Level* level = &Test;
   Vector<Direction> solution = Solver(level).Solve();
   std::string levelName(level->name);
   levelName = levelName.substr(0, levelName.find_first_of(' '));

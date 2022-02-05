@@ -2,6 +2,26 @@
 #include <cstdio>
 #include <intrin.h>
 
+static u64 stackStart;
+void stackcheck_begin() {
+#if _DEBUG
+  u8 local;
+  stackStart = (u64)&local;
+#endif
+}
+
+void stackcheck() {
+#if _DEBUG
+  u8 local;
+  u64 currentStack = (u64)&local;
+  if (stackStart - currentStack > 0x10'000) {
+    printf("Stack overflow detected! Execution paused.\n");
+    assert(false);
+    getchar();
+  }
+#endif
+}
+
 Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   const Stephen& stephen,
   std::initializer_list<Ladder> ladders,
@@ -14,11 +34,6 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   _grid = NArray<Tile>(_width, _height);
   _grid.Fill(Tile::Empty);
   Vector<Tile> extraTiles(tiles);
-
-#define o(x) +1
-  _cpmOut.movedSausages = Vector<bool>(SAUSAGES);
-  _cpmOut.movedSausages.Resize(SAUSAGES);
-#undef o
 
   assert(width * height == strlen(asciiGrid));
   for (s32 i=0; i<width * height; i++) {
@@ -252,7 +267,7 @@ void Level::SetState(const State* s) {
   _sausages.CopyFromArray(s->sausages, sizeof(s->sausages));
 
   // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.
-  if (_stephen.HasFork()) _sausageSpeared = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.z);
+  if (_stephen.HasFork()) _sausageSpeared = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
 }
 
 const char* DIRS[] = {
@@ -286,10 +301,7 @@ bool Level::WouldStephenStepOnGrill(const Stephen& stephen, Direction dir) {
 
 // Where possible, I prefer to check to see if we should call a function instead of using &handled.
 bool Level::Move(Direction dir) {
-#if _DEBUG
-  u8 local;
-  _stackStart = (u64)&local;
-#endif
+  stackcheck_begin();
   s8 standingOnSausage = GetSausage(_stephen.x, _stephen.y, _stephen.z - 1);
   if (standingOnSausage != -1) {
     Sausage sausage = _sausages[standingOnSausage];
@@ -355,11 +367,8 @@ bool Level::HandleLogRolling(const Sausage& sausage, Direction dir, bool& handle
       if (_stephen.z <= 0) FAIL("Stephen would fall below the world");
 
       if (_stephen.HasFork()) {
-        bool forkSupported = CanWalkOnto(_stephen.forkX, _stephen.forkY, _stephen.z);
-        if (forkSupported) { // Stephen becomes forkless!
-          _stephen.forkZ = _stephen.z;
-          _stephen.forkDir = _stephen.dir;
-          FAIL("Stephen cannot (yet) become forkless");
+        if (!CanWalkOnto(_stephen.forkX, _stephen.forkY, _stephen.forkZ)) {
+          _stephen.forkDir = _stephen.dir; // Fork disconnects, and remains where it was.
         }
       }
       _stephen.z--;
@@ -370,7 +379,7 @@ bool Level::HandleLogRolling(const Sausage& sausage, Direction dir, bool& handle
 }
 
 bool Level::HandleSpearedMotion(Direction dir) {
-  if (!CanPhysicallyMove(_stephen.forkX, _stephen.forkY, _stephen.z, dir)) {
+  if (!CanPhysicallyMove(_stephen.forkX, _stephen.forkY, _stephen.forkZ, dir)) {
     if (dir == Inverse(_stephen.dir)) _sausageSpeared = -1;
     else FAIL("Speared sausage cannot physically move %s", DIRS[dir]);
   }
@@ -441,6 +450,7 @@ bool Level::HandleLadderMotion(Direction dir, bool& handled) {
 }
 
 bool Level::HandleBurnedStep(Direction dir) {
+  stackcheck();
   return Move(Inverse(dir));
 }
 
@@ -463,7 +473,6 @@ bool Level::HandleForklessMotion(Direction dir) {
       reconnectFork = (_stephen.x == _stephen.forkX + 1 && _stephen.y == _stephen.forkY);
     }
     if (reconnectFork) {
-      _stephen.forkZ = -1;
       _stephen.forkDir = None;
     }
   }
@@ -551,151 +560,169 @@ bool Level::HandleDefaultMotion(Direction dir) {
   return true;
 }
 
+struct CPMData {
+  Vector<s8> movedSausages;
+  s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
+  u8 consideredSausages = 0;
+  bool pushedFork = false;
+} data;
+
 bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir) {
-  _cpmOut.movedSausages.Fill(false);
-  _cpmOut.sausageToSpear = -1;
-  _cpmOut.movedFork = false;
-  return CanPhysicallyMoveInternal(x, y, z, dir);
+  data.movedSausages.Resize(0);
+  data.sausageToSpear = -1;
+  data.consideredSausages = 0;
+  data.pushedFork = false;
+
+  if (!CanPhysicallyMoveInternal(x, y, z, dir)) return false;
+  CheckForSausageCarry(dir, z);
+  return true;
 }
 
-bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
-#if _DEBUG
-  u8 local;
-  u64 currentStack = (u64)&local;
-  if (_stackStart - currentStack > 0x10'000) {
-    printf("Stack overflow detected! Execution paused.\n");
-    assert(false);
-    getchar();
-  }
-#endif
+bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir /*, CPMData& data */) {
+  stackcheck();
   if (IsWall(x, y, z)) return false; // No, walls cannot move.
 
+  s8 dx = 0;
+  s8 dy = 0;
+  s8 dz = 0;
+  if (dir == Up)          dy = -1;
+  else if (dir == Down)   dy = +1;
+  else if (dir == Left)   dx = -1;
+  else if (dir == Right)  dx = +1;
+  else if (dir == Crouch) /*dz = -1;*/ return false; // Nothing can move down, ever.
+  else if (dir == Jump)   dz = +1;
+  else assert(false);
+
+  // We check for a sausage first, because if the fork is inside a sausage we don't need think about its motion separately,
+  // it simply rolls along with the sausage.
   s8 sausageNo = GetSausage(x, y, z);
-
-  if (sausageNo == -1) { // There is not a sausage in this square
+  if (sausageNo == -1) {
     if (!_stephen.HasFork() && x == _stephen.forkX && y == _stephen.forkY && z == _stephen.forkZ) {
-      // There is a fork in this square
-      _cpmOut.movedFork = true;
-
-      // CanPhysicallyMoveInternal is pushing stephen's fork.
-      // TODO: We need to decide (ala spearing) if this push is valid, or if it's valid but only if we spear the separated fork.
-      if (dir == Up) {
-        return CanPhysicallyMoveInternal(x, y - 1, z, dir);
-      } else if (dir == Down) {
-        return CanPhysicallyMoveInternal(x, y + 1, z, dir);
-      } else if (dir == Left) {
-        return CanPhysicallyMoveInternal(x - 1, y, z, dir);
-      } else if (dir == Right) {
-        return CanPhysicallyMoveInternal(x + 1, y, z, dir);
-      } else if (dir == Jump) {
-        return CanPhysicallyMoveInternal(x, y, z + 1, dir);
-      } else if (dir == Crouch) {
-        return false; // It's never possible for sausages to move down, so don't even bother.
+      data.pushedFork = true;
+      if (_stephen.forkDir == dir) {
+        data.sausageToSpear = GetSausage(x + dx, y + dy, z); // We don't need to add dz here because this only happens for UDLR.
+      } else if (_stephen.forkDir == Inverse(dir)) {
+        data.sausageToSpear = GetSausage(x - dx, y - dy, z); // We don't need to add dz here because this only happens for UDLR.
       } else {
-        assert(false); // Unknown direction
-        FAIL("Attempted to physically move in an unknown direction");
+        data.sausageToSpear = -1; // Can't push the fork into a sausage in this direction
       }
+      return CanPhysicallyMoveInternal(x + dx, y + dy, z + dz, dir);
     }
+    return true;
   }
 
-  if (_cpmOut.sausageToSpear == -1) _cpmOut.sausageToSpear = sausageNo;
-
-  // We have already evaluated this sausage; it would've failed then.
-  if (_cpmOut.movedSausages[sausageNo]) return true;
-  _cpmOut.movedSausages[sausageNo] = true;
-
+  assert(sausageNo < sizeof(data.consideredSausages) * 8);
+  if (data.consideredSausages & (1 << sausageNo)) return true; // Already analyzed
+  data.consideredSausages |= (1 << sausageNo);
+  if (data.sausageToSpear == -1) data.sausageToSpear = sausageNo; // If spearing is possible, the first sausage we encounter will be our spear target.
   Sausage sausage = _sausages[sausageNo];
 
-  // Sausages can move if the tiles beyond them can move (either other sausages or empty space)
-  if (dir == Up) {
-    if (sausage.IsVertical()) {
-      return CanPhysicallyMoveInternal(sausage.x1, sausage.y1 - 1, sausage.z, dir);
-    } else {
-      return CanPhysicallyMoveInternal(sausage.x1, sausage.y1 - 1, sausage.z, dir)
-          && CanPhysicallyMoveInternal(sausage.x2, sausage.y2 - 1, sausage.z, dir);
-    }
-  } else if (dir == Down) {
-    if (sausage.IsVertical()) {
-      return CanPhysicallyMoveInternal(sausage.x2, sausage.y2 + 1, sausage.z, dir);
-    } else {
-      return CanPhysicallyMoveInternal(sausage.x1, sausage.y1 + 1, sausage.z, dir)
-          && CanPhysicallyMoveInternal(sausage.x2, sausage.y2 + 1, sausage.z, dir);
-    }
-  } else if (dir == Left) {
-    if (sausage.IsHorizontal()) {
-      return CanPhysicallyMoveInternal(sausage.x1 - 1, sausage.y1, sausage.z, dir);
-    } else {
-      return CanPhysicallyMoveInternal(sausage.x1 - 1, sausage.y1, sausage.z, dir)
-          && CanPhysicallyMoveInternal(sausage.x2 - 1, sausage.y2, sausage.z, dir);
-    }
-  } else if (dir == Right) {
-    if (sausage.IsHorizontal()) {
-      return CanPhysicallyMoveInternal(sausage.x2 + 1, sausage.y2, sausage.z, dir);
-    } else {
-      return CanPhysicallyMoveInternal(sausage.x1 + 1, sausage.y1, sausage.z, dir)
-          && CanPhysicallyMoveInternal(sausage.x2 + 1, sausage.y2, sausage.z, dir);
-    }
-  } else if (dir == Jump) {
-    return CanPhysicallyMoveInternal(sausage.x1, sausage.y1, sausage.z + 1, dir)
-        && CanPhysicallyMoveInternal(sausage.x2, sausage.y2, sausage.z + 1, dir);
-  } else if (dir == Crouch) {
-    return false; // It's never possible for sausages to move down, so don't even bother.
-  } else {
-    assert(false); // Unknown direction
-    FAIL("Attempted to physically move in an unknown direction");
-  }
+  if (!CanPhysicallyMoveInternal(sausage.x1 + dx, sausage.y1 + dy, sausage.z + dz, dir)) return false;
+  if (!CanPhysicallyMoveInternal(sausage.x2 + dx, sausage.y2 + dy, sausage.z + dz, dir)) return false;
+  // Both of the sausage halves can move, so the sausage will move if the move succeeds.
+  data.movedSausages.Push(sausageNo);
+  return true;
+}
+
+void Level::CheckForSausageCarry(Direction dir, s8 z) {
+  if (dir == Crouch || dir == Jump) return; // Sausages can only be carried laterally (UDLR)
+
+  bool stephenIsRotating = (dir != _stephen.dir && dir != Inverse(_stephen.dir));
+
+  bool anySausagesMoved;
+  do {
+    z++;
+    anySausagesMoved = false;
+    for (s8 sausageNo = 0; sausageNo < _sausages.Size(); sausageNo++) {
+      Sausage sausage = _sausages[sausageNo];
+      if (sausage.z != z) continue; // Pedantic layer-by-layer nonsense
+
+      if (CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
+       || CanWalkOnto(sausage.x2, sausage.y2, sausage.z)) continue; // Sausage is resting on a wall
+      if (_stephen.forkZ == sausage.z-1 && !_stephen.HasFork() && !data.pushedFork) {
+        if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
+          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Sausage is resting on disconnected fork which is not moving
+      }
+      if (_stephen.forkZ == sausage.z-1 && !stephenIsRotating) {
+        if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
+          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Fork carry
+      }
+      if (_stephen.z == sausage.z-1 && stephenIsRotating) {
+        if ((_stephen.x == sausage.x1 && _stephen.y == sausage.y1)
+          || (_stephen.x == sausage.x2 && _stephen.y == sausage.y2)) {
+          assert(false);
+          continue; // Sausage hat (unsupported as yet)
+        }
+      }
+
+      s8 restingOn1 = GetSausage(sausage.x1, sausage.y1, sausage.z-1);
+      if (!data.movedSausages.Contains(restingOn1)) continue; // Supported by another sausage which is not moving.
+      s8 restingOn2 = GetSausage(sausage.x2, sausage.y2, sausage.z-1);
+      if (!data.movedSausages.Contains(restingOn2)) continue; // Supported by another sausage which is not moving.
+
+      // If this sausage can physically move, it will be added to the movedSausages list.
+      if (CanPhysicallyMoveInternal(sausage.x1, sausage.y1, sausage.z, dir)) {
+        anySausagesMoved = true;
+      }
+    } // End for loop
+  } while (anySausagesMoved);
 }
 
 bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
   bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir);
 
   if (!canPhysicallyMove) {
-    if (spear && _cpmOut.sausageToSpear != -1) {
-      _sausageSpeared = _cpmOut.sausageToSpear;
+    if (spear && data.sausageToSpear != -1) {
+      _sausageSpeared = data.sausageToSpear;
       // This location cannot move, but we can still move into it (by spearing).
       return true;
     }
+    if (data.pushedFork && data.sausageToSpear != -1) {
+      _sausageSpeared = data.sausageToSpear;
+      // This location cannot move *but* the fork can move, which may allow the sausages to move.
+      // This is a destructive action.
+      if (dir == Up)         _stephen.forkY--;
+      else if (dir == Down)  _stephen.forkY++;
+      else if (dir == Left)  _stephen.forkX--;
+      else if (dir == Right) _stephen.forkX++;
+      // Then, try the move again, and if we still can't move, give up.
+      canPhysicallyMove = CanPhysicallyMove(x, y, z, dir);
+      if (!canPhysicallyMove) FAIL("Stephen's fork can stick into sausage %c but the move is still impossible", 'a' + data.sausageToSpear);
+      // Else, we fall into the main block.
+    } else {
+      if (!_interactive) return false;
 
-    if (!_interactive) return false;
-
-    // This branch can be hit from a bunch of places. Let's try to give a useful error message.
-    if (spear) FAIL("Stephen's fork cannot move in direction %s, and there is nothing to spear", DIRS[dir]);
-    if (_cpmOut.sausageToSpear != -1) FAIL("Cannot move sausage %c in direction %s", 'a' + _cpmOut.sausageToSpear, DIRS[dir]);
-    FAIL("Wall at [%d, %d, %d] cannot move %s (probably you pushed a fork into it)", x, y, z, DIRS[dir]);
+      // This branch can be hit from a bunch of places. Let's try to give a useful error message.
+      if (spear) FAIL("Stephen's fork cannot move in direction %s, and there is nothing to spear", DIRS[dir]);
+      if (data.sausageToSpear != -1) FAIL("Cannot move sausage %c in direction %s", 'a' + data.sausageToSpear, DIRS[dir]);
+      FAIL("Wall at [%d, %d, %d] cannot move %s (probably you pushed a fork into it)", x, y, z, DIRS[dir]);
+    }
   }
 
-  // Currently not worrying about side-effects. Wouldn't be too hard to prevent, though:
-  // Just copy the sausages into a temp array, then swap the temp and current arrays.
-  for (s8 sausageNo = 0; sausageNo < _cpmOut.movedSausages.Size(); sausageNo++) {
-    // TODO: I'm really hoping that order doesn't matter here. But it might, if sausages are stacked on each other?
-    if (!_cpmOut.movedSausages[sausageNo]) continue;
+  // The ordering here is important -- we need to move lower sausages first so that they drop in the same order.
+  for (s8 sausageNo : data.movedSausages) {
     Sausage sausage = _sausages[sausageNo];
-
-    bool sausageHasFork = !_stephen.HasFork()
-      && sausage.z == _stephen.forkZ
-      && ((sausage.x1 == _stephen.forkX && sausage.y1 == _stephen.forkY)
-       || (sausage.x2 == _stephen.forkX && sausage.y2 == _stephen.forkY));
 
     // Move the sausage
     if (dir == Up) {
       sausage.y1--;
       sausage.y2--;
-      if (sausageHasFork) _stephen.forkY--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkY--;
     } else if (dir == Down) {
       sausage.y1++;
       sausage.y2++;
-      if (sausageHasFork) _stephen.forkY++;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkY++;
     } else if (dir == Left) {
       sausage.x1--;
       sausage.x2--;
-      if (sausageHasFork) _stephen.forkX--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkX--;
     } else if (dir == Right) {
       sausage.x1++;
       sausage.x2++;
-      if (sausageHasFork) _stephen.forkX++;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkX++;
     } else if (dir == Jump) {
       sausage.z++;
-      if (sausageHasFork) _stephen.forkZ--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
     } else {
       assert(false);
       FAIL("Cannot move sausage %c in direction %d", 'a' + sausageNo, dir);
@@ -709,12 +736,16 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       if (sausage.IsHorizontal()) {
         if (dir == Up || dir == Down) {
           sausage.flags ^= Sausage::Flags::Rolled;
-          if (sausageHasFork && (_stephen.forkDir == Up || _stephen.forkDir == Down)) _stephen.forkDir = Inverse(_stephen.forkDir);
+          if (!_stephen.HasFork() && sausageNo == _sausageSpeared && (_stephen.forkDir == Up || _stephen.forkDir == Down)) {
+            _stephen.forkDir = Inverse(_stephen.forkDir);
+          }
         }
       } else { // sausage.IsVertical()
         if (dir == Left || dir == Right) {
           sausage.flags ^= Sausage::Flags::Rolled;
-          if (sausageHasFork && (_stephen.forkDir == Left || _stephen.forkDir == Right)) _stephen.forkDir = Inverse(_stephen.forkDir);
+          if (!_stephen.HasFork() && sausageNo == _sausageSpeared && (_stephen.forkDir == Left || _stephen.forkDir == Right)) {
+            _stephen.forkDir = Inverse(_stephen.forkDir);
+          }
         }
       }
 
@@ -724,7 +755,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
         if (supported) break;
         if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
         sausage.z--;
-        if (sausageHasFork) _stephen.forkZ--;
+        if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
       }
     }
 
@@ -743,7 +774,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
     _sausages[sausageNo] = sausage;
   }
 
-  if (_cpmOut.movedFork) { // This boolean is only set if the fork is not inside a sausage.
+  if (data.pushedFork) { // This boolean is only set if the fork is not inside a sausage.
     if (dir == Up) {
       _stephen.forkY--;
     } else if (dir == Down) {
@@ -773,7 +804,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
 bool Level::MoveStephenThroughSpace(Direction dir) {
   // If there's a speared sausage, we need to move it first, and it will check the space it's moving into.
   // If it succeeds, the fork is clear to move (and we don't want to double-move the sausage).
-  if (_sausageSpeared != -1 && _stephen.HasFork()) {
+  if (_stephen.HasFork() && _sausageSpeared != -1) {
     if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.z, dir)) return false;
   }
 
@@ -792,14 +823,16 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
     if (_stephen.HasFork()) _stephen.forkX++;
   } else if (dir == Crouch) {
     _stephen.z--;
+    if (_stephen.HasFork()) _stephen.forkZ--;
   } else if (dir == Jump) {
     _stephen.z++;
+    if (_stephen.HasFork()) _stephen.forkZ++;
   }
 
   // If there's no speared sausage, we need to check the space the fork is moving into.
   if (_sausageSpeared == -1 && _stephen.HasFork()) {
     bool spear = (dir == _stephen.dir);
-    if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.z, dir, spear)) return false;
+    if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.forkZ, dir, spear)) return false;
   }
   if (!MoveThroughSpace(_stephen.x, _stephen.y, _stephen.z, dir)) return false;
 
