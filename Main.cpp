@@ -215,8 +215,8 @@ Level TwistyFarm(10, 14, "2-10 Twisty Farm",
 
 Level ColdJag(12, 5, "3-1 Cold Jag",
   "    222_3__1"
-  "    1_bc____"
-  "    1_bc____"
+  "    1_ab____"
+  "    1_ab____"
   "__##U_____11"
   "__##_>______",
   {},
@@ -226,8 +226,8 @@ Level ColdJag(12, 5, "3-1 Cold Jag",
 Level ColdFinger(17, 6, "3-2 Cold Finger",
   "____________     "
   "____________     "
-  "3?_c___^____1    "
-  "___c______1__    "
+  "3?_a___^____1    "
+  "___a______1__    "
   "__________1__##__"
   "         __ _##__",
   {},
@@ -263,7 +263,10 @@ Level ColdTrail(19, 10, "3-4 Cold Trail",
   "____________       "
   "____________       "
   "_____________      "
-  "______________     ");
+  "______________     ",
+  {},
+  {},
+  {Sausage{1, 2, 2, 2, 1}, Sausage{1, 3, 1, 4, 1}, Sausage{2, 3, 2, 4, 1}});
 
 Level ColdCliff(8, 8, "3-5 Cold Cliff",
   "2222    "
@@ -449,8 +452,6 @@ Level LandsEnd(13, 7, "Land's End",
 
 
 int main() {
-  // GreatTowerImanex.InteractiveSolver();
-
   Level Test(6, 6, "Test",
     "___111"
     "___121"
@@ -458,10 +459,10 @@ int main() {
     "____U_"
     "____v_"
     "______", {}, {}, {Sausage{3, 1, 3, 2, 1}});
-  Test.InteractiveSolver();
 
-  //*
-  Level* level = &Test;
+  Level* level = &ColdTrail;
+  level->InteractiveSolver();
+
   Vector<Direction> solution = Solver(level).Solve();
   std::string levelName(level->name);
   levelName = levelName.substr(0, levelName.find_first_of(' '));

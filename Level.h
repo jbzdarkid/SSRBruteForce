@@ -94,6 +94,12 @@ struct Sausage {
   inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
   inline bool IsVertical() const { return !IsHorizontal(); }
   inline bool IsRolled() const { return (flags & Rolled) != 0; }
+  inline bool IsAt(s8 x_, s8 y_, s8 z_) const {
+    if (z_ != z) return false;
+    if (x_ == x1 && y_ == y1) return true;
+    if (x_ == x2 && y_ == y2) return true;
+    return false;
+  }
   bool operator==(const Sausage& other) const {
     static_assert(sizeof(Sausage) == 8);
     u64 a = *(u64*)this;
@@ -103,7 +109,7 @@ struct Sausage {
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
-#define SAUSAGES o(0) o(1) // o(2) // o(3) // o(4)
+#define SAUSAGES o(0) o(1) o(2) // o(3) // o(4)
 #define STAY_NEAR_THE_SAUSAGES 0
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
@@ -187,18 +193,17 @@ private:
   bool HandleForklessMotion(Direction dir);
   bool HandleDefaultMotion(Direction dir);
 
-  // TODO: Maybe another layer here? There's some quite complex stuff happening with CPM/MTS. Not sure how to cleanly split it up, though.
-
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir);
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
+  // TODO: A comment
   void CheckForSausageCarry(Direction dir, s8 z);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
-  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false);
+  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear=false, bool doDoubleMove=true);
   // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
   // and we are just trying to figure out if that motion results in an invalid state,
   // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.

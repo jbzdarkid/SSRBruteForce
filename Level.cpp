@@ -167,7 +167,7 @@ void Level::Print() const {
       else if (_grid(x, y) == Wall3)  putchar('3');
       else if (_grid(x, y) == Wall4)  putchar('4');
       else if (_grid(x, y) == Wall5)  putchar('5');
-      else assert(false);
+      else                            putchar('?');
     }
     putchar('|');
     putchar('\n');
@@ -216,6 +216,7 @@ bool Level::InteractiveSolver() {
 
   printf("Level completed in %d moves\n", undoHistory.Size() - 1);
   _interactive = false;
+  SetState(&undoHistory[0]); // Restore the original state
   return true;
 }
 
@@ -546,15 +547,19 @@ bool Level::HandleDefaultMotion(Direction dir) {
 
 struct CPMData {
   Vector<s8> movedSausages;
+  Vector<s8> sausagesToDrop;
   s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
   u8 consideredSausages = 0;
+  u8 sausagesToDoubleMove = 0;
   bool pushedFork = false;
 } data;
 
 bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir) {
   data.movedSausages.Resize(0);
+  data.sausagesToDrop.Resize(0);
   data.sausageToSpear = -1;
   data.consideredSausages = 0;
+  data.sausagesToDoubleMove = 0;
   data.pushedFork = false;
 
   if (!CanPhysicallyMoveInternal(x, y, z, dir)) return false;
@@ -617,40 +622,70 @@ void Level::CheckForSausageCarry(Direction dir, s8 z) {
   do {
     z++;
     anySausagesMoved = false;
+
+    // It's probably more efficient to iterate by asking about sausages that are above sausages which moved.
+    // But it's also a whole lot more work.
     for (s8 sausageNo = 0; sausageNo < _sausages.Size(); sausageNo++) {
       Sausage sausage = _sausages[sausageNo];
       if (sausage.z != z) continue; // Pedantic layer-by-layer nonsense
 
       if (IsWall(sausage.x1, sausage.y1, sausage.z-1)
        || IsWall(sausage.x2, sausage.y2, sausage.z-1)) continue; // Sausage is resting on a wall
-      if (!_stephen.HasFork() && _stephen.forkZ == sausage.z-1 && !data.pushedFork) {
-        if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
-          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Sausage is resting on disconnected fork which is not moving
+
+      bool sausageCanDoubleMove = true;
+
+      // TODO: Fork rotates under a sausage so it doesn't move.
+      // ... we kinda need the rotation target to do that correctly.
+
+      if (sausage.IsAt(_stephen.forkX, _stephen.forkY, _stephen.forkZ+1)) {
+        if (!_stephen.HasFork() && !data.pushedFork) continue; // Sausage is resting on disconnected fork which is not moving
+        if (_stephen.HasFork() && stephenIsRotating) continue; // Supported by fork while rotating (fork drop)
+        sausageCanDoubleMove = false;
+      } else if (sausage.IsAt(_stephen.x, _stephen.y, _stephen.z+1)) {
+        if (stephenIsRotating) continue; // Supported by stephen while rotating (sausage hat) [TODO]
+        sausageCanDoubleMove = false;
       }
-      if (_stephen.HasFork() && _stephen.forkZ == sausage.z-1 && stephenIsRotating) {
-        if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
-          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Supported by fork while rotating (fork drop)
-      }
-      if (_stephen.z == sausage.z-1 && stephenIsRotating) {
-        if ((_stephen.x == sausage.x1 && _stephen.y == sausage.y1)
-          || (_stephen.x == sausage.x2 && _stephen.y == sausage.y2)) continue; // Supported by stephen while rotating (sausage hat) (not handled here)
-      }
+
+      // TODO: What if a sausage is supported by sausages which are dropping?
+      // What if it's a bit of both? -> Pretty sure it doesn't move in this case, because the 'dropping' sausage is static.
 
       s8 restingOn1 = GetSausage(sausage.x1, sausage.y1, sausage.z-1);
       if (restingOn1 != -1 && !data.movedSausages.Contains(restingOn1)) continue; // Supported by another sausage which is not moving.
       s8 restingOn2 = GetSausage(sausage.x2, sausage.y2, sausage.z-1);
       if (restingOn2 != -1 && !data.movedSausages.Contains(restingOn2)) continue; // Supported by another sausage which is not moving.
 
-      // If this sausage can physically move, it will be added to the movedSausages list.
-      if (CanPhysicallyMoveInternal(sausage.x1, sausage.y1, sausage.z, dir)) {
-        anySausagesMoved = true;
+      // NB: We are calling the internal method here to avoid resetting the data structure.
+      if (!CanPhysicallyMoveInternal(sausage.x1, sausage.y1, sausage.z, dir)) {
+        // We know that this sausage *should've* been carried -- all of its supports were moving.
+        // If it couldn't move, that means (probably) all of its supports are gone, so we potentially need to drop it.
+        data.sausagesToDrop.Push(sausageNo);
+        continue;
+      }
+      // Otherwise, it was already added to data.sausagesToMove by CanPhysicallyMoveInternal.
+      anySausagesMoved = true;
+      if (!sausageCanDoubleMove) continue; // Preconditions for double-move, i.e. not being supported by stephen or his fork.
+
+      // Sausages can only double-move if they are in the same direction as the motion,
+      // and if the sausage(s) that support them are perpendicular to the motion.
+      if (dir == Up || dir == Down) {
+        if (sausage.IsVertical()
+          && (restingOn1 == -1 || _sausages[restingOn1].IsHorizontal())
+          && (restingOn2 == -1 || _sausages[restingOn2].IsHorizontal())) {
+          data.sausagesToDoubleMove |= (1 << sausageNo);
+        }
+      } else if (dir == Left || dir == Right) {
+        if (sausage.IsHorizontal()
+          && (restingOn1 == -1 || _sausages[restingOn1].IsVertical())
+          && (restingOn2 == -1 || _sausages[restingOn2].IsVertical())) {
+          data.sausagesToDoubleMove |= (1 << sausageNo);
+        }
       }
     } // End for loop
   } while (anySausagesMoved);
 }
 
-bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
-  bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir);
+bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear, bool doDoubleMove) {
+  bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir); // TODO: Maybe cache & check the last CPM call? Most of the time we run the same exact call twice.
 
   if (!canPhysicallyMove) {
     if (spear && data.sausageToSpear != -1) {
@@ -701,9 +736,12 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
       sausage.x1++;
       sausage.x2++;
       if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkX++;
+    } else if (dir == Crouch) {
+      sausage.z--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
     } else if (dir == Jump) {
       sausage.z++;
-      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ++;
     } else {
       assert(false);
       FAIL("Cannot move sausage %c in direction %d", 'a' + sausageNo, dir);
@@ -779,6 +817,32 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool spear) {
     }
   }
 
+  for (s8 sausageNo : data.sausagesToDrop) {
+    Sausage sausage = _sausages[sausageNo];
+    while (true) {
+      bool supported = CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
+                    || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
+      if (supported) break;
+      if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
+      sausage.z--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
+    }
+    _sausages[sausageNo] = sausage;
+  }
+
+  // And now we handle double-moves by just moving every marked sausage again.
+  if (doDoubleMove && data.sausagesToDoubleMove != 0) {
+    // Make a copy since data will be overwritten after we call ourselves again.
+    u8 sausagesToDoubleMove = data.sausagesToDoubleMove;
+    for (s8 i=0; i<_sausages.Size(); i++) {
+      if (sausagesToDoubleMove & (1 << i)) {
+        Sausage sausage = _sausages[i];
+        MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, dir, false, false); // Avoid infinite-ish recursion
+        for (s8 sausageNo : data.movedSausages) sausagesToDoubleMove &= ~(1 << sausageNo);
+      }
+    }
+  }
+
   return true;
 }
 
@@ -842,14 +906,7 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
 s8 Level::GetSausage(s8 x, s8 y, s8 z) const {
   if (z < 0) return -1;
 
-#define o(i) \
-  { \
-    const Sausage& sausage = _sausages[i]; \
-    if (z == sausage.z) { \
-      if (x == sausage.x1 && y == sausage.y1) return i; \
-      if (x == sausage.x2 && y == sausage.y2) return i; \
-    } \
-  }
+#define o(i) if (_sausages[i].IsAt(x, y, z)) return i;
   SAUSAGES;
 #undef o
 
