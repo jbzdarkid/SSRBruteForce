@@ -97,10 +97,7 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
     return;
   }
 
-  if (sausages.size() > 0) {
-    _sausages.Resize(0); // Extra sausages go first, because I said so.
-    for (Sausage sausage : sausages) _sausages.Push(sausage);
-  }
+  for (Sausage sausage : sausages) _sausages.Push(sausage);
   for (Sausage& sausage : _sausages) {
     if (sausage.y1 == sausage.y2) sausage.flags |= Sausage::Flags::Horizontal;
   }
@@ -141,40 +138,27 @@ void Level::Print() const {
   for (u8 y=0; y<_height; y++) {
     putchar('|');
     for (u8 x=0; x<_width; x++) {
-      s8 sausageNo = -1;
-      for (int i=0; i<_sausages.Size(); i++) {
-        const Sausage& sausage = _sausages[i];
-        if ((sausage.x1 == x && sausage.y1 == y) 
-         || (sausage.x2 == x && sausage.y2 == y)) {
-          if (sausageNo == -1) sausageNo = i;
-          else if (_sausages[sausageNo].z < sausage.z) sausageNo = i;
+
+      char dynamic = ' ';
+      for (s8 z = 0; z < 8; z++) {
+        if (x == _stephen.x && y == _stephen.y && z == _stephen.z) {
+          dynamic = " ^<  >v"[_stephen.dir];
+        } else if (!_stephen.HasFork() && x == _stephen.forkX && y == _stephen.forkY && z == _stephen.forkZ) {
+          dynamic = '+';
+        } else if (GetSausage(x, y, z) != -1) {
+          s8 sausageNo = GetSausage(x, y, z);
+          if (sausageNo != -1 && _grid(x, y) == Empty) dynamic = 'A' + sausageNo;
+          if (sausageNo != -1 && _grid(x, y) != Empty) dynamic = 'a' + sausageNo;
+        } else if (dynamic == ' ') { // Ladders are lower priority over basically everything else.
+          for (const Ladder& ladder : _ladders) {
+            if (ladder.x == x && ladder.y == y && ladder.z == z) {
+              dynamic = " UL  RD"[ladder.dir];
+              break;
+            }
+          }
         }
       }
-      char ladderCh = '\0';
-      const char* dirChars = " UL  RD";
-      for (const Ladder& ladder : _ladders) {
-        if (ladder.x == x && ladder.y == y) ladderCh = dirChars[ladder.dir];
-      }
-
-      if (x == _stephen.x && y == _stephen.y) {
-        if (_stephen.dir == Up)          putchar('^');
-        else if (_stephen.dir == Down)   putchar('v');
-        else if (_stephen.dir == Left)   putchar('<');
-        else if (_stephen.dir == Right)  putchar('>');
-        else assert(false);
-      }
-      else if (!_stephen.HasFork() && x == _stephen.forkX && y == _stephen.forkY) {
-        putchar('+');
-      }
-      //else if (stephen.dir == Up && x == stephen.x && y == stephen.y - 1) row[x+1] = '|';
-      //else if (stephen.dir == Down && x == stephen.x && y == stephen.y + 1) row[x+1] = '|';
-      //else if (stephen.dir == Left && x == stephen.x - 1 && y == stephen.y) row[x+1] = '-';
-      //else if (stephen.dir == Right && x == stephen.x + 1 && y == stephen.y) row[x+1] = '-';
-      else if (sausageNo != -1) {
-        if (_grid(x, y) == Empty)     putchar('A' + sausageNo);
-        else                          putchar('a' + sausageNo);
-      }
-      else if (ladderCh != '\0')      putchar(ladderCh);
+      if (dynamic !=  ' ')              putchar(dynamic);
       else if (_grid(x, y) == Empty)  putchar(' ');
       else if (_grid(x, y) &  Grill)  putchar('#');
       else if (_grid(x, y) == Ground) putchar('_');
@@ -314,10 +298,10 @@ bool Level::Move(Direction dir) {
   if (!HandleLadderMotion(dir, handled)) return false;
 
   if (!handled) {
-    if (_sausageSpeared != -1) {
-      if (!HandleSpearedMotion(dir)) return false;
-    } else if (!_stephen.HasFork()) {
+    if (!_stephen.HasFork()) { // Need to check this first, because _sausageSpeared is re-used when stephen doesn't have his fork.
       if (!HandleForklessMotion(dir)) return false;
+    } else if (_sausageSpeared != -1) {
+      if (!HandleSpearedMotion(dir)) return false;
     } else {
       if (!HandleDefaultMotion(dir)) return false;
     }
@@ -589,7 +573,7 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir /*, CPMDat
   else if (dir == Down)   dy = +1;
   else if (dir == Left)   dx = -1;
   else if (dir == Right)  dx = +1;
-  else if (dir == Crouch) /*dz = -1;*/ return false; // Nothing can move down, ever.
+  else if (dir == Crouch) dz = -1; // Nothing can move down, ever.
   else if (dir == Jump)   dz = +1;
   else assert(false);
 
@@ -637,28 +621,25 @@ void Level::CheckForSausageCarry(Direction dir, s8 z) {
       Sausage sausage = _sausages[sausageNo];
       if (sausage.z != z) continue; // Pedantic layer-by-layer nonsense
 
-      if (CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
-       || CanWalkOnto(sausage.x2, sausage.y2, sausage.z)) continue; // Sausage is resting on a wall
-      if (_stephen.forkZ == sausage.z-1 && !_stephen.HasFork() && !data.pushedFork) {
+      if (IsWall(sausage.x1, sausage.y1, sausage.z-1)
+       || IsWall(sausage.x2, sausage.y2, sausage.z-1)) continue; // Sausage is resting on a wall
+      if (!_stephen.HasFork() && _stephen.forkZ == sausage.z-1 && !data.pushedFork) {
         if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
           || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Sausage is resting on disconnected fork which is not moving
       }
-      if (_stephen.forkZ == sausage.z-1 && !stephenIsRotating) {
+      if (_stephen.HasFork() && _stephen.forkZ == sausage.z-1 && stephenIsRotating) {
         if ((_stephen.forkX == sausage.x1 && _stephen.forkY == sausage.y1)
-          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Fork carry
+          || (_stephen.forkX == sausage.x2 && _stephen.forkY == sausage.y2)) continue; // Supported by fork while rotating (fork drop)
       }
       if (_stephen.z == sausage.z-1 && stephenIsRotating) {
         if ((_stephen.x == sausage.x1 && _stephen.y == sausage.y1)
-          || (_stephen.x == sausage.x2 && _stephen.y == sausage.y2)) {
-          assert(false);
-          continue; // Sausage hat (unsupported as yet)
-        }
+          || (_stephen.x == sausage.x2 && _stephen.y == sausage.y2)) continue; // Supported by stephen while rotating (sausage hat) (not handled here)
       }
 
       s8 restingOn1 = GetSausage(sausage.x1, sausage.y1, sausage.z-1);
-      if (!data.movedSausages.Contains(restingOn1)) continue; // Supported by another sausage which is not moving.
+      if (restingOn1 != -1 && !data.movedSausages.Contains(restingOn1)) continue; // Supported by another sausage which is not moving.
       s8 restingOn2 = GetSausage(sausage.x2, sausage.y2, sausage.z-1);
-      if (!data.movedSausages.Contains(restingOn2)) continue; // Supported by another sausage which is not moving.
+      if (restingOn2 != -1 && !data.movedSausages.Contains(restingOn2)) continue; // Supported by another sausage which is not moving.
 
       // If this sausage can physically move, it will be added to the movedSausages list.
       if (CanPhysicallyMoveInternal(sausage.x1, sausage.y1, sausage.z, dir)) {

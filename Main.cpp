@@ -451,14 +451,14 @@ Level LandsEnd(13, 7, "Land's End",
 int main() {
   // GreatTowerImanex.InteractiveSolver();
 
-  Level Test(5, 6, "Test",
-    "__111"
-    "a_121"
-    "a_111"
-    "<__U_"
-    "_____"
-    "_bb__");
-  WretchsRetreat.InteractiveSolver();
+  Level Test(6, 6, "Test",
+    "___111"
+    "___121"
+    "_aa111"
+    "____U_"
+    "____v_"
+    "______", {}, {}, {Sausage{3, 1, 3, 2, 1}});
+  Test.InteractiveSolver();
 
   //*
   Level* level = &Test;
