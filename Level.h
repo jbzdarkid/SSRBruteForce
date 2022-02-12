@@ -203,7 +203,7 @@ private:
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
-  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doDoubleMove=true);
+  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
   // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
   // and we are just trying to figure out if that motion results in an invalid state,
   // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.
