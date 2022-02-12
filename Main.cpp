@@ -453,14 +453,14 @@ Level LandsEnd(13, 7, "Land's End",
 
 int main() {
   Level Test(6, 6, "Test",
-    "___111"
-    "___121"
-    "_aa111"
-    "____U_"
-    "____v_"
-    "______", {}, {}, {Sausage{3, 1, 3, 2, 1}});
+    "______"
+    "__a___"
+    "__a___"
+    "___^__"
+    "______"
+    "______", {}, {}, {Sausage{2, 2, 3, 2, 1}});
 
-  Level* level = &ColdTrail;
+  Level* level = &Test;
   level->InteractiveSolver();
 
   Vector<Direction> solution = Solver(level).Solve();
