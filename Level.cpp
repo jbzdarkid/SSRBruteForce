@@ -98,9 +98,6 @@ Level::Level(u8 width, u8 height, const char* name, const char* asciiGrid,
   }
 
   for (Sausage sausage : sausages) _sausages.Push(sausage);
-  for (Sausage& sausage : _sausages) {
-    if (sausage.y1 == sausage.y2) sausage.flags |= Sausage::Flags::Horizontal;
-  }
 
   // Ladders from the grid, as 2D, may need height extensions.
   Vector<Ladder> extraLadders;
@@ -477,31 +474,35 @@ bool Level::HandleParallelMotion(Direction dir) {
 
 bool Level::HandleRotation(Direction dir) {
   if (dir == Up) {
-    if (!MoveThroughSpace( _stephen.forkX, _stephen.y - 1, _stephen.z, dir,                   true)) return false;
-    if (!CanPhysicallyMove(_stephen.x,     _stephen.y - 1, _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
+    bool clockwise = (_stephen.dir == Left ? +1 : -1);
+    if (!MoveThroughSpace( _stephen.forkX, _stephen.y - 1, _stephen.z, dir,                   clockwise)) return false;
+    if (!CanPhysicallyMove(_stephen.x,     _stephen.y - 1, _stephen.z, Inverse(_stephen.dir), clockwise)) return true; // Bonk
     _stephen.forkY = _stephen.y - 1;
-    if (!MoveThroughSpace( _stephen.x,     _stephen.y - 1, _stephen.z, Inverse(_stephen.dir), true)) return false;
+    if (!MoveThroughSpace( _stephen.x,     _stephen.y - 1, _stephen.z, Inverse(_stephen.dir), clockwise)) return false;
     _stephen.dir = dir;
     _stephen.forkX = _stephen.x;
   } else if (dir == Down) {
-    if (!MoveThroughSpace( _stephen.forkX, _stephen.y + 1, _stephen.z, dir,                   true)) return false;
-    if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
+    bool clockwise = (_stephen.dir == Right ? +1 : -1);
+    if (!MoveThroughSpace( _stephen.forkX, _stephen.y + 1, _stephen.z, dir,                   clockwise)) return false;
+    if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Inverse(_stephen.dir), clockwise)) return true; // Bonk
     _stephen.forkY = _stephen.y + 1;
-    if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Inverse(_stephen.dir), true)) return false;
+    if (!MoveThroughSpace( _stephen.x,     _stephen.y + 1, _stephen.z, Inverse(_stephen.dir), clockwise)) return false;
     _stephen.dir = dir;
     _stephen.forkX = _stephen.x;
   } else if (dir == Left) {
-    if (!MoveThroughSpace( _stephen.x - 1, _stephen.forkY, _stephen.z, dir,                   true)) return false;
-    if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
+    bool clockwise = (_stephen.dir == Down ? +1 : -1);
+    if (!MoveThroughSpace( _stephen.x - 1, _stephen.forkY, _stephen.z, dir,                   clockwise)) return false;
+    if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), clockwise)) return true; // Bonk
     _stephen.forkX = _stephen.x - 1;
-    if (!MoveThroughSpace( _stephen.x - 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return false;
+    if (!MoveThroughSpace( _stephen.x - 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), clockwise)) return false;
     _stephen.dir = dir;
     _stephen.forkY = _stephen.y;
   } else if (dir == Right) {
-    if (!MoveThroughSpace( _stephen.x + 1, _stephen.forkY, _stephen.z, dir,                   true)) return false;
-    if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
+    bool clockwise = (_stephen.dir == Up ? +1 : -1);
+    if (!MoveThroughSpace( _stephen.x + 1, _stephen.forkY, _stephen.z, dir,                   clockwise)) return false;
+    if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), clockwise)) return true; // Bonk
     _stephen.forkX = _stephen.x + 1;
-    if (!MoveThroughSpace( _stephen.x + 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return false;
+    if (!MoveThroughSpace( _stephen.x + 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), clockwise)) return false;
     _stephen.dir = dir;
     _stephen.forkY = _stephen.y;
   } else {
@@ -517,6 +518,7 @@ struct CPMData {
   Vector<s8> sausagesToDrop;
   s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
   u8 consideredSausages = 0;
+  u8 sausagesToRotate = 0;
   u8 sausagesToDoubleMove = 0;
   bool pushedFork = false;
 } data;
@@ -526,6 +528,7 @@ bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRot
   data.sausagesToDrop.Resize(0);
   data.sausageToSpear = -1;
   data.consideredSausages = 0;
+  data.sausagesToRotate = 0;
   data.sausagesToDoubleMove = 0;
   data.pushedFork = false;
 
@@ -604,7 +607,11 @@ void Level::CheckForSausageCarry(Direction dir, s8 z, bool stephenIsRotating) {
         if (_stephen.HasFork() && stephenIsRotating) continue; // Supported by fork while rotating (fork drop)
         sausageCanDoubleMove = false;
       } else if (sausage.IsAt(_stephen.x, _stephen.y, _stephen.z+1)) {
-        if (stephenIsRotating) continue; // Supported by stephen while rotating (sausage hat) [TODO]. Note: I don't think sausage hats bonk.
+        // If a sausage is on stephen's head while he rotates, then the sausage rotates too.
+        if (stephenIsRotating) {
+          data.sausagesToRotate |= (1 << sausageNo);
+          continue;
+        }
         sausageCanDoubleMove = false;
       }
 
@@ -646,9 +653,9 @@ void Level::CheckForSausageCarry(Direction dir, s8 z, bool stephenIsRotating) {
   } while (anySausagesMoved);
 }
 
-bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool doDoubleMove) {
-  // TODO: Maybe cache & check the last CPM call? Most of the time we run the same exact call twice.
-  bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir, stephenIsRotating);
+bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir, bool doDoubleMove) {
+  // TODO: Maybe cache & check the last CPM call? When we rotate (~50% of the time), we make the same call twice in a row.
+  bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir, stephenRotationDir);
 
   if (!canPhysicallyMove) {
     // Stephen can only spear when he is moving forwards. (Note that we have already inverted |dir| if this is a log roll)
@@ -671,7 +678,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
       if (!canPhysicallyMove) FAIL("Stephen's fork can stick into sausage %c but the move is still impossible", 'a' + data.sausageToSpear);
       // Else, we fall into the main block.
     } else {
-      if (!_interactive) return false;
+      if (!_interactive) FAIL("");
 
       // This branch can be hit from a bunch of places. Let's try to give a useful error message.
       if (canSpear) FAIL("Stephen's fork cannot move in direction %s, and there is nothing to spear", DIRS[dir]);
@@ -799,10 +806,11 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   if (doDoubleMove && data.sausagesToDoubleMove != 0) {
     // Make a copy since data will be overwritten after we call ourselves again.
     u8 sausagesToDoubleMove = data.sausagesToDoubleMove;
-    for (s8 i=0; i<_sausages.Size(); i++) {
-      if (sausagesToDoubleMove & (1 << i)) {
-        Sausage sausage = _sausages[i];
-        MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, dir, false, false); // Avoid infinite-ish recursion
+    for (s8 sausageNo=0; sausageNo<_sausages.Size(); sausageNo++) {
+      if (sausagesToDoubleMove & (1 << sausageNo)) {
+
+        Sausage sausage = _sausages[sausageNo];
+        MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, dir, stephenRotationDir, false); // Avoid infinite-ish recursion
         for (s8 sausageNo : data.movedSausages) sausagesToDoubleMove &= ~(1 << sausageNo);
       }
     }

@@ -81,8 +81,7 @@ struct Sausage {
     Cook1B = 2, // If (x1, y1) is cooked when rolled over
     Cook2A = 4, // If (x2, y2) is cooked when not rolled over
     Cook2B = 8, // If (x2, y2) is cooked when rolled over
-    Horizontal = 16,
-    Rolled = 32,
+    Rolled = 16,
     Cook1 = Cook1A | Cook1B, // If (x1, y1) is cooked on both sides
     Cook2 = Cook2A | Cook2B, // If (x2, y2) is cooked on both sides
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B,
@@ -91,8 +90,8 @@ struct Sausage {
   u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
   u16 _ = 0; // Padding
 
-  inline bool IsHorizontal() const { return (flags & Horizontal) != 0; }
-  inline bool IsVertical() const { return !IsHorizontal(); }
+  inline bool IsVertical() const { return x1 == x2; }
+  inline bool IsHorizontal() const { return y1 == y2; }
   inline bool IsRolled() const { return (flags & Rolled) != 0; }
   inline bool IsAt(s8 x_, s8 y_, s8 z_) const {
     if (z_ != z) return false;
@@ -204,7 +203,7 @@ private:
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
-  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating=false, bool doDoubleMove=true);
+  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doDoubleMove=true);
   // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
   // and we are just trying to figure out if that motion results in an invalid state,
   // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.
