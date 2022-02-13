@@ -196,6 +196,16 @@ private:
   // CanPhysicallyMove is for when you want to check if motion is possible,
   // and if it isn't, stephen will enact a different kind of motion.
   // It has no side-effects.
+  struct CPMData {
+    Vector<s8> movedSausages;
+    Vector<s8> sausagesToDrop;
+    s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
+    s8 sausageHat = -1;
+    u8 consideredSausages = 0; // We have /considered/ if this sausage can physically move and added it to movedSausages
+    u8 sausagesToDoubleMove = 0;
+    bool pushedFork = false;
+    bool canPhysicallyMove = false;
+  } _data;
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating=false);
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
   // TODO: A comment or two
@@ -205,7 +215,8 @@ private:
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
-  // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
+  bool MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, const CPMData& data, s8 stephenRotationDir, bool doSausageRotation, bool doDoubleMove);
+// Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
   // and we are just trying to figure out if that motion results in an invalid state,
   // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.
   // It will have side effects even if the move is invalid.

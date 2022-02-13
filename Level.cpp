@@ -513,28 +513,21 @@ bool Level::HandleRotation(Direction dir) {
   return true;
 }
 
-struct CPMData {
-  Vector<s8> movedSausages;
-  Vector<s8> sausagesToDrop;
-  s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
-  s8 sausageHat = -1;
-  u8 consideredSausages = 0; // We have /considered/ if this sausage can physically move and added it to movedSausages
-  u8 sausagesToDoubleMove = 0;
-  bool pushedFork = false;
-} data;
-
 bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating) {
-  data.movedSausages.Resize(0);
-  data.sausagesToDrop.Resize(0);
-  data.sausageToSpear = -1;
-  data.sausageHat = -1;
-  data.consideredSausages = 0;
-  data.sausagesToDoubleMove = 0;
-  data.pushedFork = false;
+  _data.movedSausages.Resize(0);
+  _data.sausagesToDrop.Resize(0);
+  _data.sausageToSpear = -1;
+  _data.sausageHat = -1;
+  _data.consideredSausages = 0;
+  _data.sausagesToDoubleMove = 0;
+  _data.pushedFork = false;
+  _data.canPhysicallyMove = false;
 
-  if (!CanPhysicallyMoveInternal(x, y, z, dir)) return false;
-  CheckForSausageCarry(x, y, z, dir, stephenIsRotating);
-  return true;
+  if (CanPhysicallyMoveInternal(x, y, z, dir)) {
+    CheckForSausageCarry(x, y, z, dir, stephenIsRotating);
+    _data.canPhysicallyMove = true;
+  }
+  return _data.canPhysicallyMove;
 }
 
 bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
@@ -557,36 +550,36 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
   s8 sausageNo = GetSausage(x, y, z);
   if (sausageNo == -1) {
     if (!_stephen.HasFork() && x == _stephen.forkX && y == _stephen.forkY && z == _stephen.forkZ) {
-      data.pushedFork = true;
+      _data.pushedFork = true;
       if (_stephen.forkDir == dir) {
-        data.sausageToSpear = GetSausage(x + dx, y + dy, z); // We don't need to add dz here because this only happens for UDLR.
+        _data.sausageToSpear = GetSausage(x + dx, y + dy, z); // We don't need to add dz here because this only happens for UDLR.
       } else if (_stephen.forkDir == Inverse(dir)) {
-        data.sausageToSpear = GetSausage(x - dx, y - dy, z); // We don't need to add dz here because this only happens for UDLR.
+        _data.sausageToSpear = GetSausage(x - dx, y - dy, z); // We don't need to add dz here because this only happens for UDLR.
       } else {
-        data.sausageToSpear = -1; // Can't push the fork into a sausage in this direction
+        _data.sausageToSpear = -1; // Can't push the fork into a sausage in this direction
       }
       return CanPhysicallyMoveInternal(x + dx, y + dy, z + dz, dir);
     }
     return true;
   }
 
-  assert(sausageNo < sizeof(data.consideredSausages) * 8);
-  if (data.consideredSausages & (1 << sausageNo)) return true; // Already analyzed
-  data.consideredSausages |= (1 << sausageNo);
-  if (data.sausageToSpear == -1) data.sausageToSpear = sausageNo; // If spearing is possible, the first sausage we encounter will be our spear target.
+  assert(sausageNo < sizeof(_data.consideredSausages) * 8);
+  if (_data.consideredSausages & (1 << sausageNo)) return true; // Already analyzed
+  _data.consideredSausages |= (1 << sausageNo);
+  if (_data.sausageToSpear == -1) _data.sausageToSpear = sausageNo; // If spearing is possible, the first sausage we encounter will be our spear target.
   Sausage sausage = _sausages[sausageNo];
 
   if (!CanPhysicallyMoveInternal(sausage.x1 + dx, sausage.y1 + dy, sausage.z + dz, dir)) return false;
   if (!CanPhysicallyMoveInternal(sausage.x2 + dx, sausage.y2 + dy, sausage.z + dz, dir)) return false;
   // Both of the sausage halves can move, so the sausage will move if the move succeeds.
-  data.movedSausages.Push(sausageNo);
+  _data.movedSausages.Push(sausageNo);
   return true;
 }
 
 bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool canDoubleMove) {
   s8 sausageNo = GetSausage(x, y, z+1);
-  if (sausageNo == -1 || data.consideredSausages & (1 << sausageNo)) return false; // Already analyzed
-  data.consideredSausages |= (1 << sausageNo);
+  if (sausageNo == -1 || _data.consideredSausages & (1 << sausageNo)) return false; // Already analyzed
+  _data.consideredSausages |= (1 << sausageNo);
   Sausage sausage = _sausages[sausageNo];
 
   // Find the x and y which are not implicitly supported (by whoever our caller is)
@@ -603,14 +596,14 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   if (IsWall(otherX, otherY, z)) return false; // Other support is a wall
 
   if (_stephen.forkX == otherX && _stephen.forkY == otherY && _stephen.forkZ == z) {
-    if (!_stephen.HasFork() && !data.pushedFork) return false; // Sausage is resting on disconnected fork which is not moving
+    if (!_stephen.HasFork() && !_data.pushedFork) return false; // Sausage is resting on disconnected fork which is not moving
     if (_stephen.HasFork() && stephenIsRotating) return false; // Supported by fork while rotating (fork drop)
     canDoubleMove = false; // Supported by the fork which is also moving, but this prevents a double-move
   }
   s8 otherSausageNo = GetSausage(otherX, otherY, z);
-  if (otherSausageNo != -1 && !data.movedSausages.Contains(otherSausageNo)) return false; // Supported by another sausage which is not moving.
+  if (otherSausageNo != -1 && !_data.movedSausages.Contains(otherSausageNo)) return false; // Supported by another sausage which is not moving.
 
-  // TODO: This is not where sausage hats come from.
+  // TODO: This is not where sausage hats come from. Pretty sure.
   if (_stephen.x == otherX && _stephen.y == otherY && _stephen.z == z) {
     // While stephen is rotating, he counts as a support.
     if (stephenIsRotating) return false;
@@ -625,39 +618,26 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
     // and if the sausage(s) that support them are perpendicular to the motion.
     if (dir == Up || dir == Down) {
       if (sausage.IsVertical() && (otherSausageNo == -1 || _sausages[otherSausageNo].IsHorizontal())) {
-        data.sausagesToDoubleMove |= (1 << sausageNo);
+        _data.sausagesToDoubleMove |= (1 << sausageNo);
       }
     } else { assert(dir == Left || dir == Right);
       if (sausage.IsHorizontal() && (otherSausageNo == -1 || _sausages[otherSausageNo].IsVertical())) {
-        data.sausagesToDoubleMove |= (1 << sausageNo);
+        _data.sausagesToDoubleMove |= (1 << sausageNo);
       }
     }
   }
 
-  data.movedSausages.Push(sausageNo);
+  _data.movedSausages.Push(sausageNo);
   return true;
 }
 
 void Level::CheckForSausageCarry(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating) {
   if (dir == Crouch || dir == Jump) return; // Sausages can only be carried laterally (UDLR)
 
-  // TODO: Hat here? Maybe a bool? Maybe inline the code somewhat? This *is* where sausage hats come from.
-  // I guess, I mean I could also compute them elsewhere. Seems like a waste though.
-  // Well now this looks like a hack. Try harder.
-//  if (x == _stephen.x && y == _stephen.y && z == _stephen.z) {
-    IsSausageCarried(x, y, z, dir, stephenIsRotating, false);
-//  }
-
-  // This also looks like a hack. But it isn't, I guess.
-  // It's wrong, too. We need to check from the *current* fork position. Not wherever this is.
-//  if (!stephenIsRotating && _stephen.HasFork() && x == _stephen.forkX && y == _stephen.forkY && z == _stephen.forkZ) {
-    IsSausageCarried(x, y, z, dir, stephenIsRotating, false);
-//  }
-
   bool anySausagesMoved;
   do {
     anySausagesMoved = false;
-    for (s8 sausageNo : data.movedSausages) {
+    for (s8 sausageNo : _data.movedSausages) {
       Sausage sausage = _sausages[sausageNo];
 
       bool canDoubleMove = false;
@@ -673,10 +653,16 @@ void Level::CheckForSausageCarry(s8 x, s8 y, s8 z, Direction dir, bool stephenIs
 }
 
 bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir, bool doSausageRotation, bool doDoubleMove) {
-  // TODO: Maybe cache & check the last CPM call? When we rotate (~50% of the time), we make the same call twice in a row.
-  bool canPhysicallyMove = CanPhysicallyMove(x, y, z, dir, stephenRotationDir != 0);
+  CanPhysicallyMove(x, y, z, dir, stephenRotationDir != 0);
+  return MoveThroughSpaceInternal(x, y, z, dir, _data, stephenRotationDir, doSausageRotation, doDoubleMove);
+}
 
-  if (!canPhysicallyMove) {
+bool Level::CarryThroughSpace() {
+  CheckForSausageCarry(x, y, z, dir, stephenIsRotating);
+}
+
+bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, const CPMData& data, s8 stephenRotationDir, bool doSausageRotation, bool doDoubleMove) {
+  if (!data.canPhysicallyMove) {
     // Stephen can only spear when he is moving forwards. (Note that we have already inverted |dir| if this is a log roll)
     bool canSpear = (_stephen.HasFork() && dir == _stephen.dir);
     if (canSpear && data.sausageToSpear != -1) {
@@ -693,8 +679,9 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
       else if (dir == Left)  _stephen.forkX--;
       else if (dir == Right) _stephen.forkX++;
       // Then, try the move again, and if we still can't move, give up.
-      canPhysicallyMove = CanPhysicallyMove(x, y, z, dir);
-      if (!canPhysicallyMove) FAIL("Stephen's fork can stick into sausage %c but the move is still impossible", 'a' + data.sausageToSpear);
+      if (!CanPhysicallyMove(x, y, z, dir, stephenRotationDir != 0)) {
+        FAIL("Stephen's fork can stick into sausage %c but the move is still impossible", 'a' + data.sausageToSpear);
+      }
       // Else, we fall into the main block.
     } else {
       if (!_interactive) FAIL("");
@@ -955,6 +942,10 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
       } else if (dir == Right) {
         if (!MoveThroughSpace(_stephen.forkX + 1, _stephen.forkY, _stephen.forkZ, dir)) return false;
       } else { assert(false); FAIL("think about this later, but probably just z +- 1"); }
+
+      // TODO: Wrong! This is 'carry through space', i.e. movement is not guaranteed.
+      // Then, move the tile above the fork (to handle sausage carries)
+      if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.forkZ + 1, dir)) return false;
     }
   }
   if (dir == Up) {
@@ -966,6 +957,10 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
   } else if (dir == Right) {
     if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, _stephen.z, dir)) return false;
   } else { assert(false); FAIL("think about this later, but probably just z +- 1"); }
+
+  // TODO: Wrong! This is 'carry through space', i.e. movement is not guaranteed.
+  // Then, move the tile above stephen (to handle sausage carries)
+  if (!MoveThroughSpace(_stephen.x, _stephen.y, _stephen.z + 1, dir)) return false;
 
   // This function is allowed side effects, so we can move stephen's body before calling MoveThroughSpace
   if (dir == Up) {
