@@ -746,15 +746,39 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
           }
         }
       }
+    }
 
-      while (true) {
-        bool supported = CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
-                      || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
-        if (supported) break;
-        if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
-        sausage.z--;
-        if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
+    _sausages[sausageNo] = sausage;
+  }
+
+  // And now we handle double-moves by just moving every marked sausage again.
+  // TODO: Cooking two sides using a double move?
+  if (doDoubleMove && data.sausagesToDoubleMove != 0) {
+    // Make a copy since data will be overwritten after we call ourselves again.
+    u8 sausagesToDoubleMove = data.sausagesToDoubleMove;
+    for (s8 sausageNo=0; sausageNo<_sausages.Size(); sausageNo++) {
+      if (sausagesToDoubleMove & (1 << sausageNo)) {
+        Sausage sausage = _sausages[sausageNo];
+        MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, dir, stephenRotationDir, false); // Avoid infinite-ish recursion
+        
+        // If any sausages moved as a part of this, they don't need to double-move (since they did just double-move).
+        for (s8 sausageNo2 : data.movedSausages) sausagesToDoubleMove &= ~(1 << sausageNo2);
       }
+    }
+  }
+
+  // TODO: Sloppy. Can we just add movedSausages to the drop list during CPM?
+  Vector<s8> sausagesToDrop = data.movedSausages.Copy();
+  sausagesToDrop.Append(data.sausagesToDrop);
+  for (s8 sausageNo : sausagesToDrop) {
+    Sausage sausage = _sausages[sausageNo];
+    while (true) {
+      bool supported = CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
+                    || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
+      if (supported) break;
+      if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
+      sausage.z--;
+      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
     }
 
     // Cook the sausage
@@ -768,7 +792,6 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
       sausage.flags |= sidesToCook;
     }
 
-    // If nothing has gone wrong, save the updated sausage
     _sausages[sausageNo] = sausage;
   }
 
@@ -787,7 +810,9 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
       assert(false);
       FAIL("Cannot move disconnected fork in direction %d", dir);
     }
+  }
 
+  if (!_stephen.HasFork()) { // TODO: What if dropping the fork means a sausage is unsupported? I'm really thinking about making a dummy sausage for the fork.
     while (true) {
       bool supported = CanWalkOnto(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
       if (supported) break;
@@ -796,38 +821,11 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
     }
   }
 
-  for (s8 sausageNo : data.sausagesToDrop) {
-    Sausage sausage = _sausages[sausageNo];
-    while (true) {
-      bool supported = CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
-                    || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
-      if (supported) break;
-      if (sausage.z <= 0) FAIL("Sausage %c would fall below the world", 'a' + sausageNo);
-      sausage.z--;
-      if (!_stephen.HasFork() && sausageNo == _sausageSpeared) _stephen.forkZ--;
-    }
-    _sausages[sausageNo] = sausage;
-  }
-
-  // And now we handle double-moves by just moving every marked sausage again.
-  if (doDoubleMove && data.sausagesToDoubleMove != 0) {
-    // Make a copy since data will be overwritten after we call ourselves again.
-    u8 sausagesToDoubleMove = data.sausagesToDoubleMove;
-    for (s8 sausageNo=0; sausageNo<_sausages.Size(); sausageNo++) {
-      if (sausagesToDoubleMove & (1 << sausageNo)) {
-        Sausage sausage = _sausages[sausageNo];
-        MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, dir, stephenRotationDir, false); // Avoid infinite-ish recursion
-        for (s8 sausageNo : data.movedSausages) sausagesToDoubleMove &= ~(1 << sausageNo);
-      }
-    }
-  }
-
   // And now we handle rotation by another mess of if statements.
   // Rotation is made of two separate moves, and we only rotate sausages on the second one.
   if (doSausageRotation && data.sausageHat != -1) {
     assert(stephenRotationDir);
     Sausage& sausage = _sausages[data.sausageHat];
-    s8 z = sausage.z;
     while (true) { // Recurse until we stop finding things to rotate. We'll change sausage at the end of the loop.
       // Because x1 <= x2 and y1 <= y2, there are only 4 ways fo a sausage to be on stephen's head. In the ASCII art, stephen is in the middle.
       if (sausage.x1 == _stephen.x - 1) {
@@ -917,8 +915,7 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
       // Wait, what happens if a sausage is only supported by a rotating sausage? I don't think I've seen this case. I really hope it just drops.
       // Probably we move this block up to the top and just recompute whatever is on stephen's head. Ugh, really?
       // We could also set a boolean for 'is the fork on stephen's head', I guess.
-      z++;
-      s8 sausageNo = GetSausage(_stephen.x, _stephen.y, z);
+      s8 sausageNo = GetSausage(_stephen.x, _stephen.y, sausage.z+1);
       if (sausageNo == -1) break;
       sausage = _sausages[sausageNo]; // And we go again.
     }
@@ -930,16 +927,31 @@ bool Level::MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotation
 bool Level::MoveStephenThroughSpace(Direction dir) {
   // If there's a speared sausage, we need to move it first, and it will check the space it's moving into.
   // If it succeeds, the fork is clear to move (and we don't want to double-move the sausage).
-  if (_stephen.HasFork() && _sausageSpeared != -1) {
-    if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.z, dir)) return false;
+  if (_stephen.HasFork()) {
+    if (_sausageSpeared != -1) {
+      if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.z, dir)) return false;
+    } else { assert(_sausageSpeared == -1);
+      // If there's no speared sausage, we need to check the space the fork is moving into.
+      if (dir == Up) {
+        if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY - 1, _stephen.forkZ, dir)) return false;
+      } else if (dir == Down) {
+        if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY + 1, _stephen.forkZ, dir)) return false;
+      } else if (dir == Left) {
+        if (!MoveThroughSpace(_stephen.forkX - 1, _stephen.forkY, _stephen.forkZ, dir)) return false;
+      } else if (dir == Right) {
+        if (!MoveThroughSpace(_stephen.forkX + 1, _stephen.forkY, _stephen.forkZ, dir)) return false;
+      } else { assert(false); FAIL("think about this later, but probably just z +- 1"); }
+    }
   }
-
-  // TODO: A bit too tired right now, but we used to move stephen and fork *before* moving sausages. Not sure why, though.
-  // If there's no speared sausage, we need to check the space the fork is moving into.
-  if (_sausageSpeared == -1 && _stephen.HasFork()) {
-    if (!MoveThroughSpace(_stephen.forkX, _stephen.forkY, _stephen.forkZ, dir)) return false;
-  }
-  if (!MoveThroughSpace(_stephen.x, _stephen.y, _stephen.z, dir)) return false;
+  if (dir == Up) {
+    if (!MoveThroughSpace(_stephen.x, _stephen.y - 1, _stephen.z, dir)) return false;
+  } else if (dir == Down) {
+    if (!MoveThroughSpace(_stephen.x, _stephen.y + 1, _stephen.z, dir)) return false;
+  } else if (dir == Left) {
+    if (!MoveThroughSpace(_stephen.x - 1, _stephen.y, _stephen.z, dir)) return false;
+  } else if (dir == Right) {
+    if (!MoveThroughSpace(_stephen.x + 1, _stephen.y, _stephen.z, dir)) return false;
+  } else { assert(false); FAIL("think about this later, but probably just z +- 1"); }
 
   // This function is allowed side effects, so we can move stephen's body before calling MoveThroughSpace
   if (dir == Up) {
@@ -987,7 +999,7 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
 s8 Level::GetSausage(s8 x, s8 y, s8 z) const {
   if (z < 0) return -1;
 
-#define o(i) if (_sausages[i].IsAt(x, y, z)) return i;
+#define o(i) if (_sausages[i].IsAt(x, y, z)) return (i);
   SAUSAGES;
 #undef o
 
