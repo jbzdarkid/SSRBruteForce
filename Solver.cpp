@@ -255,7 +255,7 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   }
 
   if (_level->WouldStephenStepOnGrill(state->stephen, dir)) totalMillis += 152; // TODO: Does this change while speared?
-  // TODO: Does the sausage movement cost depend on your *current state* or the *next state*? I.e. if you unspear and roll a sausage, do you pay for it?
+  // TODO: Does the sausage movement cost depend on your *current state* or the *next state*? I.e. if you unspear and roll a sausage behind you, do you pay for it?
   // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
   // TODO: Time motion w/ sausage hat
   // TODO: Time motion w/ fork carry

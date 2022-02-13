@@ -176,11 +176,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Level.cpp" />
+    <ClCompile Include="LevelData.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Solver.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Level.h" />
+    <ClInclude Include="LevelData.h" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="WitnessRNG\StdLib.h" />

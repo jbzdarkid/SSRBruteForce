@@ -233,7 +233,7 @@ Level ColdFinger(17, 6, "3-2 Cold Finger",
   {},
   {},
   {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
-  {Level::Tile::Over3});
+  {Tile::Over3});
 
 Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
   "________      "
@@ -422,7 +422,7 @@ Level SludgeCoast(10, 11, "4-3 Sludge Coast",
   Stephen{3, 0, 1, Right},
   {},
   {},
-  {Level::Tile::Over2});
+  {Tile::Over2});
 
 Level SlopeView(18, 8, "5-1 Slope View",
   "        $$     1  "
