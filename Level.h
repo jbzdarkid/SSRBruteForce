@@ -198,8 +198,9 @@ private:
   // It has no side-effects.
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating=false);
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
-  // TODO: A comment
-  void CheckForSausageCarry(Direction dir, s8 z, bool stephenIsRotating);
+  // TODO: A comment or two
+  bool IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool canDoubleMove);
+  void CheckForSausageCarry(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating);
   // MoveThroughSpace is for when stephen is supposed to make a certain motion,
   // and if the motion fails, the move should not have been taken.
   // It may have side effects.

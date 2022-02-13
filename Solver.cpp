@@ -28,7 +28,7 @@ u16 Score(State* state) {
 
 Vector<Direction> Solver::Solve() {
   printf("Solving %s\n", _level->name);
-  
+
   State* initialState;
   _visitedNodes2.CopyAdd(_level->GetState(), &initialState);
   _unexplored = LinkedList<State>(initialState);
@@ -161,7 +161,7 @@ void Solver::ComputeWinningStates() {
     we will process C, D, B, A -- ergo when we check D the first time it won't be marked winning.
     But, we do still want to mark C as winning -- since we haven't *truly* computed the costs yet, we don't know if it's faster.
   */
-  
+
   // If (somehow) we make it through the entire loop and find no win states, this is the correct exit condition.
   // It is very likely that this value will be updated during iteration.
   State* endOfLoop = _explored.Previous();
