@@ -30,10 +30,10 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c == '3') _grid(x, y) = Wall3;
     else if (c == '4') _grid(x, y) = Wall4;
     else if (c == '5') _grid(x, y) = Wall5;
-    else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
-    else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
-    else if (c == 'L') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
-    else if (c == 'R') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
+    // else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
+    // else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
+    // else if (c == 'L') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
+    // else if (c == 'R') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
     else if (c == '^') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Up); }
     else if (c == 'v') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Down); }
     else if (c == '<') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Left); }

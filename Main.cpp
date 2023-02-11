@@ -110,6 +110,55 @@ Level TheAnchorage(10, 6, "1-16 The Anchorage",
   "          "
   "__##      ");
 
+// ABC: Lachrymose Head
+// DE: Southjaunt
+// FG: Infant's Break
+// HI: Comely Hearth
+// JK: Little Fire
+// LM: Eastreach
+// N: Bay's Neck
+// OP: Burning Wharf
+// Q: Happy Pool
+// R: Maiden's Walk
+// ST: Fiery Jut
+// UV: Merchant's Elegy
+// T: Seafinger
+// UVW: The Clover
+// XY: Inlet Shore
+// (): The Anchorage
+// Z: Overworld Sausage 1
+Level Overworld1(29, 27, "Area 1 Overworld",
+  "   _______     _____         "
+  "   _ _   ___________         "
+  " ____111 __1_ZZ______        "
+  " ____111_^____________       "
+  "          __________         "
+  "____UU_______________        "
+  "    __   ________ _ _>_PP__  "
+  "    __ __V_______N__<_O__ _  "
+  "   >_____V__X_   N__  O__ _  "
+  "    ______^_X_ _QQ______L___ "
+  "    ___   _Y____   _JJ_KLMM__"
+  "___1WW_   _Y___  _ ____K_<_  "
+  "___1_______R___ _  __>_____  "
+  "___  __UV__R__v   __ ___ __  "
+  "   T^^_UV_ _^________<_      "
+  "   T_______________HH_II     "
+  "      ___  ____________      "
+  "      ___ST__0________       "
+  "      ___STv_____0____       "
+  "      ___  ________FFG       "
+  "            ________<G_      "
+  "            _______ >___     "
+  "             __^____________ "
+  "              _____D__EAAB__ "
+  "                ___D__E__BCC "
+  "                _______^____ "
+  "                ____         ",
+  Stephen{20, 23, 0, Up},
+  {},
+  {});
+
 Level EmersonJetty(19, 17, "2-1 Emerson Jetty",
   "         ___  _    "
   "____1__________1 1 "
@@ -460,7 +509,7 @@ int main() {
     "______"
     "______", {}, {}, {Sausage{2, 2, 3, 2, 1}});
 
-  Level* level = &Test;
+  Level* level = &Overworld1;
   level->InteractiveSolver();
 
   Vector<Direction> solution = Solver(level).Solve();

@@ -144,7 +144,7 @@ public:
 
 protected:
   Stephen _stephen;
-#define SAUSAGES o(0) o(1) // o(2) // o(3) // o(4)
+// #define SAUSAGES o(0) o(1) // o(2) // o(3) // o(4)
   Vector<Sausage> _sausages;
 
 private:
