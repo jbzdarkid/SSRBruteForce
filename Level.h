@@ -3,11 +3,6 @@
 #include "LevelData.h"
 #include "WitnessRNG/StdLib.h"
 
-#define STAY_NEAR_THE_SAUSAGES 0
-#define HASH_CACHING 1
-#define SORT_SAUSAGE_STATE 0
-#define OVERWORLD_HACK 1
-
 // This is a shallow copy of the State struct -- it does not include the sausage positions (and is thus much smaller).
 // However, those positions are *technically* irrelevant once we've computed the entire graph.
 struct ShallowState {
@@ -34,7 +29,6 @@ struct State {
   State* d = nullptr;
   State* l = nullptr;
   State* r = nullptr;
-  bool isWinning = false;
 
   ShallowState* shallow;
 

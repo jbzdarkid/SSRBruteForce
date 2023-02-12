@@ -30,16 +30,19 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c == '3') _grid(x, y) = Wall3;
     else if (c == '4') _grid(x, y) = Wall4;
     else if (c == '5') _grid(x, y) = Wall5;
-    // else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
-    // else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
-    // else if (c == 'L') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
-    // else if (c == 'R') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
+#if !OVERWORLD_HACK // need to use these capital letters for sausages
+    else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
+    else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
+    else if (c == 'L') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
+    else if (c == 'R') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Right}); }
+#endif
     else if (c == '^') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Up); }
     else if (c == 'v') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Down); }
     else if (c == '<') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Left); }
     else if (c == '>') { _grid(x, y) = Ground; _stephen = Stephen(x, y, 0, Right); }
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
+#if OVERWORLD_HACK
       if (c >= 'A' && c <= 'Z') {
         _grid(x, y) = Ground;
         num = c - 'A';
@@ -47,6 +50,15 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
         _grid(x, y) = Ground;
         num = c - 'a' + 26;
       }
+#else
+      if (c >= 'A' && c <= 'Z') {
+        _grid(x, y) = Empty;
+        num = c - 'A';
+      } else {
+        _grid(x, y) = Ground;
+        num = c - 'a';
+      }
+#endif
 
       // We need to do this here because, even if we don't *solve* levels
       // with less than the expected count, we still construct them.
@@ -64,6 +76,19 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     } else {
       printf("Couldn't parse character '%c' for puzzle '%s', giving up\n", c, name);
       return;
+    }
+
+    if (name[0] == 'O' && name[1] == 'v' && name[2] == 'e') { // Overworlds
+      const char* dirs[] = {
+        nullptr,
+        "North",
+        "West",
+        nullptr,
+        nullptr,
+        "East",
+        "South",
+      };
+      // printf("[%s] if (_stephen.x == %d && _stephen.y == %d && _stephen.dir == %s) sausagesToRemove = {};\n", name, _stephen.x, _stephen.y, dirs[_stephen.dir]);
     }
   }
   if (stephen.x > -1) {
@@ -123,10 +148,13 @@ void LevelData::Print() const {
           dynamic = '+';
         } else if (GetSausage(x, y, z) != -1) {
           s8 sausageNo = GetSausage(x, y, z);
-          // if (sausageNo != -1 && _grid(x, y) == Empty) dynamic = 'A' + sausageNo;
-          // if (sausageNo != -1 && _grid(x, y) != Empty) dynamic = 'a' + sausageNo;
+#if OVERWORLD_HACK
           if (sausageNo != -1 && sausageNo < 26) dynamic = 'A' + sausageNo;
           if (sausageNo != -1 && sausageNo >= 26) dynamic = 'a' + sausageNo - 26;
+#else
+          if (sausageNo != -1 && _grid(x, y) == Empty) dynamic = 'A' + sausageNo;
+          if (sausageNo != -1 && _grid(x, y) != Empty) dynamic = 'a' + sausageNo;
+#endif
         } else if (dynamic == ' ') { // Ladders are lower priority over basically everything else.
           for (const Ladder& ladder : _ladders) {
             if (ladder.x == x && ladder.y == y && ladder.z == z) {
@@ -136,7 +164,7 @@ void LevelData::Print() const {
           }
         }
       }
-      if (dynamic !=  ' ')              putchar(dynamic);
+      if (dynamic !=  ' ')            putchar(dynamic);
       else if (_grid(x, y) == Empty)  putchar(' ');
       else if (_grid(x, y) &  Grill)  putchar('#');
       else if (_grid(x, y) == Ground) putchar('_');
@@ -158,7 +186,9 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  // if (_stephen != _start) return false;
+#if !OVERWORLD_HACK
+  if (_stephen != _start) return false;
+#endif
   for (const Sausage& sausage : _sausages) {
     if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   }

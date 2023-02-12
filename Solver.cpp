@@ -60,7 +60,7 @@ Vector<Direction> Solver::Solve() {
     for (State* state : _explored) {
       u16 score = Score(state);
       if (score == bestScore) {
-        state->isWinning = true;
+        state->shallow->winDistance = 0;
       }
     }
 
@@ -86,7 +86,7 @@ void Solver::BFSStateGraph() {
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
-    if (state->isWinning) { // Delayed addition of winning nodes to keep _explored in order
+    if (state->shallow->winDistance == 0) { // Delayed addition of winning nodes to keep _explored in order
       _unexplored.AdvanceHead();
       _explored.AddToTail(state);
       continue;
@@ -137,8 +137,10 @@ State* Solver::GetOrInsertState(u16 depth) {
     //_level->Print();
   }
 
+  state->shallow = _shallowAlloc.make<ShallowState>();
+
   if (_level->Won()) {
-      state->isWinning = true;
+      state->shallow->winDistance = 0;
       if (_winningDepth == UNWINNABLE) {
         // Once we find a winning state, we have reached the minimum depth for a solution.
         // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
@@ -150,38 +152,17 @@ State* Solver::GetOrInsertState(u16 depth) {
       // in order to keep the _explored list in depth-sorted order.
   }
 
-  state->shallow = _shallowAlloc.make<ShallowState>();
-
   _unexplored.AddToTail(state);
   return state;
 }
 
 void Solver::CreateShallowStates() {
-  /*
-  // "Leaked" memory, except that because there's no container, we don't have to be careful when freeing.
-  // Not that I free this ever or anything
-  ShallowState* zoneAlloc = new ShallowState[_explored.Size()]; // TODO: I can just move this into the initial BFS if I use a smart allocator.
-  s32 i = 0;
-
-  NodeHashSet<size_t> allocAddrs;
-  printf("Creating shallow states:                                                                            |\n");
-  s32 percPrint = _explored.Size() / 100;
-  for (State* state : _explored) {
-    i++;
-    // ShallowState* shallow = &zoneAlloc[i];
-    ShallowState* shallow = _shallowAlloc.make<ShallowState>();
-    state->shallow = shallow;
-    if (i % percPrint == 0) printf("#");
-  }
-  printf("|\n");
-  */
   _explored2 = LinkedLoop<ShallowState>(); // Clear the shallow state list in case we're re-evaluating after failing to win.
 
   // Second iteration because we need shallow copies of the udlr states. (maybe not?)
   printf("Populating shallow states:                                                                          |\n");
   for (State* state : _explored) {
     ShallowState* shallow = state->shallow;
-    shallow->winDistance = state->isWinning ? 0 : UNWINNABLE;
     if (state->u) shallow->u = state->u->shallow;
     if (state->d) shallow->d = state->d->shallow;
     if (state->l) shallow->l = state->l->shallow;
@@ -250,7 +231,7 @@ void Solver::ComputeWinningStates() {
 }
 
 void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements) {
-  if (state->isWinning) {
+  if (state->shallow->winDistance == 0) {
     if (totalMillis < _bestMillis
      || (totalMillis == _bestMillis && backwardsMovements > _bestBackwardsMovements)) {
       _bestSolution = _solution.Copy();

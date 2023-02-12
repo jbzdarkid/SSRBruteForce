@@ -170,22 +170,37 @@ bool Level::Move(Direction dir) {
   if (_stephen.x == 3  && _stephen.y == 8  && _stephen.dir == Right)  sausagesToRemove = {'Y', 'Z', 'a'};
   if (_stephen.x == 10 && _stephen.y == 9  && _stephen.dir == Up)     sausagesToRemove = {'b', 'c'};
   if (_stephen.x == 9  && _stephen.y == 3  && _stephen.dir == Up)     sausagesToRemove = {'d', 'e', 'f'};
+  if (_stephen.x == 13 && _stephen.y == 3  && _stephen.dir == Left)   sausagesToRemove = {'g'};
   s8 numRedSausages = 32;
 #elif OVERWORLD_HACK == 2
+  if (_stephen.x == 33 && _stephen.y == 3  && _stephen.dir == Right)  sausagesToRemove = {'A', 'B'};
+  if (_stephen.x == 35 && _stephen.y == 7  && _stephen.dir == Down)   sausagesToRemove = {'C', 'D'};
+  if (_stephen.x == 29 && _stephen.y == 18 && _stephen.dir == Right)  sausagesToRemove = {'E', 'F'};
+  if (_stephen.x == 15 && _stephen.y == 27 && _stephen.dir == Right)  sausagesToRemove = {'G', 'H'};
+  if (_stephen.x == 28 && _stephen.y == 33 && _stephen.dir == Up)     sausagesToRemove = {'I'};
+  if (_stephen.x == 26 && _stephen.y == 30 && _stephen.dir == Down)   sausagesToRemove = {'J', 'K'};
+  if (_stephen.x == 38 && _stephen.y == 40 && _stephen.dir == Right)  sausagesToRemove = {'L'};
+  if (_stephen.x == 12 && _stephen.y == 37 && _stephen.dir == Right)  sausagesToRemove = {'M'};
+  if (_stephen.x == 11 && _stephen.y == 31 && _stephen.dir == Right)  sausagesToRemove = {'N', 'O'};
+  if (_stephen.x == 2  && _stephen.y == 34 && _stephen.dir == Right)  sausagesToRemove = {'P', 'Q'};
+  if (_stephen.x == 18 && _stephen.y == 21 && _stephen.dir == Right)  sausagesToRemove = {'R'};
+  s8 numRedSausages = 17;
 #endif
-
-  bool allOtherSausagesCooked = true;
-  for (s8 i = 0; i < numRedSausages; i++) {
-    if (_sausages[i].x1 > 0 && (_sausages[i].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) {
-      allOtherSausagesCooked = false;
-      break;
-    }
-  }
-  if (allOtherSausagesCooked && _stephen.x == 13 && _stephen.y == 3  && _stephen.dir == Left)   sausagesToRemove = {'g'};
-  // if (_stephen.x == 12 && _stephen.y == 3  && _stephen.dir == Up)     sausagesToRemove = {'g'};
 
   for (char sausageToRemove : sausagesToRemove) {
     u8 sausageNo = (sausageToRemove > 'Z') ? sausageToRemove - 'a' + 26 : sausageToRemove - 'A';
+
+    if (sausageNo == numRedSausages) {
+      bool allOtherSausagesCooked = true;
+      for (s8 i = 0; i < numRedSausages; i++) {
+        if (_sausages[i].x1 > 0 && (_sausages[i].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) {
+          allOtherSausagesCooked = false;
+          break;
+        }
+      }
+      if (!allOtherSausagesCooked) continue;
+    }
+
     _sausages[sausageNo].z = -2;
     _sausages[sausageNo].flags = Sausage::Flags::FullyCooked;
   }
