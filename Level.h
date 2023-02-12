@@ -10,7 +10,6 @@
 struct State {
   Stephen stephen;
 
-  // TODO: Try changing this to just be a Vector<Sausage>? It would save me a lot of headache, I think. But it might cost a lot of memory.
 #define o(x) +1
   Sausage sausages[SAUSAGES];
 #undef o

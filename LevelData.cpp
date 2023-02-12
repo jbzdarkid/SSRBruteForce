@@ -41,11 +41,11 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
       if (c >= 'A' && c <= 'Z') {
-        _grid(x, y) = Empty;
+        _grid(x, y) = Ground;
         num = c - 'A';
       } else {
         _grid(x, y) = Ground;
-        num = c - 'a';
+        num = c - 'a' + 26;
       }
 
       // We need to do this here because, even if we don't *solve* levels
@@ -123,8 +123,10 @@ void LevelData::Print() const {
           dynamic = '+';
         } else if (GetSausage(x, y, z) != -1) {
           s8 sausageNo = GetSausage(x, y, z);
-          if (sausageNo != -1 && _grid(x, y) == Empty) dynamic = 'A' + sausageNo;
-          if (sausageNo != -1 && _grid(x, y) != Empty) dynamic = 'a' + sausageNo;
+          // if (sausageNo != -1 && _grid(x, y) == Empty) dynamic = 'A' + sausageNo;
+          // if (sausageNo != -1 && _grid(x, y) != Empty) dynamic = 'a' + sausageNo;
+          if (sausageNo != -1 && sausageNo < 26) dynamic = 'A' + sausageNo;
+          if (sausageNo != -1 && sausageNo >= 26) dynamic = 'a' + sausageNo - 26;
         } else if (dynamic == ' ') { // Ladders are lower priority over basically everything else.
           for (const Ladder& ladder : _ladders) {
             if (ladder.x == x && ladder.y == y && ladder.z == z) {
@@ -156,7 +158,7 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  if (_stephen != _start) return false;
+  // if (_stephen != _start) return false;
   for (const Sausage& sausage : _sausages) {
     if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   }

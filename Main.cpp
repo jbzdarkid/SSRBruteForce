@@ -121,32 +121,32 @@ Level TheAnchorage(10, 6, "1-16 The Anchorage",
 // Q: Happy Pool
 // R: Maiden's Walk
 // ST: Fiery Jut
-// UV: Merchant's Elegy
-// T: Seafinger
-// UVW: The Clover
-// XY: Inlet Shore
-// (): The Anchorage
-// Z: Overworld Sausage 1
-Level Overworld1(29, 27, "Area 1 Overworld",
+// TU: Merchant's Elegy
+// VW: Seafinger
+// YZa: The Clover
+// bc: Inlet Shore
+// cef: The Anchorage
+// g: Overworld Sausage 1
+Level Overworld1(29, 27, "Overworld1",
   "   _______     _____         "
   "   _ _   ___________         "
-  " ____111 __1_ZZ______        "
-  " ____111_^____________       "
+  " ____fde __1_gg______        "
+  " ____fde_^____________       "
   "          __________         "
-  "____UU_______________        "
+  "____ZZ_______________        "
   "    __   ________ _ _>_PP__  "
-  "    __ __V_______N__<_O__ _  "
-  "   >_____V__X_   N__  O__ _  "
-  "    ______^_X_ _QQ______L___ "
-  "    ___   _Y____   _JJ_KLMM__"
-  "___1WW_   _Y___  _ ____K_<_  "
-  "___1_______R___ _  __>_____  "
+  "    __ __a_______N__<_O__ _  "
+  "   >_____a__c_   N__  O__ _  "
+  "    ______^_c_ _QQ______L___ "
+  "    ___   _b____   _JJ_KLMM__"
+  "___XYY_   _b___  _ ____K_<_  "
+  "___X_______R___ _  __>_____  "
   "___  __UV__R__v   __ ___ __  "
-  "   T^^_UV_ _^________<_      "
-  "   T_______________HH_II     "
+  "   W^^_UV_ _^________<_      "
+  "   W_______________HH_II     "
   "      ___  ____________      "
-  "      ___ST__0________       "
-  "      ___STv_____0____       "
+  "      ___ST__1________       "
+  "      ___STv_____1____       "
   "      ___  ________FFG       "
   "            ________<G_      "
   "            _______ >___     "
@@ -155,7 +155,7 @@ Level Overworld1(29, 27, "Area 1 Overworld",
   "                ___D__E__BCC "
   "                _______^____ "
   "                ____         ",
-  Stephen{20, 23, 0, Up},
+  Stephen{15, 22, 0, Up},
   {},
   {});
 
