@@ -32,7 +32,7 @@ Vector<Direction> Solver::Solve() {
 
   State* initialState;
   _visitedNodes2.CopyAdd(_level->GetState(), &initialState);
-  // initialState->shallow = _shallowAlloc.allocate(1);
+  initialState->shallow = _shallowAlloc.make<ShallowState>();
   _unexplored.AddToTail(initialState);
 
   BFSStateGraph();
@@ -150,27 +150,31 @@ State* Solver::GetOrInsertState(u16 depth) {
       // in order to keep the _explored list in depth-sorted order.
   }
 
-  // state->shallow = _shallowAlloc.allocate(1);
+  state->shallow = _shallowAlloc.make<ShallowState>();
 
   _unexplored.AddToTail(state);
   return state;
 }
 
 void Solver::CreateShallowStates() {
+  /*
   // "Leaked" memory, except that because there's no container, we don't have to be careful when freeing.
   // Not that I free this ever or anything
   ShallowState* zoneAlloc = new ShallowState[_explored.Size()]; // TODO: I can just move this into the initial BFS if I use a smart allocator.
   s32 i = 0;
 
+  NodeHashSet<size_t> allocAddrs;
   printf("Creating shallow states:                                                                            |\n");
   s32 percPrint = _explored.Size() / 100;
   for (State* state : _explored) {
-    ShallowState* shallow = &zoneAlloc[i++];
+    i++;
+    // ShallowState* shallow = &zoneAlloc[i];
+    ShallowState* shallow = _shallowAlloc.make<ShallowState>();
     state->shallow = shallow;
     if (i % percPrint == 0) printf("#");
   }
   printf("|\n");
-
+  */
   _explored2 = LinkedLoop<ShallowState>(); // Clear the shallow state list in case we're re-evaluating after failing to win.
 
   // Second iteration because we need shallow copies of the udlr states. (maybe not?)
