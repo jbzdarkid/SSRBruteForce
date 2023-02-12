@@ -183,7 +183,7 @@ bool Level::Move(Direction dir) {
 
   bool allOtherSausagesCooked = true;
   for (s8 i = 0; i < 32; i++) {
-    if ((_sausages[i].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) {
+    if (_sausages[i].x1 > 0 && (_sausages[i].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) {
       allOtherSausagesCooked = false;
       break;
     }
@@ -459,12 +459,13 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
     return true;
   }
 
+  return false; // HACK: sausages cannot move in the overworld
+
   assert(sausageNo < sizeof(data.consideredSausages) * 8);
   if (data.consideredSausages & (1 << sausageNo)) return true; // Already analyzed
   data.consideredSausages |= (1 << sausageNo);
   if (data.sausageToSpear == -1) data.sausageToSpear = sausageNo; // If spearing is possible, the first sausage we encounter will be our spear target.
   Sausage sausage = _sausages[sausageNo];
-  return false; // HACK: sausages cannot move
 
   if (!CanPhysicallyMoveInternal(sausage.x1 + dx, sausage.y1 + dy, sausage.z + dz, dir)) return false;
   if (!CanPhysicallyMoveInternal(sausage.x2 + dx, sausage.y2 + dy, sausage.z + dz, dir)) return false;
@@ -1019,6 +1020,6 @@ size_t State::Hash() const {
 }
 
 Direction Inverse(Direction dir) {
-  assert(dir > 0 && dir < 7)
+  assert(dir > 0 && dir < 7);
   return (Direction)(7 - dir);
 }

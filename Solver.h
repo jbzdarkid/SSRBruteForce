@@ -13,6 +13,7 @@ private:
   void BFSStateGraph();
   State* GetOrInsertState(u16 depth);
 
+  void CreateShallowStates();
   void ComputeWinningStates();
 
   void DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements);
@@ -22,7 +23,10 @@ private:
   NodeHashSet<State> _visitedNodes2 = NodeHashSet<State>(0x7FFFFFF); // Choose a relatively large initial size because we'll need it.
   u16 _winningDepth = UNWINNABLE;
   LinkedList<State> _unexplored;
-  LinkedLoop<State> _explored;
+  LinkedList<State> _explored;
+
+  LinearAllocator<ShallowState> _shallowAlloc;
+  LinkedLoop<ShallowState> _explored2;
 
   Vector<Direction> _solution;
   Vector<Direction> _bestSolution;

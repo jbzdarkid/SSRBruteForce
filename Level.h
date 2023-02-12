@@ -7,6 +7,19 @@
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
 
+// This is a shallow copy of the State struct -- it does not include the sausage positions (and is thus much smaller).
+// However, those positions are *technically* irrelevant once we've computed the entire graph.
+struct ShallowState {
+  ShallowState* next = nullptr;
+  ShallowState* u = nullptr;
+  ShallowState* d = nullptr;
+  ShallowState* l = nullptr;
+  ShallowState* r = nullptr;
+
+#define UNWINNABLE 0xFFFE
+  u16 winDistance = UNWINNABLE;
+};
+
 struct State {
   Stephen stephen;
 
@@ -20,8 +33,9 @@ struct State {
   State* d = nullptr;
   State* l = nullptr;
   State* r = nullptr;
-#define UNWINNABLE 0xFFFE
-  u16 winDistance = UNWINNABLE;
+  bool isWinning = false;
+
+  ShallowState* shallow;
 
 #if HASH_CACHING
   size_t hash = 0;

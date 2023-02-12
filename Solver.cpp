@@ -15,11 +15,12 @@ u16 Score(State* state) {
   u16 score = 0;
   u16 sidesCooked;
   u8 flags;
-#define o(x) \
-  flags = state->sausages[x].flags; \
-  sidesCooked = (flags & Sausage::Flags::FullyCooked); \
-  if (sidesCooked == Sausage::Flags::FullyCooked) score += 100; \
-  else score += __popcnt16(sidesCooked);
+#define o(x) { \
+    flags = state->sausages[x].flags; \
+    sidesCooked = (flags & Sausage::Flags::FullyCooked); \
+    if (sidesCooked == Sausage::Flags::FullyCooked) score += 100; \
+    else score += __popcnt16(sidesCooked); \
+  }
 
   SAUSAGES;
 #undef o
@@ -31,7 +32,8 @@ Vector<Direction> Solver::Solve() {
 
   State* initialState;
   _visitedNodes2.CopyAdd(_level->GetState(), &initialState);
-  _unexplored = LinkedList<State>(initialState);
+  // initialState->shallow = _shallowAlloc.allocate(1);
+  _unexplored.AddToTail(initialState);
 
   BFSStateGraph();
 
@@ -40,14 +42,14 @@ Vector<Direction> Solver::Solve() {
   ComputeWinningStates();
 
   u32 winningStates = 0;
-  for (State* state : _explored) {
-    if (state->winDistance != UNWINNABLE) winningStates++;
+  for (ShallowState* shallow : _explored2) {
+    if (shallow->winDistance != UNWINNABLE) winningStates++;
   }
 
   printf("Of the %zd nodes, %d are winning.\n", _visitedNodes2.Size(), winningStates);
 
   _level->SetState(initialState); // Be polite and make sure we restore the original level state
-  if (initialState->winDistance == UNWINNABLE) {
+  if (initialState->shallow == nullptr || initialState->shallow->winDistance == UNWINNABLE) {
     printf("Automatic solver could not find a solution.\n");
     u16 bestScore = 0;
     for (State* state : _explored) {
@@ -57,13 +59,15 @@ Vector<Direction> Solver::Solve() {
     printf("Best score: %d\n", bestScore);
     for (State* state : _explored) {
       u16 score = Score(state);
-      if (score == bestScore) state->winDistance = 0;
+      if (score == bestScore) {
+        state->isWinning = true;
+      }
     }
-    printf("Recomputing winning states\n");
+
     ComputeWinningStates();
   }
 
-  printf("Found the shortest # of moves: %d\n", initialState->winDistance);
+  printf("Found the shortest # of moves: %d\n", initialState->shallow->winDistance);
   printf("Done computing victory states\n");
 
   DFSWinStates(initialState, 0, 0);
@@ -82,9 +86,9 @@ void Solver::BFSStateGraph() {
 
   while (_unexplored.Head() != nullptr) {
     State* state = _unexplored.Head();
-    if (state->winDistance == 0) { // Delayed addition of winning nodes to keep _explored in order
+    if (state->isWinning) { // Delayed addition of winning nodes to keep _explored in order
       _unexplored.AdvanceHead();
-      _explored.AddCurrent(state);
+      _explored.AddToTail(state);
       continue;
     }
 
@@ -120,7 +124,7 @@ void Solver::BFSStateGraph() {
     if (_level->Move(Right)) state->r = GetOrInsertState(depth);
 
     _unexplored.AdvanceHead();
-    _explored.AddCurrent(state);
+    _explored.AddToTail(state);
   }
 }
 
@@ -134,7 +138,7 @@ State* Solver::GetOrInsertState(u16 depth) {
   }
 
   if (_level->Won()) {
-      state->winDistance = 0;
+      state->isWinning = true;
       if (_winningDepth == UNWINNABLE) {
         // Once we find a winning state, we have reached the minimum depth for a solution.
         // Ergo, we should not explore the tree deeper than that solution. Since we're a BFS,
@@ -146,8 +150,43 @@ State* Solver::GetOrInsertState(u16 depth) {
       // in order to keep the _explored list in depth-sorted order.
   }
 
+  // state->shallow = _shallowAlloc.allocate(1);
+
   _unexplored.AddToTail(state);
   return state;
+}
+
+void Solver::CreateShallowStates() {
+  // "Leaked" memory, except that because there's no container, we don't have to be careful when freeing.
+  // Not that I free this ever or anything
+  ShallowState* zoneAlloc = new ShallowState[_explored.Size()]; // TODO: I can just move this into the initial BFS if I use a smart allocator.
+  s32 i = 0;
+
+  printf("Creating shallow states:                                                                            |\n");
+  s32 percPrint = _explored.Size() / 100;
+  for (State* state : _explored) {
+    ShallowState* shallow = &zoneAlloc[i++];
+    state->shallow = shallow;
+    if (i % percPrint == 0) printf("#");
+  }
+  printf("|\n");
+
+  _explored2 = LinkedLoop<ShallowState>(); // Clear the shallow state list in case we're re-evaluating after failing to win.
+
+  // Second iteration because we need shallow copies of the udlr states. (maybe not?)
+  printf("Populating shallow states:                                                                          |\n");
+  for (State* state : _explored) {
+    ShallowState* shallow = state->shallow;
+    shallow->winDistance = state->isWinning ? 0 : UNWINNABLE;
+    if (state->u) shallow->u = state->u->shallow;
+    if (state->d) shallow->d = state->d->shallow;
+    if (state->l) shallow->l = state->l->shallow;
+    if (state->r) shallow->r = state->r->shallow;
+    _explored2.AddCurrent(shallow);
+    if (_explored2.Size() % (_explored.Size() / 100) == 0) printf("#");
+  }
+
+  printf("|\n");
 }
 
 void Solver::ComputeWinningStates() {
@@ -162,46 +201,52 @@ void Solver::ComputeWinningStates() {
     But, we do still want to mark C as winning -- since we haven't *truly* computed the costs yet, we don't know if it's faster.
   */
 
+  // Reducing the memory required to represent the tree by removing sausages positions from State.
+  // This helps to avoid paging with very large trees.
+  CreateShallowStates();
+
+  printf("Computing winning states to achieve the best score\n");
+
   // If (somehow) we make it through the entire loop and find no win states, this is the correct exit condition.
   // It is very likely that this value will be updated during iteration.
-  State* endOfLoop = _explored.Previous();
+  ShallowState* endOfLoop = _explored2.Previous();
 
   while (true) {
-    State* state = _explored.Current();
-    if (state == nullptr) break; // All states are winning
+    ShallowState* shallow = _explored2.Current();
+    if (shallow == nullptr) break; // All states are winning
 
-    u16 winDistance = state->winDistance;
+    u16 winDistance = shallow->winDistance;
 
-    State* nextState = state->u;
+    ShallowState* nextState = shallow->u;
     if (nextState != nullptr && nextState->winDistance < winDistance) {
       winDistance = nextState->winDistance;
     }
-    nextState = state->d;
+    nextState = shallow->d;
     if (nextState != nullptr && nextState->winDistance < winDistance) {
       winDistance = nextState->winDistance;
     }
-    nextState = state->l;
+    nextState = shallow->l;
     if (nextState != nullptr && nextState->winDistance < winDistance) {
       winDistance = nextState->winDistance;
     }
-    nextState = state->r;
+    nextState = shallow->r;
     if (nextState != nullptr && nextState->winDistance < winDistance) {
       winDistance = nextState->winDistance;
     }
 
-    if (winDistance + 1 < state->winDistance) {
-      state->winDistance = winDistance + 1;
-      endOfLoop = _explored.Previous(); // If we come back around without making any progress, stop.
+    if (winDistance + 1 < shallow->winDistance) {
+      shallow->winDistance = winDistance + 1;
+      endOfLoop = _explored2.Previous(); // If we come back around without making any progress, stop.
     }
 
-    if (state == endOfLoop) break; // We just processed the last node, and it wasn't winning.
+    if (shallow == endOfLoop) break; // We just processed the last node, and it wasn't winning.
 
-    _explored.Advance();
+    _explored2.Advance();
   }
 }
 
 void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements) {
-  if (state->winDistance == 0) {
+  if (state->isWinning) {
     if (totalMillis < _bestMillis
      || (totalMillis == _bestMillis && backwardsMovements > _bestBackwardsMovements)) {
       _bestSolution = _solution.Copy();
@@ -219,8 +264,8 @@ void Solver::DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements)
 
 void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements) {
   if (!nextState) return; // Move would be illegal
-  if (nextState->winDistance == UNWINNABLE) return; // Move is not winning
-  if (state->winDistance != nextState->winDistance + 1) return; // Move leads away from victory
+  if (nextState->shallow->winDistance == UNWINNABLE) return; // Move is not ever winning
+  if (state->shallow->winDistance != nextState->shallow->winDistance + 1) return; // Move leads away from victory
 
   // Compute the duration of this motion
 

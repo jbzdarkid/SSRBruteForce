@@ -510,7 +510,7 @@ int main() {
     "______", {}, {}, {Sausage{2, 2, 3, 2, 1}});
 
   Level* level = &Overworld1;
-  level->InteractiveSolver();
+  // level->InteractiveSolver();
 
   Vector<Direction> solution = Solver(level).Solve();
   std::string levelName(level->name);
