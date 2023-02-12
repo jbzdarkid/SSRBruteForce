@@ -122,7 +122,6 @@ bool Level::WouldStephenStepOnGrill(const Stephen& stephen, Direction dir) {
 // Where possible, I prefer to check to see if we should call a function instead of using &handled.
 bool Level::Move(Direction dir) {
   stackcheck_begin();
-  /*
   s8 standingOnSausage = GetSausage(_stephen.x, _stephen.y, _stephen.z - 1);
   if (standingOnSausage != -1) {
     Sausage sausage = _sausages[standingOnSausage];
@@ -151,19 +150,10 @@ bool Level::Move(Direction dir) {
   if (IsGrill(_stephen.x, _stephen.y, _stephen.z)) {
     if (!HandleBurnedStep(dir)) return false;
   }
-  */
 
-  assert(_stephen.HasFork());
-  if (_sausageSpeared != -1) {
-    if (!HandleSpearedMotion(dir)) return false;
-  } else if (dir == _stephen.dir || dir == Inverse(_stephen.dir)) {
-    if (!HandleParallelMotion(dir)) return false;
-  } else {
-    if (!HandleRotation(dir)) return false;
-  }
-
-  // Hackity hack.
+#if OVERWORLD_HACK // In the overworld, sausages disappear when you step on things
   Vector<char> sausagesToRemove;
+#if OVERWORLD_HACK == 1
   if (_stephen.x == 23 && _stephen.y == 25 && _stephen.dir == Up)     sausagesToRemove = {'A', 'B', 'C'};
   if (_stephen.x == 20 && _stephen.y == 21 && _stephen.dir == Right)  sausagesToRemove = {'D', 'E'};
   if (_stephen.x == 20 && _stephen.y == 20 && _stephen.dir == Left)   sausagesToRemove = {'F', 'G'};
@@ -180,9 +170,12 @@ bool Level::Move(Direction dir) {
   if (_stephen.x == 3  && _stephen.y == 8  && _stephen.dir == Right)  sausagesToRemove = {'Y', 'Z', 'a'};
   if (_stephen.x == 10 && _stephen.y == 9  && _stephen.dir == Up)     sausagesToRemove = {'b', 'c'};
   if (_stephen.x == 9  && _stephen.y == 3  && _stephen.dir == Up)     sausagesToRemove = {'d', 'e', 'f'};
+  s8 numRedSausages = 32;
+#elif OVERWORLD_HACK == 2
+#endif
 
   bool allOtherSausagesCooked = true;
-  for (s8 i = 0; i < 32; i++) {
+  for (s8 i = 0; i < numRedSausages; i++) {
     if (_sausages[i].x1 > 0 && (_sausages[i].flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) {
       allOtherSausagesCooked = false;
       break;
@@ -196,6 +189,7 @@ bool Level::Move(Direction dir) {
     _sausages[sausageNo].z = -2;
     _sausages[sausageNo].flags = Sausage::Flags::FullyCooked;
   }
+#endif
 
   return true;
 }
@@ -459,7 +453,9 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
     return true;
   }
 
-  return false; // HACK: sausages cannot move in the overworld
+#if OVERWORLD_HACK
+  return false; // Sausages cannot move in the overworld
+#endif
 
   assert(sausageNo < sizeof(data.consideredSausages) * 8);
   if (data.consideredSausages & (1 << sausageNo)) return true; // Already analyzed
