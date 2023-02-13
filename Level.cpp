@@ -170,6 +170,14 @@ bool Level::Move(Direction dir) {
   if (_stephen.x == 2  && _stephen.y == 34 && _stephen.dir == Right)  sausagesToRemove = {'P', 'Q'};
   if (_stephen.x == 18 && _stephen.y == 21 && _stephen.dir == Right)  sausagesToRemove = {'R'};
   s8 numRedSausages = 17;
+#elif OVERWORLD_HACK == 3
+  if (_stephen.x == 5  && _stephen.y == 15 && _stephen.dir == Down)   sausagesToRemove = {'A'};
+  if (_stephen.x == 15 && _stephen.y == 13 && _stephen.dir == Down)   sausagesToRemove = {'B', 'C'};
+  if (_stephen.x == 24 && _stephen.y == 21 && _stephen.dir == Right)  sausagesToRemove = {'F', 'G'};
+  if (_stephen.x == 26 && _stephen.y == 4  && _stephen.dir == Right)  sausagesToRemove = {'H', 'I'};
+  if (_stephen.x == 25 && _stephen.y == 11 && _stephen.dir == Up)     sausagesToRemove = {'J'};
+  if (_stephen.x == 4  && _stephen.y == 22 && _stephen.dir == Left)   sausagesToRemove = {'K'};
+  s8 numRedSausages = 10;
 #endif
 
   for (char sausageToRemove : sausagesToRemove) {
@@ -395,17 +403,6 @@ bool Level::HandleRotation(Direction dir) {
   return true;
 }
 
-struct CPMData {
-  Vector<s8> movedSausages;
-  Vector<s8> sausagesToDrop;
-  s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
-  s8 sausageHat = -1;
-  u8 consideredSausages = 0; // We have /considered/ if this sausage can physically move and added it to movedSausages
-  u8 sausagesToDoubleMove = 0;
-  bool pushedFork = false;
-  bool canPhysicallyMove = false;
-} data;
-
 bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating) {
   // Reset the struct rather than reallocating it.
   data.movedSausages.Resize(0);
@@ -475,11 +472,11 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
 
 bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool canDoubleMove) {
   s8 sausageNo = GetSausage(x, y, z+1);
-  if (sausageNo == -1) return; // No sausage to carry
+  if (sausageNo == -1) return false; // No sausage to carry
   {
     u8 mask = (1 << sausageNo);
     assert(mask == (1 << sausageNo)); // Assert no truncation
-    if (data.consideredSausages & mask) return; // Already known to be moving
+    if (data.consideredSausages & mask) return false; // Already known to be moving
     data.consideredSausages |= mask;
   }
   Sausage sausage = _sausages[sausageNo];
@@ -951,9 +948,4 @@ bool Level::MoveStephenThroughSpace(Direction dir) {
   }
 #endif
   return true;
-}
-
-Direction Inverse(Direction dir) {
-  assert(dir > 0 && dir < 7);
-  return (Direction)(7 - dir);
 }

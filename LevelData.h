@@ -22,7 +22,6 @@ enum Direction : u8 {
   Right = 5,
   Down = 6,
 };
-Direction Inverse(Direction dir);
 
 struct Stephen {
   s8 x;

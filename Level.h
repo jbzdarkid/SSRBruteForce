@@ -1,21 +1,28 @@
 #pragma once
-#include "Types.h"
 #include "LevelData.h"
 #include "State.h"
 #include "WitnessRNG/StdLib.h"
 
 struct Level : public LevelData {
   using LevelData::LevelData; // Inherit the constructor
+
+  // The starting point whenever you write an automated solver -- this function allows the user to
+  // manually input the moves they'd like to make. This also is a critical debugging tool, since it
+  // allows us to reproduce a specific behavior.
   bool InteractiveSolver();
 
+  // Serialize/deserialize the current state, used for backtracking algorithms.
   State GetState() const;
   void SetState(const State* state);
 
-  // Returns true if the move succeeded
-  // Returns false if the move was illegal for any reason
+  // The main entry point -- this takes a player input (any of the 4 cardinal directions) and
+  // simulates the game's behavior by moving stephen, his fork, and the sausages around the level.
+  // This function returns false if moves is "useless", i.e. it would cause an immediate loss
+  // or zero change in state (walking into a wall).
   bool Move(Direction dir);
 private:
-  // Move() helpers
+  // These 7 functions handle the different ways stephen can move on level terrain
+  // Much like the parent Move function, their return value indicates a useless move.
   bool HandleLogRolling(const Sausage& sausage, Direction dir, bool& handled);
   bool HandleSpearedMotion(Direction dir);
   bool HandleLadderMotion(Direction dir, bool& handled);
@@ -26,26 +33,46 @@ private:
   // TODO: Rename, repurposed
   bool MoveThroughSpace3(Direction dir, s8 stephenRotationDir=0);
 
-  // CanPhysicallyMove is for when you want to check if motion is possible,
-  // and if it isn't, stephen will enact a different kind of motion.
-  // It has no side-effects.
+  // This function checks if *whatever* is at |x, y, z| can move in a direction |dir|
+  // For example, air can always move, walls can never move, and most everything else
+  // will check the cell in front of it.
+  // This function has no direct side-effects, but does evaluate the entirety of the movement,
+  // and updates the below struct with the potential results of the call.
+  struct CPMData {
+    Vector<s8> movedSausages;
+    Vector<s8> sausagesToRoll;
+    Vector<s8> sausagesToDrop;
+    s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
+    s8 sausageHat = -1;
+    u8 consideredSausages = 0; // We have /considered/ if this sausage can physically move and added it to movedSausages if applicable
+    u8 sausagesToDoubleMove = 0;
+    bool pushedFork = false;
+    bool canPhysicallyMove = false;
+  } data;
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating=false);
+  // Recursive internal function which actually does the heavy lifting.
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
-  // When a sausage is supported by another moving object (sausage, stephen, or fork) they can be 'carried' along,
-  // which means that they move but do not block the overall motion.
+  // Another internal helper because sausage carrying is complicated
   bool IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool canDoubleMove);
   void CheckForSausageCarry(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating);
-  // MoveThroughSpace is for when stephen is supposed to make a certain motion,
-  // and if the motion fails, the move should not have been taken.
-  // It may have side effects.
+
+  // The counterpart to CanPhysicallyMove, MoveThroughSpace actually enacts the proposed movement.
+  // Note that in some cases a move will have side effects but not result in stephen moving.
+  // As with CPM, a return value of false indicates a useless movement.
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
   bool MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
-  // Similarly to MoveThroughSpace, MoveStephenThroughSpace is for actually moving stephen,
-  // and we are just trying to figure out if that motion results in an invalid state,
-  // such as losing or burning a sausage. The equivalent check function is CanWalkOnto.
-  // It will have side effects even if the move is invalid.
+
+  // This function handles movement of stephen (and his fork) common to all the above functions.
+  // A return value of false indicates a useless move.
   bool MoveStephenThroughSpace(Direction dir);
 
+  // Saves which sausage the fork is currently stuck in (-1 if not stuck).
+  // *technically* this should live on Stephen, but it would make that > sizeof(u64).
   s8 _sausageSpeared = -1;
-  bool _interactive = false;
+  bool _interactive = false; // Set to true while in the InteractiveSolver, allows us to emit nice errors
+
+  inline Direction Inverse(Direction dir) {
+    assert(dir > 0 && dir < 7);
+    return (Direction)(7 - dir);
+  }
 };

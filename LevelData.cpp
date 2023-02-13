@@ -30,7 +30,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c == '3') _grid(x, y) = Wall3;
     else if (c == '4') _grid(x, y) = Wall4;
     else if (c == '5') _grid(x, y) = Wall5;
-#if !OVERWORLD_HACK // need to use these capital letters for sausages
+#if (OVERWORLD_HACK == 0 || OVERWORLD_HACK >= 2) // need to use these capital letters for sausages I mean not really but whatever
     else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
     else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
     else if (c == 'L') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Left}); }
@@ -88,7 +88,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
         "East",
         "South",
       };
-      // printf("[%s] if (_stephen.x == %d && _stephen.y == %d && _stephen.dir == %s) sausagesToRemove = {};\n", name, _stephen.x, _stephen.y, dirs[_stephen.dir]);
+      //printf("[%s] if (_stephen.x == %d && _stephen.y == %d && _stephen.dir == %s) sausagesToRemove = {};\n", name, _stephen.x, _stephen.y, dirs[_stephen.dir]);
     }
   }
   if (stephen.x > -1) {
@@ -190,7 +190,7 @@ bool LevelData::Won() const {
 #if !OVERWORLD_HACK
   if (_stephen != _start) return false;
 #endif
-  for (const Sausage& sausage : _sausages) {
+  for (Sausage sausage : _sausages) {
     if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
   }
   return true;
