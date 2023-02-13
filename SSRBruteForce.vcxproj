@@ -179,12 +179,13 @@
     <ClCompile Include="LevelData.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Solver.cpp" />
+    <ClCompile Include="State.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Level.h" />
     <ClInclude Include="LevelData.h" />
     <ClInclude Include="Solver.h" />
-    <ClInclude Include="Types.h" />
+    <ClInclude Include="State.h" />
     <ClInclude Include="WitnessRNG\StdLib.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
