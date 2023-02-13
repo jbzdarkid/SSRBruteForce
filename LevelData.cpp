@@ -186,7 +186,7 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  if (_stephen.x == 1 && _stephen.y == 1) return true; // also hack
+  if (_stephen.x == 4 && _stephen.y == 13) return true; // also hack
 #if !OVERWORLD_HACK
   if (_stephen != _start) return false;
 #endif

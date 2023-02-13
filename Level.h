@@ -21,15 +21,13 @@ struct Level : public LevelData {
   // or zero change in state (walking into a wall).
   bool Move(Direction dir);
 private:
-  // These 7 functions handle the different ways stephen can move on level terrain
+  // These 4 functions handle the different ways stephen can move on level terrain
   // Much like the parent Move function, their return value indicates a useless move.
-  bool HandleLogRolling(const Sausage& sausage, Direction dir, bool& handled);
-  bool HandleSpearedMotion(Direction dir);
+  bool HandleLogRolling(Direction dir, bool& handled);
   bool HandleLadderMotion(Direction dir, bool& handled);
-  bool HandleBurnedStep(Direction dir);
-  bool HandleForklessMotion(Direction dir);
-  bool HandleRotation(Direction dir);
-  bool HandleParallelMotion(Direction dir);
+  bool HandleRotation(Direction dir, bool& handled);
+  bool HandleBurnedStep(Direction dir, bool& handled);
+  bool HandleForkReconnect(Direction dir, bool& handled);
   // TODO: Rename, repurposed
   bool MoveThroughSpace3(Direction dir, s8 stephenRotationDir=0);
 
@@ -60,11 +58,11 @@ private:
   // Note that in some cases a move will have side effects but not result in stephen moving.
   // As with CPM, a return value of false indicates a useless movement.
   bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
-  bool MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
+  bool MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
 
   // This function handles movement of stephen (and his fork) common to all the above functions.
   // A return value of false indicates a useless move.
-  bool MoveStephenThroughSpace(Direction dir);
+  bool MoveStephenThroughSpace(Direction dir, bool ladderMotion=false);
 
   // Saves which sausage the fork is currently stuck in (-1 if not stuck).
   // *technically* this should live on Stephen, but it would make that > sizeof(u64).
