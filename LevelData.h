@@ -1,12 +1,17 @@
 #pragma once
 #include <initializer_list>
-#include "Types.h"
 #include "WitnessRNG/StdLib.h"
 
+// Mmmm, macros
 #define STAY_NEAR_THE_SAUSAGES 0
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
-#define OVERWORLD_HACK 2
+#define OVERWORLD_HACK 0
+#define SAUSAGES o(0) o(1) //o(2) // o(3) // o(4)
+//  #define SAUSAGES o(0) o(1) o(2) o(3) o(4) o(5) o(6) o(7) o(8) o(9) \
+//                   o(10) o(11) o(12) o(13) o(14) o(15) o(16) o(17) // o(18) o(19) \
+//                   o(20) o(21) o(22) o(23) o(24) o(25) o(26) o(27) o(28) o(29) \
+//                   o(30) o(31) o(32)
 
 enum Direction : u8 {
   None = 0,
@@ -47,18 +52,16 @@ struct Stephen {
   // If it has any other value, then it is elsewhere in the world.
   inline bool HasFork() const { return forkDir == None; }
   bool operator==(const Stephen& other) const {
-    // We keep states where stephen has a fork in a normalized form so that we can do a direct u64 comparison.
 #if _DEBUG
+    // Run some sanity checks
     if (HasFork()) {
       assert(forkZ == z);
-      assert(forkDir == None);
     }
     if (other.HasFork()) {
       assert(other.forkZ == other.z);
-      assert(other.forkDir == None);
     }
 #endif
-    static_assert(sizeof(Stephen) == 8);
+    static_assert(sizeof(Stephen) == sizeof(u64));
     u64 a = *(u64*)this;
     u64 b = *(u64*)&other;
     return a == b;
@@ -74,7 +77,8 @@ struct Ladder {
 };
 
 struct Sausage {
-  // I expect x1, y1 to be the left- or upper- half of the sausage. This means future work if we rotate sausages.
+  // x1, y1 will always refer to the the left- or upper- half of the sausage.
+  // This does cause some extra work while rotating, but makes comparison and referencing much easier.
   s8 x1;
   s8 y1;
   s8 x2;
@@ -90,11 +94,11 @@ struct Sausage {
     Rolled = 16,
     Cook1 = Cook1A | Cook1B, // If (x1, y1) is cooked on both sides
     Cook2 = Cook2A | Cook2B, // If (x2, y2) is cooked on both sides
-    FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B,
+    FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B, // If all 4 sides are cooked
   };
 
   u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
-  u16 _ = 0; // Padding
+  u16 _ = 0; // Unused, padding
 
   inline bool IsVertical() const { return x1 == x2; }
   inline bool IsHorizontal() const { return y1 == y2; }
@@ -109,11 +113,12 @@ struct Sausage {
     static_assert(sizeof(Sausage) == 8);
     u64 a = *(u64*)this;
     u64 b = *(u64*)&other;
-    return a == b; // Assuming the padding bytes are always 0?
+    return a == b; // Assuming the padding bytes are always 0
   }
   bool operator!=(const Sausage& other) const { return !(*this == other); }
 };
 
+// Note the bit-masking here -- this allows us to natively represent overhangs
 enum Tile : u8 {
   Empty  = 0,
   Ground = 0b00000001,
@@ -149,11 +154,6 @@ public:
 
 protected:
   Stephen _stephen;
-// #define SAUSAGES o(0) o(1) // o(2) // o(3) // o(4)
-  #define SAUSAGES o(0) o(1) o(2) o(3) o(4) o(5) o(6) o(7) o(8) o(9) \
-                   o(10) o(11) o(12) o(13) o(14) o(15) o(16) o(17) // o(18) o(19) \
-//                   o(20) o(21) o(22) o(23) o(24) o(25) o(26) o(27) o(28) o(29) \
-//                   o(30) o(31) o(32)
   Vector<Sausage> _sausages;
 
 private:

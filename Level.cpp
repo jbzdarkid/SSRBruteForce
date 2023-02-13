@@ -2,6 +2,9 @@
 #include <cstdio>
 #include <intrin.h>
 
+// Helper functions to check for infinite recursion. By taking the address of a stack-local variable,
+// we can determine if the stack has grown _very_ large, and then pre-emptively kill execution.
+// This will result in a smaller and easier callstack to debug.
 static u64 stackStart;
 void stackcheck_begin() {
 #if _DEBUG
@@ -21,6 +24,17 @@ void stackcheck() {
   }
 #endif
 }
+
+// Frequently used in FAIL() strings
+constexpr const char* DIRS[] = {"None", "Up", "Left", "Jump", "Crouch", "Right", "Down"};
+
+#define FAIL(reason, ...) \
+  do { \
+    if (_interactive) { \
+      printf("[%d] Move was illegal: " reason "\n", __LINE__, ##__VA_ARGS__); \
+    } \
+    return false; \
+  } while (0)
 
 bool Level::InteractiveSolver() {
   _interactive = true;
@@ -59,7 +73,7 @@ bool Level::InteractiveSolver() {
 
   printf("Level completed in %d moves\n", undoHistory.Size() - 1);
   _interactive = false;
-  SetState(&undoHistory[0]); // Restore the original state
+  SetState(&undoHistory[0]); // Restore the initial state
   return true;
 }
 
@@ -87,39 +101,10 @@ void Level::SetState(const State* s) {
   _sausages.CopyFromArray(s->sausages, sizeof(s->sausages));
 
   // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.
+  // TODO: Uhh, I think I'm more CPU bound these days? Not sure.
   if (_stephen.HasFork()) _sausageSpeared = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
 }
 
-const char* DIRS[] = {
-  "None",
-  "Up",
-  "Left",
-  "Jump",
-  "Crouch",
-  "Right",
-  "Down",
-};
-
-#define FAIL(reason, ...) \
-  { \
-    if (_interactive) { \
-      printf("[%d] Move was illegal: " reason "\n", __LINE__, ##__VA_ARGS__); \
-    } \
-    return false; \
-  }
-
-bool Level::WouldStephenStepOnGrill(const Stephen& stephen, Direction dir) {
-  if (dir == Up)         return IsGrill(stephen.x, stephen.y - 1, stephen.z);
-  else if (dir == Down)  return IsGrill(stephen.x, stephen.y + 1, stephen.z);
-  else if (dir == Left)  return IsGrill(stephen.x - 1, stephen.y, stephen.z);
-  else if (dir == Right) return IsGrill(stephen.x + 1, stephen.y, stephen.z);
-  else {
-    assert(false);
-    FAIL("Stephen is moving in an invalid direction %d", dir);
-  }
-}
-
-// Where possible, I prefer to check to see if we should call a function instead of using &handled.
 bool Level::Move(Direction dir) {
   stackcheck_begin();
   s8 standingOnSausage = GetSausage(_stephen.x, _stephen.y, _stephen.z - 1);
@@ -151,7 +136,7 @@ bool Level::Move(Direction dir) {
     if (!HandleBurnedStep(dir)) return false;
   }
 
-#if OVERWORLD_HACK // In the overworld, sausages disappear when you step on things
+#if OVERWORLD_HACK // In the overworld, sausages disappear when you step on things. Not sure if this is the right place for this hack tbf.
   Vector<char> sausagesToRemove;
 #if OVERWORLD_HACK == 1
   if (_stephen.x == 23 && _stephen.y == 25 && _stephen.dir == Up)     sausagesToRemove = {'A', 'B', 'C'};
@@ -212,43 +197,45 @@ bool Level::Move(Direction dir) {
 bool Level::HandleLogRolling(const Sausage& sausage, Direction dir, bool& handled) {
   if (dir == Up && sausage.IsHorizontal() && (_stephen.dir == Up || _stephen.dir == Down)) {
     if (CanPhysicallyMove(sausage.x1, sausage.y1, sausage.z, Down)
-      && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Down)) {
+     && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Down)) {
       if (!MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, Down)) return false; // This *should* move the entire sausage.
       if (!MoveStephenThroughSpace(Down)) return false;
       handled = true;
     }
   } else if (dir == Down && sausage.IsHorizontal() && (_stephen.dir == Up || _stephen.dir == Down)) {
     if (CanPhysicallyMove(sausage.x1, sausage.y1, sausage.z, Up)
-      && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Up)) {
+     && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Up)) {
       if (!MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, Up)) return false; // This *should* move the entire sausage.
       if (!MoveStephenThroughSpace(Up)) return false;
       handled = true;
     }
   } else if (dir == Left && sausage.IsVertical() && (_stephen.dir == Left || _stephen.dir == Right)) {
     if (CanPhysicallyMove(sausage.x1, sausage.y1, sausage.z, Right)
-      && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Right)) {
+     && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Right)) {
       if (!MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, Right)) return false; // This *should* move the entire sausage.
       if (!MoveStephenThroughSpace(Right)) return false;
       handled = true;
     }
   } else if (dir == Right && sausage.IsVertical() && (_stephen.dir == Left || _stephen.dir == Right)) {
     if (CanPhysicallyMove(sausage.x1, sausage.y1, sausage.z, Left)
-      && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Left)) {
+     && CanPhysicallyMove(sausage.x2, sausage.y2, sausage.z, Left)) {
       if (!MoveThroughSpace(sausage.x1, sausage.y1, sausage.z, Left)) return false; // This *should* move the entire sausage.
       if (!MoveStephenThroughSpace(Left)) return false;
       handled = true;
     }
   }
   if (handled) {
+    // We've handled the lateral motion, so now we handle dropping stephen (and any sausages) down
     while (true) {
       bool stephenSupported = CanWalkOnto(_stephen.x, _stephen.y, _stephen.z);
-      if (stephenSupported) break;
-      // Log rolls are allowed to make stephen fall off of cliffs, but we've already checked that sausages cannot be lost.
-      if (_stephen.z <= 0) FAIL("Stephen would fall below the world");
+      if (stephenSupported) break; // Landed safely
+      if (_stephen.z <= 0) FAIL("Stephen would log roll off the world");
 
+      // Handle fork disconnect (logroll where stephen is facing backwards)
       if (_stephen.HasFork()) {
         if (!CanWalkOnto(_stephen.forkX, _stephen.forkY, _stephen.forkZ)) {
-          _stephen.forkDir = _stephen.dir; // Fork disconnects, and remains where it was.
+          _stephen.forkDir = _stephen.dir; // Set the fork's direction to mark it as disconnected.
+          assert(!_stephen.HasFork());
         }
       }
       _stephen.z--;
@@ -420,6 +407,7 @@ struct CPMData {
 } data;
 
 bool Level::CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating) {
+  // Reset the struct rather than reallocating it.
   data.movedSausages.Resize(0);
   data.sausagesToDrop.Resize(0);
   data.sausageToSpear = -1;
@@ -478,20 +466,25 @@ bool Level::CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir) {
   if (data.sausageToSpear == -1) data.sausageToSpear = sausageNo; // If spearing is possible, the first sausage we encounter will be our spear target.
   Sausage sausage = _sausages[sausageNo];
 
+  // Check if both of the sausage halves can move, recursively.
   if (!CanPhysicallyMoveInternal(sausage.x1 + dx, sausage.y1 + dy, sausage.z + dz, dir)) return false;
   if (!CanPhysicallyMoveInternal(sausage.x2 + dx, sausage.y2 + dy, sausage.z + dz, dir)) return false;
-  // Both of the sausage halves can move, so the sausage will move if the move succeeds.
   data.movedSausages.Push(sausageNo);
   return true;
 }
 
 bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating, bool canDoubleMove) {
   s8 sausageNo = GetSausage(x, y, z+1);
-  if (sausageNo == -1 || data.consideredSausages & (1 << sausageNo)) return false; // Already analyzed
-  data.consideredSausages |= (1 << sausageNo);
+  if (sausageNo == -1) return; // No sausage to carry
+  {
+    u8 mask = (1 << sausageNo);
+    assert(mask == (1 << sausageNo)); // Assert no truncation
+    if (data.consideredSausages & mask) return; // Already known to be moving
+    data.consideredSausages |= mask;
+  }
   Sausage sausage = _sausages[sausageNo];
 
-  // Find the x and y which are not implicitly supported (by whoever our caller is)
+  // Find the x and y which are not supported by our caller
   s8 otherX;
   s8 otherY;
   if (sausage.x1 == x && sausage.y1 == y) {
@@ -504,6 +497,7 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
 
   if (IsWall(otherX, otherY, z)) return false; // Other support is a wall
 
+  // The other support is a fork
   if (_stephen.forkX == otherX && _stephen.forkY == otherY && _stephen.forkZ == z) {
     if (!_stephen.HasFork() && !data.pushedFork) return false; // Sausage is resting on disconnected fork which is not moving
     if (_stephen.HasFork() && stephenIsRotating) { // Supported by fork while rotating (fork drop)
@@ -542,6 +536,7 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
     }
   }
 
+  // If we've reached here, the other support is air or is also moving, so this sausage will move too.
   data.movedSausages.Push(sausageNo);
   return true;
 }
@@ -626,7 +621,7 @@ bool Level::MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotatio
       // Then, try the move again, and if we still can't move, give up.
       canPhysicallyMove = CanPhysicallyMove(x, y, z, dir);
       if (!canPhysicallyMove) FAIL("Stephen's fork can stick into sausage %c but the move is still impossible", 'a' + data.sausageToSpear);
-      // Else, we fall into the main block.
+      // We successfully stuck the fork into a sausage, continue into the main block.
     } else {
       if (!_interactive) FAIL("");
 
@@ -637,7 +632,7 @@ bool Level::MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotatio
     }
   }
 
-  // The ordering here is important -- we need to move lower sausages first so that stacked sausages drop properly.
+  // The iteration order here is important -- we need to move lower sausages first so that stacked sausages drop properly.
   for (s8 sausageNo : data.movedSausages) {
     Sausage sausage = _sausages[sausageNo];
 
@@ -716,8 +711,18 @@ bool Level::MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotatio
     }
   }
 
+  // The order here needs to be from bottom to top, fortunately this is the same order that we add sausages to the list in.
+#if _DEBUG
+  s8 z_ = -1;
   for (s8 sausageNo : data.sausagesToDrop) {
     Sausage sausage = _sausages[sausageNo];
+    assert(sausage.z >= z_);
+    z_ = sausage.z;
+  }
+#endif
+  for (s8 sausageNo : data.sausagesToDrop) {
+    Sausage sausage = _sausages[sausageNo];
+
     while (true) {
       bool supported = CanWalkOnto(sausage.x1, sausage.y1, sausage.z)
                     || CanWalkOnto(sausage.x2, sausage.y2, sausage.z);
@@ -758,7 +763,9 @@ bool Level::MoveThroughSpace2(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotatio
     }
   }
 
-  if (!_stephen.HasFork()) { // TODO: What if dropping the fork means a sausage is unsupported? I'm really thinking about making a dummy sausage for the fork.
+  // TODO: What if dropping the fork means a sausage is unsupported? I'm really thinking about making a dummy sausage for the fork.
+  // How do I usually compute supportability? Why can't this work like that?
+  if (!_stephen.HasFork()) {
     while (true) {
       bool supported = CanWalkOnto(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
       if (supported) break;

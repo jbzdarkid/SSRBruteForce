@@ -10,7 +10,6 @@ struct Level : public LevelData {
 
   State GetState() const;
   void SetState(const State* state);
-  bool WouldStephenStepOnGrill(const Stephen& stephen, Direction dir); // Used by Solver to compute movement durations.
 
   // Returns true if the move succeeded
   // Returns false if the move was illegal for any reason

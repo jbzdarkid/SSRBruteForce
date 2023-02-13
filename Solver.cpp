@@ -284,7 +284,7 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
 #undef o
   }
 
-  if (_level->WouldStephenStepOnGrill(state->stephen, dir)) totalMillis += 152; // TODO: Does this change while speared?
+  if (WouldStephenStepOnGrill(state->stephen, dir)) totalMillis += 152; // TODO: Does this change while speared?
   // TODO: Does the sausage movement cost depend on your *current state* or the *next state*? I.e. if you unspear and roll a sausage behind you, do you pay for it?
   // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
   // TODO: Time motion w/ sausage hat
@@ -303,4 +303,13 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   _solution.Push(dir);
   DFSWinStates(nextState, totalMillis, backwardsMovements);
   _solution.Pop();
+}
+
+bool Solver::WouldStephenStepOnGrill(Stephen stephen, Direction dir) const {
+  if (dir == Up)         return _level->IsGrill(stephen.x, stephen.y - 1, stephen.z);
+  else if (dir == Down)  return _level->IsGrill(stephen.x, stephen.y + 1, stephen.z);
+  else if (dir == Left)  return _level->IsGrill(stephen.x - 1, stephen.y, stephen.z);
+  else if (dir == Right) return _level->IsGrill(stephen.x + 1, stephen.y, stephen.z);
+  assert(false);
+  return false;
 }

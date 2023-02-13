@@ -13,7 +13,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 {
   _grid.Fill(Tile::Empty);
   Vector<Tile> extraTiles(tiles);
- 
+
   assert(width * height == strlen(asciiGrid));
   for (s32 i=0; i<width * height; i++) {
     s8 x = i % width;
@@ -186,6 +186,7 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
+  if (_stephen.x == 1 && _stephen.y == 1) return true; // also hack
 #if !OVERWORLD_HACK
   if (_stephen != _start) return false;
 #endif
@@ -212,17 +213,19 @@ bool LevelData::IsWithinGrid(s8 x, s8 y, s8 z) const {
 bool LevelData::IsWall(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   u8 cell = _grid(x, y);
-  // At z=0, we are blocked if the cell has the second bit set, i.e. (cell & 0b10).
-  return cell & (Ground << 1 << z);
+  // if _stephen.z == 0 then you are blocked by Wall1. if _stephen.z == 1 then you are blocked by Wall2.
+  return (cell & (Ground << 1 << z)) != 0;
 }
 
 bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   u8 cell = _grid(x, y);
-  // If you are at z=0, you can walk onto anything at ground level. If you are at z=1, you can walk onto Wall1
-  if ((cell & (Ground << z)) != 0) return true; // Ground at our current level
-  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z) return true; // Fork at our current level
-  if (GetSausage(x, y, z-1) != -1) return true; // Sausage at our current level
+  // Here's one of the places where we take advantage of the overhang bitmask.
+  // Note that this *only* checks for ground at our feet, not if we're walking into a wall.
+  // if _stephen.z == 0 then you can walk onto Ground. if _stephen.z == 1 then you can walk onto Wall1
+  if ((cell & (Ground << z)) != 0) return true; // Stepping onto ground at our current level
+  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z) return true; // Stepping onto a fork
+  if (GetSausage(x, y, z-1) != -1) return true; // Stepping onto a sausage
   return false;
 }
 
