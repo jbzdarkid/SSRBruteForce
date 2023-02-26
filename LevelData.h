@@ -3,11 +3,11 @@
 #include "WitnessRNG/StdLib.h"
 
 // Mmmm, macros
-#define STAY_NEAR_THE_SAUSAGES 0
+#define STAY_NEAR_THE_SAUSAGES 3
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
 #define OVERWORLD_HACK 0
-#define SAUSAGES o(0) //o(1) //o(2) // o(3) // o(4)
+#define SAUSAGES o(0) o(1) o(2) // o(3) // o(4)
 //  #define SAUSAGES o(0) o(1) o(2) o(3) o(4) o(5) o(6) o(7) o(8) o(9) \
 //                   o(10) o(11) o(12) o(13) o(14) o(15) o(16) o(17) // o(18) o(19) \
 //                   o(20) o(21) o(22) o(23) o(24) o(25) o(26) o(27) o(28) o(29) \
@@ -108,6 +108,7 @@ struct Sausage {
     if (x_ == x2 && y_ == y2) return true;
     return false;
   }
+  inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
   bool operator==(const Sausage& other) const {
     static_assert(sizeof(Sausage) == 8);
     u64 a = *(u64*)this;

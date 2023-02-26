@@ -47,6 +47,7 @@ private:
     bool pushedFork = false;
     bool canPhysicallyMove = false;
   } data;
+  bool Consider(s8 sausageNo); // Helper around data.consideredSausages
   bool CanPhysicallyMove(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRotating=false);
   // Recursive internal function which actually does the heavy lifting.
   bool CanPhysicallyMoveInternal(s8 x, s8 y, s8 z, Direction dir);
@@ -57,7 +58,7 @@ private:
   // The counterpart to CanPhysicallyMove, MoveThroughSpace actually enacts the proposed movement.
   // Note that in some cases a move will have side effects but not result in stephen moving.
   // As with CPM, a return value of false indicates a useless movement.
-  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
+  bool MoveThroughSpace(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool checkSausageCarry=false, bool doSausageRotation=false, bool doDoubleMove=true);
   bool MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephenRotationDir=0, bool doSausageRotation=false, bool doDoubleMove=true);
 
   // This function handles movement of stephen (and his fork) common to all the above functions.

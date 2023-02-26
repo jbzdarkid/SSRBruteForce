@@ -186,12 +186,14 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  if (_stephen.x == 4 && _stephen.y == 13) return true; // also hack
+//  return (_stephen.x == 7 && _stephen.y == 13 && _stephen.dir == Up
+//      && ((_sausages[0].x1 == 7 && _sausages[0].y1 == 9 && _sausages[1].x1 == 7 && _sausages[1].y1 == 11)
+//          || (_sausages[1].x1 == 7 && _sausages[1].y1 == 9 && _sausages[0].x1 == 7 && _sausages[0].y1 == 11)));
 #if !OVERWORLD_HACK
   if (_stephen != _start) return false;
 #endif
   for (Sausage sausage : _sausages) {
-    if ((sausage.flags & Sausage::Flags::FullyCooked) != Sausage::Flags::FullyCooked) return false;
+    if (!sausage.IsFullyCooked()) return false;
   }
   return true;
 }

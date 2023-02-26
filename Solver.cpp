@@ -81,6 +81,7 @@ Vector<Direction> Solver::Solve() {
 
 void Solver::BFSStateGraph() {
   State depthMarker;
+  depthMarker.shallow = new ShallowState();
   u16 depth = 0;
   _unexplored.AddToTail(&depthMarker);
 

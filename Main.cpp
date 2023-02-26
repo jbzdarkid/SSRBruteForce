@@ -468,7 +468,7 @@ Level SlopeView(18, 8, "5-1 Slope View",
   {Sausage{6, 3, 6, 4}});
 
 
-Level LandsEnd(13, 7, "Land's End",
+Level LandsEnd(13, 7, "5-5 Land's End",
   "      _1     "
   "_1___ __  3  "
   "____ ___223__"
@@ -479,6 +479,72 @@ Level LandsEnd(13, 7, "Land's End",
   Stephen{10, 2, 3, Left},
   {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}},
   {Sausage{9, 2, 9, 3, 2}});
+
+Level FolkloreSetup(8, 9, "6-2.5 Folklore Setup",
+  "________"
+  "41_1____"
+  "41_1_1__"
+  "4111112 "
+  "41_1_11 "
+  "41_1_11 "
+  "4111111 "
+  "5444451 "
+  "        ",
+  Stephen{1,1,1,Down},
+  {},
+  {Sausage{3,1,3,2,1}, Sausage{1,6,2,6,1}, Sausage{4,6,5,6,1}});
+
+Level TheSplittingBough1(16, 6, "6-5 The Splitting Bough (Part 1/2)",
+  "_______1________"
+  "__aa_________##_"
+  "_______111_1_##_"
+  "____<__1________"
+  "___________     "
+  "________        ");
+
+Level SuspensionBridgeSetup(30, 14, "6-10.5 Suspension Bridge Setup",
+  "___ _ _     _ _1_____________4"
+  "________ _ _ _ 1___11____1___4"
+  "1______ _ _ _ _____11________4"
+  "________ ___ _ ___aa__55____54"
+  "_______ _ ___ __1_bb_________4"
+  "___1___________<___________114"
+  "_________11_________11_____114"
+  "______________     _______    "
+  "       ______       ______    "
+  "       _________ _________    "
+  "       _______1_ _1_______    "
+  "       _________ _________    "
+  "       __11__ 1   1 ______    "
+  "       ______                 ");
+
+Level CuriousDragonsSetup(13, 14, "6-11.5 Curious Dragons Setup",
+  "__1___444___1"
+  "______444___1"
+  "5____5444__44"
+  "______444__44"
+  "<___aa444__44"
+  "____bb444__44"
+  "    ________ "
+  "    ________ "
+  "    ____     "
+  "    ____     "
+  "    _1__     "
+  "    _1__     "
+  "    ____     "
+  "    ____     ");
+  
+Level CuriousDragons2(11, 9, "6-11 Curious Dragons (Part 2/2)",
+  "    _______"
+  "    11___1_"
+  "_aBb_____U_"
+  "_acC_______"
+  "_1  _______"
+  "<U  _______"
+  "    __##___"
+  "    __##___"
+  "    _______");
+  
 
 // ABC: Lachrymose Head
 // DE: Southjaunt
@@ -676,7 +742,7 @@ int main() {
     "______"
     "______", {}, {}, {Sausage{2, 2, 3, 2, 1}});
 
-  Level* level = &OverworldSausage3;
+  Level* level = &CuriousDragons2;
 #if _DEBUG
   level->InteractiveSolver();
 #endif
