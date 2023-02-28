@@ -81,7 +81,7 @@ Vector<Direction> Solver::Solve() {
 
 void Solver::BFSStateGraph() {
   State depthMarker;
-  depthMarker.shallow = new ShallowState();
+  depthMarker.shallow = new ShallowState(); // Just so that state->shallow->winDistance works.
   u16 depth = 0;
   _unexplored.AddToTail(&depthMarker);
 
@@ -98,7 +98,7 @@ void Solver::BFSStateGraph() {
       if (_unexplored.Size() == 1) { // Only the dummy state is left in queue, queue is essentially empty
         printf("BFS exploration complete (no nodes remaining).\n");
         break;
-      } else if (_visitedNodes2.Size() > 100'000'000) {
+      } else if (_visitedNodes2.Size() > 150'000'000) {
         printf("giving up (too many nodes).\n");
         break;
       } else if (depth == _winningDepth + 2) {

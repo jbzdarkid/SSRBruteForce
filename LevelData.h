@@ -3,7 +3,7 @@
 #include "WitnessRNG/StdLib.h"
 
 // Mmmm, macros
-#define STAY_NEAR_THE_SAUSAGES 3
+#define STAY_NEAR_THE_SAUSAGES 2
 #define HASH_CACHING 1
 #define SORT_SAUSAGE_STATE 0
 #define OVERWORLD_HACK 0

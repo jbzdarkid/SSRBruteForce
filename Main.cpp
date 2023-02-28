@@ -747,12 +747,7 @@ int main() {
   level->InteractiveSolver();
 #endif
 
-  Vector<Direction> solution = Solver(level).Solve();
-  std::string levelName(level->name);
-  levelName = levelName.substr(0, levelName.find_first_of(' '));
-  std::ofstream file(levelName + ".dem");
-
-  const char* dirs[] = {
+  const char* DIRS[] = {
     nullptr,
     "North",
     "West",
@@ -761,12 +756,34 @@ int main() {
     "East",
     "South",
   };
-  for (Direction dir : solution) file << dirs[dir] << '\n';
+  for (Direction dir : {
+    Right, Up, Up, Up, Right,
+    Left, Left, Left, Down, Up,
+    Up, Left, Right, Up, Down,
+    Up, Right, Left, Left, Left,
+    Up, Down, Down, Left, Right,
+    Up, Down, Down, Left, Right,
+    Right, Down, // Down the ladder
+
+    // More dubious stuff here
+    Left, Up, Left, Left, Right
+    })
+  {
+    level->Print();
+    printf("%s\n", DIRS[dir]);
+    level->Move(dir);
+  }
+  Vector<Direction> solution = Solver(level).Solve();
+  std::string levelName(level->name);
+  levelName = levelName.substr(0, levelName.find_first_of(' '));
+  std::ofstream file(levelName + ".dem");
+
+  for (Direction dir : solution) file << DIRS[dir] << '\n';
   file.close();
 
   for (Direction dir : solution) {
     level->Print();
-    printf("%s\n", dirs[dir]);
+    printf("%s\n", DIRS[dir]);
     getchar();
     level->Move(dir);
   }

@@ -945,7 +945,11 @@ bool Level::MoveStephenThroughSpace(Direction dir, bool ladderMotion) {
   distanceToSausage = \
     (_sausages[i].x1 - _stephen.x) * (_sausages[i].x1 - _stephen.x) + \
     (_sausages[i].y1 - _stephen.y) * (_sausages[i].y1 - _stephen.y); \
-  if (distanceToSausage <= distance) closeToAnySausage = true;
+  if (distanceToSausage <= distance) closeToAnySausage = true; \
+  distanceToSausage = \
+    (_sausages[i].x2 - _stephen.x) * (_sausages[i].x2 - _stephen.x) + \
+    (_sausages[i].y2 - _stephen.y) * (_sausages[i].y2 - _stephen.y); \
+  if (distanceToSausage <= distance) closeToAnySausage = true; \
 
   SAUSAGES;
 #undef o
