@@ -2,34 +2,30 @@
 #include "Level.h"
 #include "WitnessRNG/StdLib.h"
 
+#include <unordered_set>
+#include <unordered_map>
+#include <vector>
+
 struct Solver {
   Solver(Level* level);
-  ~Solver();
 
-  Vector<Direction> Solve();
+  std::vector<Direction> Solve();
 
 private:
-  void BFSStateGraph();
-  State* GetOrInsertState(u16 depth);
-
-  void CreateShallowStates();
-  void ComputeWinningStates();
-
-  void DFSWinStates(State* state, u64 totalMillis, u16 backwardsMovements);
-  void ComputePenaltyAndRecurse(State* state, State* nextState, Direction dir, u64 totalMillis, u16 backwardsMovements);
+  bool SolveRecursive(u16 depth);
+  void FindBestSolutionRecursive(u16 depth, u64 cost);
+  void ComputePenaltyAndRecurse(const State& state, Direction dir, u16 depth, u64 cost);
   bool WouldStephenStepOnGrill(Stephen stephen, Direction dir) const;
 
   Level* _level = nullptr;
-  NodeHashSet<State> _visitedNodes2 = NodeHashSet<State>(0x7FFFFF); // Choose a relatively large initial size because we'll need it.
-  u16 _winningDepth = UNWINNABLE;
-  LinkedList<State> _unexplored;
-  LinkedList<State> _explored;
+  u16 _bestDepth = 0;
 
-  LinearAllocator _shallowAlloc;
-  LinkedLoop<ShallowState> _explored2;
+  std::unordered_set<State, State> _visited;
+  std::unordered_set<State, State> _winning;
+  std::unordered_map<State, u64, State> _winningCosts;
 
-  Vector<Direction> _solution;
-  Vector<Direction> _bestSolution;
-  u64 _bestMillis = (u64)-1;
+  std::vector<Direction> _solution;
+  std::vector<Direction> _bestSolution;
+  u64 _bestCost = (u64)-1;
   u16 _bestBackwardsMovements = 0;
 };

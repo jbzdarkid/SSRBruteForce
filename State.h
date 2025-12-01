@@ -36,6 +36,7 @@ struct State {
 
   bool operator==(const State& other) const;
   size_t Hash() const;
+  std::size_t operator()(const State& state) const { return state.Hash(); }
 };
 
 namespace std {

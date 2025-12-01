@@ -734,6 +734,7 @@ Level Overworld4(38, 32, "Overworld4",
   {Sausage{2,19,2,20,4}});
 
 int main() {
+  /*
   Level Test(6, 6, "Test",
     "______"
     "__a___"
@@ -742,20 +743,11 @@ int main() {
     "______"
     "______", {}, {}, {Sausage{2, 2, 3, 2, 1}});
 
-  Level* level = &CuriousDragons2;
+  Level* level = &LachrymoseHead;
 #if _DEBUG
   level->InteractiveSolver();
 #endif
 
-  const char* DIRS[] = {
-    nullptr,
-    "North",
-    "West",
-    nullptr,
-    nullptr,
-    "East",
-    "South",
-  };
   for (Direction dir : {
     Right, Up, Up, Up, Right,
     Left, Left, Left, Down, Up,
@@ -773,7 +765,21 @@ int main() {
     printf("%s\n", DIRS[dir]);
     level->Move(dir);
   }
-  Vector<Direction> solution = Solver(level).Solve();
+  */
+  const char* DIRS[] = {
+    nullptr,
+    "North",
+    "West",
+    nullptr,
+    nullptr,
+    "East",
+    "South",
+  };
+
+  Level* level = &LachrymoseHead;
+  level->InteractiveSolver();
+
+  std::vector<Direction> solution = Solver(level).Solve();
   std::string levelName(level->name);
   levelName = levelName.substr(0, levelName.find_first_of(' '));
   std::ofstream file(levelName + ".dem");
