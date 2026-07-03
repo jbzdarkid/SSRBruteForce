@@ -5,3 +5,7 @@ Debug/
 *.vcxproj.user
 *.vcxproj.filters
 *.dem
+vcpkg_installed
+*.idb
+*.pdb
+layer_cache/
