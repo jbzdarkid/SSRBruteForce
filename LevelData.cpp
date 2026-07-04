@@ -21,15 +21,18 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     char c = asciiGrid[i];
     if (c == '?') _grid(x, y) = extraTiles.PopValue();
     else if (c == ' ') _grid(x, y) = Empty;
-    else if (c == '#') _grid(x, y) = (Tile)(Ground | Grill);
-    else if (c == '$') _grid(x, y) = (Tile)(Wall1 | Grill);
-    else if (c == '%') _grid(x, y) = (Tile)(Wall2 | Grill);
+    else if (c == '#') _grid(x, y) = GroundGrill;
+    else if (c == '$') _grid(x, y) = Wall1Grill;
+    else if (c == '%') _grid(x, y) = Wall2Grill;
     else if (c == '_') _grid(x, y) = Ground;
     else if (c == '1') _grid(x, y) = Wall1;
     else if (c == '2') _grid(x, y) = Wall2;
     else if (c == '3') _grid(x, y) = Wall3;
     else if (c == '4') _grid(x, y) = Wall4;
     else if (c == '5') _grid(x, y) = Wall5;
+    else if (c == '6') _grid(x, y) = Wall6;
+    else if (c == '7') _grid(x, y) = Wall7;
+    else if (c == '8') _grid(x, y) = Wall8;
 #if (OVERWORLD_HACK == 0 || OVERWORLD_HACK >= 2) // need to use these capital letters for sausages I mean not really but whatever
     else if (c == 'U') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Up}); }
     else if (c == 'D') { _grid(x, y) = Ground; _ladders.Push(Ladder{x, y, 0, Down}); }
@@ -127,7 +130,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
   // Ladders from the initializer list do not get the same treatment.
   for (const Ladder& ladder : ladders) _ladders.Push(ladder);
 
-  assert(extraTiles.Size() == 0); // Assert that all excess tiles were consumed
+  assert(extraTiles.Empty()); // Assert that all excess tiles were consumed
 }
 
 void LevelData::Print() const {
@@ -164,16 +167,21 @@ void LevelData::Print() const {
           }
         }
       }
-      if (dynamic !=  ' ')            putchar(dynamic);
-      else if (_grid(x, y) == Empty)  putchar(' ');
-      else if (_grid(x, y) &  Grill)  putchar('#');
-      else if (_grid(x, y) == Ground) putchar('_');
-      else if (_grid(x, y) == Wall1)  putchar('1');
-      else if (_grid(x, y) == Wall2)  putchar('2');
-      else if (_grid(x, y) == Wall3)  putchar('3');
-      else if (_grid(x, y) == Wall4)  putchar('4');
-      else if (_grid(x, y) == Wall5)  putchar('5');
-      else                            putchar('?');
+      if (dynamic != ' ')                   putchar(dynamic);
+      else if (_grid(x, y) == Empty)        putchar(' ');
+      else if (_grid(x, y) == GroundGrill)  putchar('#');
+      else if (_grid(x, y) == Wall1Grill)   putchar('$');
+      else if (_grid(x, y) == Wall2Grill)   putchar('%');
+      else if (_grid(x, y) == Ground)       putchar('_');
+      else if (_grid(x, y) == Wall1)        putchar('1');
+      else if (_grid(x, y) == Wall2)        putchar('2');
+      else if (_grid(x, y) == Wall3)        putchar('3');
+      else if (_grid(x, y) == Wall4)        putchar('4');
+      else if (_grid(x, y) == Wall5)        putchar('5');
+      else if (_grid(x, y) == Wall6)        putchar('6');
+      else if (_grid(x, y) == Wall7)        putchar('7');
+      else if (_grid(x, y) == Wall8)        putchar('8');
+      else                                  putchar('?');
     }
     putchar('|');
     putchar('\n');
@@ -208,6 +216,10 @@ s8 LevelData::GetSausage(s8 x, s8 y, s8 z) const {
   return -1;
 }
 
+int LevelData::NumSausages() const {
+    return _sausages.Size();
+}
+
 bool LevelData::IsWithinGrid(s8 x, s8 y, s8 z) const {
   return x >= 0 && x <= _width - 1 && y >= 0 && y <= _height - 1 && z >= 0;
 }
@@ -215,8 +227,13 @@ bool LevelData::IsWithinGrid(s8 x, s8 y, s8 z) const {
 bool LevelData::IsWall(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   u8 cell = _grid(x, y);
-  // if _stephen.z == 0 then you are blocked by Wall1. if _stephen.z == 1 then you are blocked by Wall2.
-  return (cell & (Ground << 1 << z)) != 0;
+
+  // Special walls (Wall6-8) encode height in the low 2 bits: 5 + (cell & 0b11).
+  if (cell & Tile::Special) return z < 5 + (cell & 0b11);
+
+  // Normal walls (Wall1-5): mask off the Grill/Special flag bits first so they don't alias the
+  // height test at z==5/6. z==0 is blocked by Wall1, z==1 by Wall2, etc.
+  return ((cell & 0b00111111) & (Ground << 1 << z)) != 0;
 }
 
 bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
@@ -224,8 +241,15 @@ bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
   u8 cell = _grid(x, y);
   // Here's one of the places where we take advantage of the overhang bitmask.
   // Note that this *only* checks for ground at our feet, not if we're walking into a wall.
-  // if _stephen.z == 0 then you can walk onto Ground. if _stephen.z == 1 then you can walk onto Wall1
-  if ((cell & (Ground << z)) != 0) return true; // Stepping onto ground at our current level
+
+  // Special walls (Wall6-8) are solid through their height and walkable on top.
+  if (cell & Tile::Special) {
+    if (z <= 5 + (cell & 0b11)) return true;
+  }
+
+  // Normal walls/overhangs: mask off Grill/Special flag bits so they don't alias the height test.
+  // z==0 walks onto Ground, z==1 onto Wall1, etc.
+  if (((cell & 0b00111111) & (Ground << z)) != 0) return true; // Stepping onto ground at our current level
   if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z) return true; // Stepping onto a fork
   if (GetSausage(x, y, z-1) != -1) return true; // Stepping onto a sausage
   return false;
@@ -235,7 +259,20 @@ bool LevelData::IsGrill(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   u8 cell = _grid(x, y);
   if ((cell & Grill) == 0) return false;
-  return (cell & (Ground << z)) != 0; // There is ground at this level
+
+  // Special walls (Wall6-8): grill applies through their height.
+  if (cell & Tile::Special) return z < 5 + (cell & 0b11);
+
+  // The Grill flag is one bit shared by the whole column, but a grill is a hazardous *surface*.
+  // Resolve it to the lowest exposed standable level (solid with open space above), so an overhang
+  // (Over2/Over3) grills its waterline floor, not the safe ledge on top (Cold Gate move 47).
+  u8 mask = cell & 0b00111111;
+  for (u8 surface = 0; surface < 6; surface++) {
+    if ((mask & (Ground << surface)) && !(mask & (Ground << (surface + 1)))) {
+      return z == surface; // The first exposed surface from the bottom is the grill.
+    }
+  }
+  return false;
 }
 
 bool LevelData::IsLadder(s8 x, s8 y, s8 z, Direction dir) const {

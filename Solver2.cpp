@@ -13,13 +13,14 @@ std::vector<Direction> Solver2::Solve() {
   u32 maxDepth = 0xFFFF;
   State2 initialState = _level->GetState2();
 
-  _currentLayer = LayerCache<State2>(0); // Initial layer is at depth 0
+  _currentLayer = WritableLayerCache<State2>(0); // Initial layer is at depth 0
   _currentLayer.Add(initialState);
 
   for (u32 depth = 1; depth < maxDepth; depth++) {
-    // Move the layers forward, so we now re-explore the nodes from the previous layer.
-    _previousLayer = _currentLayer;
-    _currentLayer = LayerCache<State2>(depth);
+    // Swap so that we iterate nodes from the previous layer
+    _currentLayer = WritableLayerCache<State2>(depth); // Flushes the _currentLayer to disk
+    _previousLayer = ReadableLayerCache<State2>(depth - 1);
+
     ProcessOneLayer(depth);
 
     if (_winningStateFound) {
@@ -45,7 +46,9 @@ std::vector<Direction> Solver2::Solve() {
 }
 
 void Solver2::ProcessOneLayer(u32 depth) {
-  for (const State2& state : _previousLayer) {
+  while (_previousLayer.MoveNext()) {
+    const State2& state = _previousLayer.Current();
+  // for (const State2& state : _previousLayer) {
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState2(state); // TODO: Should be partially avoidable once Move is itempotent on failure
       if (_level->Won()) {
@@ -65,7 +68,7 @@ void Solver2::ProcessOneLayer(u32 depth) {
 }
 
 void Solver2::FindWinningStates(u32 depth) {
-  LayerCache<State2> layer(depth);
+  std::vector<State2> layer = LoadLayerFromDisk(depth);
   for (const State2& state : layer) {
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState2(state);
@@ -172,4 +175,18 @@ u32 Solver2::ComputeScore(const State2& state, Direction dir, const State2& newS
   else if (state.stephen.dir == Right && dir == Left) score--;
 
   return score;
+}
+
+void Solver2::SaveLayerToDisk(const std::vector<State2>& layer, u32 depth) {
+  std::ofstream out("layer_" + std::to_string(depth) + ".bin", std::ios::binary);
+  out.write(reinterpret_cast<const char*>(layer.data()), layer.size() * sizeof(State2));
+}
+
+std::vector<State2> Solver2::LoadLayerFromDisk(u32 depth) {
+  std::ifstream in("layer_" + std::to_string(depth) + ".bin", std::ios::binary | std::ios::ate);
+  std::streamsize bytes = in.tellg();
+  in.seekg(0);
+  std::vector<State2> layer(bytes / sizeof(State2));
+  in.read(reinterpret_cast<char*>(layer.data()), bytes);
+  return layer;
 }

@@ -14,12 +14,20 @@ struct Level : public LevelData {
   // Serialize/deserialize the current state, used for backtracking algorithms.
   State GetState() const;
   void SetState(const State* state);
+  State2 GetState2() const;
+  void SetState2(const State2& state);
 
   // The main entry point -- this takes a player input (any of the 4 cardinal directions) and
   // simulates the game's behavior by moving stephen, his fork, and the sausages around the level.
   // This function returns false if moves is "useless", i.e. it would cause an immediate loss
   // or zero change in state (walking into a wall).
   bool Move(Direction dir);
+
+  // Optional level-specific "this state can never reach a win" predicate, used by the solvers to prune whole subtrees
+  // (see Solver.cpp / Solver2.cpp). Null by default (no pruning); set per-level in Main. IsDeadState() is called on
+  // every freshly generated state, so keep the predicate cheap.
+  bool (*deadStateCheck)(const Level&) = nullptr;
+  bool IsDeadState() const { return deadStateCheck && deadStateCheck(*this); }
 private:
   // These 4 functions handle the different ways stephen can move on level terrain
   // Much like the parent Move function, their return value indicates a useless move.
@@ -38,8 +46,8 @@ private:
   // and updates the below struct with the potential results of the call.
   struct CPMData {
     Vector<s8> movedSausages;
-    Vector<s8> sausagesToRoll;
     Vector<s8> sausagesToDrop;
+    Vector<s8> sausagesToCheckSupport; // Carry-blocked sausages whose underlying support moved out from under them.
     s8 sausageToSpear = -1; // This applies to *all* situations where a fork gets stuck in a sausage.
     s8 sausageHat = -1;
     u8 consideredSausages = 0; // We have /considered/ if this sausage can physically move and added it to movedSausages if applicable
@@ -65,10 +73,42 @@ private:
   // A return value of false indicates a useless move.
   bool MoveStephenThroughSpace(Direction dir, bool ladderMotion=false);
 
+  // Cook any halves of |sausage| resting on a grill (mapping cells through the Swapped flag).
+  // Returns false if a side would burn. Mutates sausage.flags; caller writes it back.
+  bool CookSausage(Sausage& sausage, s8 sausageNo);
+
+  // Is |sausage| held up -- by ground/wall/another sausage (CanWalkOnto), or by Stephen's body or
+  // connected fork one cell below? (sx,sy,sz)/(fx,fy,fz) are Stephen's effective body/fork cells;
+  // callers pass pending positions when checking mid-move.
+  bool SausageSupported(const Sausage& sausage, s8 sx, s8 sy, s8 sz, s8 fx, s8 fy, s8 fz) const;
+
+  // Drops a sausage straight down until it lands on support, cascading to any riders. Used after
+  // operations (e.g. fork rotation) that bypass the normal carry-and-drop path. Returns false if
+  // the sausage would fall below the world or burn.
+  bool DropSausageIfUnsupported(s8 sausageNo);
+
   // Saves which sausage the fork is currently stuck in (-1 if not stuck).
   // *technically* this should live on Stephen, but it would make that > sizeof(u64).
   s8 _sausageSpeared = -1;
   bool _interactive = false; // Set to true while in the InteractiveSolver, allows us to emit nice errors
+
+  // Where Stephen/fork will be once the in-progress MoveStephenThroughSpace completes, so the drop
+  // loop can treat him as support at his future cell. -127 means "not pending; use _stephen directly".
+  s8 _stephenPendingX = -127;
+  s8 _stephenPendingY = -127;
+  s8 _stephenPendingZ = -127;
+  s8 _stephenPendingForkX = -127;
+  s8 _stephenPendingForkY = -127;
+  s8 _stephenPendingForkZ = -127;
+
+  // Bitmask of sausages the fork's MTS pass moved this Move(), so the body's MTS pass skips
+  // re-carrying them (3-3 Cold Escarpment move 83). Reset at the start of each high-level move.
+  u8 _stepMovedSausages = 0;
+
+  // Set by HandleRotation before the corner-sweep: true when the head sausage's far half rests on
+  // another sausage (so it's not a clean hat and must not rotate, even though the sweep may shove
+  // that sausage away). 4-1 move 87 (no rotate) vs 4-2 move 77 (cantilevered -> rotates).
+  bool _hatFarHalfOnSausage = false;
 
   inline Direction Inverse(Direction dir) {
     assert(dir > 0 && dir < 7);

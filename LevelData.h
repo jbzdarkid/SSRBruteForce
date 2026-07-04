@@ -2,16 +2,16 @@
 #include <initializer_list>
 #include "WitnessRNG/StdLib.h"
 
-// Mmmm, macros
-#define STAY_NEAR_THE_SAUSAGES 2
-#define HASH_CACHING 1
-#define SORT_SAUSAGE_STATE 0
 #define OVERWORLD_HACK 0
-#define SAUSAGES o(0) o(1) o(2) // o(3) // o(4)
-//  #define SAUSAGES o(0) o(1) o(2) o(3) o(4) o(5) o(6) o(7) o(8) o(9) \
-//                   o(10) o(11) o(12) o(13) o(14) o(15) o(16) o(17) // o(18) o(19) \
-//                   o(20) o(21) o(22) o(23) o(24) o(25) o(26) o(27) o(28) o(29) \
-//                   o(30) o(31) o(32)
+#ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.
+    #define SAUSAGES o(0) o(1) o(2)
+#endif
+
+constexpr int NUM_SAUSAGES =
+#define o(x) +1
+SAUSAGES
+#undef o
+;
 
 enum Direction : u8 {
   None = 0,
@@ -91,6 +91,7 @@ struct Sausage {
     Cook2A = 4, // If (x2, y2) is cooked when not rolled over
     Cook2B = 8, // If (x2, y2) is cooked when rolled over
     Rolled = 16,
+    Swapped = 32,
     Cook1 = Cook1A | Cook1B, // If (x1, y1) is cooked on both sides
     Cook2 = Cook2A | Cook2B, // If (x2, y2) is cooked on both sides
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B, // If all 4 sides are cooked
@@ -130,11 +131,20 @@ enum Tile : u8 {
   Wall4  = 0b00011111,
   Wall5  = 0b00111111,
   Grill  = 0b01000000,
-  Unused = 0b10000000,
+  GroundGrill = Ground | Grill,
+  Wall1Grill  = Wall1  | Grill,
+  Wall2Grill  = Wall2  | Grill,
+  Over2Grill  = Over2  | Grill,
+  Special = 0b10000000,  // High bit: reserved for special tiles, with special handling
+  Wall6  = 0b10000001,
+  Wall7  = 0b10000010,
+  Wall8  = 0b10000011,
 };
 
 class LevelData {
 public:
+  friend class TestSymmetryHelper;
+
   LevelData(u8 width, u8 height, const char* name, const char* asciiGrid,
     const Stephen& stephen = {},
     std::initializer_list<Ladder> ladders = {},
@@ -144,6 +154,8 @@ public:
   bool Won() const;
 
   s8 GetSausage(s8 x, s8 y, s8 z) const;
+  int NumSausages() const;
+  const Vector<Sausage>& Sausages() const { return _sausages; } // read-only access for custom solver heuristics
   bool IsWithinGrid(s8 x, s8 y, s8 z) const;
   bool IsWall(s8 x, s8 y, s8 z) const;
   bool CanWalkOnto(s8 x, s8 y, s8 z) const;
