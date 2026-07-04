@@ -1,5 +1,6 @@
 ﻿#include "Solver2.h"
 
+#include <chrono>
 #include <iostream>
 
 Solver2::Solver2(Level* level, u32 hashtableSize) {
@@ -59,6 +60,8 @@ std::vector<Direction> Solver2::Solve() {
 }
 
 void Solver2::ProcessOneLayer(u32 depth) {
+  auto start = std::chrono::steady_clock::now();
+
   ReadableLayerCache<State2> previousLayer(depth - 1);
   WritableLayerCache<State2> currentLayer(depth);
 
@@ -83,10 +86,14 @@ void Solver2::ProcessOneLayer(u32 depth) {
   } while (previousLayer.MoveNext());
 
 
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - start).count();
+
   std::cout << "Finished exploring depth " << depth
     << " with " << currentLayer.Size()
     << " states. Total hashset size: " << _exploredStateHashes.size()
-    << " / " << _maxStateHashes << "\n";
+    << " / " << _maxStateHashes
+    << " (" << elapsed << " ms)\n";
 }
 
 void Solver2::FindWinningStates(u32 depth) {

@@ -192,6 +192,7 @@
     <ClInclude Include="Level2.h" />
     <ClInclude Include="LevelData.h" />
     <ClInclude Include="Levels.h" />
+    <ClInclude Include="LargePageAllocator.h" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="Solver2.h" />
     <ClInclude Include="State.h" />

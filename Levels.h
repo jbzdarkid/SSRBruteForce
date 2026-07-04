@@ -283,7 +283,8 @@ Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
   "     ####     "
   "      11      ");
 
-Level ColdTrail(19, 10, "3-4 Cold Trail",
+Level ColdTrail = [] {
+  Level coldTrail(19, 10, "3-4 Cold Trail",
   "11111_______       "
   "11111_______       "
   "11111_______       "
@@ -297,6 +298,9 @@ Level ColdTrail(19, 10, "3-4 Cold Trail",
   {},
   {},
   {Sausage{1, 2, 2, 2, 1}, Sausage{1, 3, 1, 4, 1}, Sausage{2, 3, 2, 4, 1}});
+  coldTrail.hashtableSize = 30;
+  return coldTrail;
+}();
 
 Level ColdCliff(8, 8, "3-5 Cold Cliff",
   "2222    "
