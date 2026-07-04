@@ -1,5 +1,7 @@
 ﻿#include "Solver2.h"
 
+#include <iostream>
+
 Solver2::Solver2(Level* level) {
   _level = level;
 
@@ -75,7 +77,11 @@ void Solver2::ProcessOneLayer(u32 depth) {
     }
   } while (previousLayer.MoveNext());
 
-  printf("Finished exploring depth %d with %zu states. Total hashset size: %zu / %zu\n", depth, currentLayer.Size(), _exploredStateHashes.size(), _maxStateHashes);
+
+  std::cout << "Finished exploring depth " << depth
+    << " with " << currentLayer.Size()
+    << " states. Total hashset size: " << _exploredStateHashes.size()
+    << " / " << _maxStateHashes << "\n";
 }
 
 void Solver2::FindWinningStates(u32 depth) {

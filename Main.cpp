@@ -1,10 +1,11 @@
 #include "Solver2.h"
-#include "Levels.h"
+#include "Levels.h" // Ordered second because it redefines Level
 
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <locale>
 #include <string>
 #include <vector>
 
@@ -106,6 +107,7 @@ static void DiffEngines(Level* level) {
 
 int main(int argc, char* argv[]) {
   setvbuf(stdout, nullptr, _IONBF, 0); // Disable stdout buffering so we see partial output on crash.
+  std::cout.imbue(std::locale("en-US")); // Used for cout decimal formatting in some places.
 
   if (argc == 1) {
     std::cout << "Invalid args\n";
