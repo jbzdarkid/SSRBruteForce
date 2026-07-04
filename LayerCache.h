@@ -19,14 +19,14 @@ public:
   WritableLayerCache(u32 depth, std::initializer_list<T> values) : WritableLayerCache(depth) {
     for (const T& value : values) Add(value);
   }
+  ~WritableLayerCache() {
+    WriteToDisk();
+  }
 
   void Add(const T& item) {
     if (!_out) return;
     _buffer.push_back(item);
-    if (_buffer.size() >= MAX_BUFFER_SIZE) {
-      _out.write(reinterpret_cast<const char*>(_buffer.data()), _buffer.size() * sizeof(T));
-      _buffer.clear();
-    }
+    if (_buffer.size() >= MAX_BUFFER_SIZE) WriteToDisk();
   }
 
   size_t Size() {
@@ -34,6 +34,12 @@ public:
   }
 
 private:
+  void WriteToDisk() {
+    if (!_out) return;
+    _out.write(reinterpret_cast<const char*>(_buffer.data()), _buffer.size() * sizeof(T));
+    _buffer.clear();
+  }
+
   std::ofstream _out;
   std::vector<T> _buffer;
 };
@@ -47,16 +53,13 @@ public:
     std::string fileName = "layer_cache/layer_" + std::to_string(depth) + ".bin";
     _in = std::ifstream(fileName, std::ios::binary);
     _buffer.reserve(MAX_BUFFER_SIZE);
+    ReadFromDisk();
   }
 
   bool MoveNext() {
     if (!_in) return false;
     if (++_current < _buffer.size()) return true;
-
-    _buffer.resize(MAX_BUFFER_SIZE);
-    _in.read(reinterpret_cast<char*>(_buffer.data()), _buffer.size() * sizeof(T));
-    _buffer.resize(_in.gcount() / sizeof(T));
-    _current = 0;
+    ReadFromDisk();
 
     return !_buffer.empty();
   }
@@ -66,6 +69,13 @@ public:
   }
 
 private:
+  void ReadFromDisk() {
+    _buffer.resize(MAX_BUFFER_SIZE);
+    _in.read(reinterpret_cast<char*>(_buffer.data()), _buffer.size() * sizeof(T));
+    _buffer.resize(_in.gcount() / sizeof(T));
+    _current = 0;
+  }
+
   std::ifstream _in;
   std::vector<T> _buffer;
   u32 _current = 0;

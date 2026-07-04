@@ -2,6 +2,8 @@
 #include "LevelData.h"
 #include "WitnessRNG/StdLib.h"
 
+#include <random>
+
 // This is a shallow copy of the State struct -- it does not include positions of stephen nor the sausages
 // and is thus much smaller. Fortunately, we can determine the shortest path without knowledge of actual state.
 struct ShallowState {
@@ -42,13 +44,6 @@ template<> struct hash<State> {
 };
 }
 
-// Per-run salt folded into State2's hash (set once at solver startup). The stage-1 memo stores 64-bit hashes only, so
-// two distinct states that share a hash get falsely deduped (one subtree skipped). Re-salting per run makes those rare
-// collisions land on DIFFERENT state pairs each time, so running a level 2-3 times and keeping the shortest solution
-// drives the miss probability down geometrically. It must be folded INTO the hash (not XOR'd onto the output, which
-// would leave colliding pairs colliding); seeding it first perturbs the whole mixing trajectory.
-inline u64 g_stateHashSalt = 0;
-
 // New version for Solver2
 struct State2 {
   Stephen stephen;
@@ -64,7 +59,12 @@ struct State2 {
 
   template <typename H>
   friend H AbslHashValue(H h, const State2& s) {
-    h = H::combine(std::move(h), g_stateHashSalt);
+    h = H::combine(std::move(h), _hashSalt);
     return H::combine_contiguous(std::move(h), reinterpret_cast<const u8*>(&s), sizeof(State2));
   }
+
+private:
+  // There is about a 9% chance of a hash collision if we use all 2^31 states that fit in my RAM.
+  // Randomize the hash to ensure this won't mess up on subsequent runs.
+  static inline u32 _hashSalt = [] { return std::random_device{}(); }();
 };

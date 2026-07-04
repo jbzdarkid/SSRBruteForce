@@ -15,16 +15,12 @@ std::vector<Direction> Solver2::Solve() {
   u32 maxDepth = 0xFFFF;
   State2 initialState = _level->GetState2();
 
-  _currentLayer = WritableLayerCache<State2>(0); // Initial layer is at depth 0
-  _currentLayer.Add(initialState);
+  {
+    WritableLayerCache<State2> initialLayer(0);
+    initialLayer.Add(initialState);
+  } // Flushes at end of scope
 
   for (u32 depth = 1; depth < maxDepth; depth++) {
-    printf("Finished exploring depth %d with %zu states. Total states: %zu\n", depth, _currentLayer.Size(), _exploredStateHashes.size());
-
-    // Swap so that we iterate nodes from the previous layer
-    _currentLayer = WritableLayerCache<State2>(depth); // Flushes the _currentLayer to disk
-    _previousLayer = ReadableLayerCache<State2>(depth - 1);
-
     ProcessOneLayer(depth);
 
     if (_winningStateFound) {
@@ -33,17 +29,16 @@ std::vector<Direction> Solver2::Solve() {
       // Allow for 2 extra interations to search for solutions which potentially take more moves, but are faster in realtime.
       maxDepth = std::min(maxDepth, depth + 2);
     }
-  }
 
-  if (_exploredStateHashes.size() >= _maxStateHashes && !_winningStateFound) {
-    printf("We ran out of hashtable size and stopped storing new states, and couldn't find a solution.\n");
-    return {};
+    if (_exploredStateHashes.size() >= _maxStateHashes) {
+      printf("We ran out of hashtable size and stopped storing new states.\n");
+      if (_winningStateFound) break;
+      return {};
+    }
   }
 
   // Free the stage 1 scratch space
   _exploredStateHashes = {};
-  _currentLayer = {};
-  _previousLayer = {};
 
   // Step 2: Re-traverse the tree backwards to identify winning states.
   for (u32 depth = maxDepth - 1; depth > 0; depth--) {
@@ -57,8 +52,11 @@ std::vector<Direction> Solver2::Solve() {
 }
 
 void Solver2::ProcessOneLayer(u32 depth) {
-  while (_previousLayer.MoveNext()) {
-    const State2& state = _previousLayer.Current();
+  ReadableLayerCache<State2> previousLayer(depth - 1);
+  WritableLayerCache<State2> currentLayer(depth);
+
+  do {
+    const State2& state = previousLayer.Current();
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState2(state); // Sadly our solver is still not completely transactional.
       if (_level->Won()) {
@@ -73,9 +71,11 @@ void Solver2::ProcessOneLayer(u32 depth) {
       bool inserted = _exploredStateHashes.insert(absl::HashOf(newState)).second;
       if (!inserted) continue;
 
-      _currentLayer.Add(newState);
+      currentLayer.Add(newState);
     }
-  }
+  } while (previousLayer.MoveNext());
+
+  printf("Finished exploring depth %d with %zu states. Total states: %zu\n", depth, currentLayer.Size(), _exploredStateHashes.size());
 }
 
 void Solver2::FindWinningStates(u32 depth) {
