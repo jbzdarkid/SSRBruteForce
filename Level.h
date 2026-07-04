@@ -23,12 +23,10 @@ struct Level : public LevelData {
   // or zero change in state (walking into a wall).
   bool Move(Direction dir);
 
-  // Optional level-specific "this state can never reach a win" predicate, used by the solvers to prune whole subtrees
-  // (see Solver.cpp / Solver2.cpp). Null by default (no pruning); set per-level in Main. IsDeadState() is called on
-  // every freshly generated state, so keep the predicate cheap.
-  bool (*deadStateCheck)(const Level&) = nullptr;
+  // Level-specific heuristic which returns false from losing states to reduce the total state count.
+  bool (*heuristic)(const Level*) = nullptr;
   u32 hashtableSize = 27;
-  bool IsDeadState() const { return deadStateCheck && deadStateCheck(*this); }
+
 private:
   // These 4 functions handle the different ways stephen can move on level terrain
   // Much like the parent Move function, their return value indicates a useless move.
@@ -74,7 +72,7 @@ private:
   // A return value of false indicates a useless move.
   bool MoveStephenThroughSpace(Direction dir, bool ladderMotion=false);
 
-  // Cook any halves of |sausage| resting on a grill (mapping cells through the Swapped flag).
+  // Cook any halves of |sausage| resting on a grill (cook bits are slot-indexed: (x1,y1)->Cook1, (x2,y2)->Cook2).
   // Returns false if a side would burn. Mutates sausage.flags; caller writes it back.
   bool CookSausage(Sausage& sausage, s8 sausageNo);
 

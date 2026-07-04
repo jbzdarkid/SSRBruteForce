@@ -103,6 +103,7 @@ void Solver2::FindWinningStates(u32 depth) {
       }
 
       if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+      if (_level->heuristic && !_level->heuristic(_level)) continue;
 
       State2 newState = _level->GetState2();
       auto search = _winningStates.find(newState);

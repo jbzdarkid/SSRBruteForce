@@ -18,7 +18,8 @@ struct Level2 : public Level {
   // ends up moving -- a grill bounces Stephen back, a fork bonks against a wall mid-turn.
   bool Move(Direction dir);
 
-  bool (*deadStateCheck)(const Level2&) = nullptr;
+  // Level-specific heuristic which returns false from losing states to reduce the total state count.
+  bool (*heuristic)(const Level2*) = nullptr;
 
 private:
   // A move's entire planning scratch AND its working tableau -- created fresh on the stack by each leaf handler (see

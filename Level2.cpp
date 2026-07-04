@@ -569,12 +569,10 @@ void Level2::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const 
     if (IsWall(s.x1, s.y1, s.z) || IsWall(s.x2, s.y2, s.z)
      || IsWall(ox1 + s.x1 - headX, oy1 + s.y1 - headY, s.z)
      || IsWall(ox2 + s.x2 - headX, oy2 + s.y2 - headY, s.z)) return; // swing blocked -> leave the hat put
-    if (s.x1 > s.x2 || (s.x1 == s.x2 && s.y1 > s.y2)) { // restore upper-left; physical halves now swap slots
+    if (s.x1 > s.x2 || (s.x1 == s.x2 && s.y1 > s.y2)) { // restore upper-left; the cook bits ride with the halves
       s8 tx = s.x1; s.x1 = s.x2; s.x2 = tx;
       s8 ty = s.y1; s.y1 = s.y2; s.y2 = ty;
-      u8 cook1 = s.flags & Sausage::Cook1, cook2 = s.flags & Sausage::Cook2;
-      s.flags = (s.flags & ~(u8)Sausage::FullyCooked) | (u8)(cook1 << 2) | (u8)(cook2 >> 2);
-      s.flags ^= Sausage::Swapped; // the two halves exchanged slots
+      s.SwapCookBits();
     }
     plan.sausages[no] = s;
     plan.mask |= (1 << no);

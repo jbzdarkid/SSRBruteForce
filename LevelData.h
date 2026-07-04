@@ -91,7 +91,6 @@ struct Sausage {
     Cook2A = 4, // If (x2, y2) is cooked when not rolled over
     Cook2B = 8, // If (x2, y2) is cooked when rolled over
     Rolled = 16,
-    Swapped = 32,
     Cook1 = Cook1A | Cook1B, // If (x1, y1) is cooked on both sides
     Cook2 = Cook2A | Cook2B, // If (x2, y2) is cooked on both sides
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B, // If all 4 sides are cooked
@@ -110,6 +109,12 @@ struct Sausage {
     return false;
   }
   inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
+  // Exchange the two halves' cook bits (Cook1*<->Cook2*). Used when a rotation puts the physical halves
+  // into swapped slots: the cook state rides with each half so slot 1 always describes (x1,y1).
+  inline void SwapCookBits() {
+    u8 cook1 = flags & Cook1, cook2 = flags & Cook2;
+    flags = (flags & ~(u8)FullyCooked) | (u8)(cook1 << 2) | (u8)(cook2 >> 2);
+  }
   bool operator==(const Sausage& other) const {
     static_assert(sizeof(Sausage) == 8);
     u64 a = *(u64*)this;

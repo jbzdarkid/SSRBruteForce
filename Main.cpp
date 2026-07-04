@@ -33,7 +33,6 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
       if (s.flags & Sausage::Flags::Cook2A) flags += "Cook2A ";
       if (s.flags & Sausage::Flags::Cook2B) flags += "Cook2B ";
       if (s.flags & Sausage::Flags::Rolled) flags += "Rolled ";
-      if (s.flags & Sausage::Flags::Swapped) flags += "Swapped ";
       if (flags.empty()) flags = "none";
       else flags.pop_back(); // drop trailing space
 
@@ -145,17 +144,6 @@ int main(int argc, char* argv[]) {
       return 0;
 #endif
       printf("Solving level %s\n", test->name);
-
-      // TODO: I need better places for these.
-      if (strcmp(test->name, "Cold Finger") == 0) {
-        test->deadStateCheck = [](const Level& level) {
-          const Vector<Sausage>& sausages = level.Sausages();
-#define o(x) if (sausages[x].z == 0 && sausages[x].IsHorizontal()) return true;
-          SAUSAGES
-#undef o
-          return false;
-        };
-      }
 
       bool success = SolveLevel(test);
       if (!success) printf("Solver could not solve the level.\n");

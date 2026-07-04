@@ -118,7 +118,7 @@ State2 Level::GetState2() const {
     if (a.y2 != b.y2) return a.y2 < b.y2;
     if (a.z != b.z) return a.z < b.z;
     return a.flags < b.flags;
-    });
+  });
 #endif
   return s;
 }
@@ -954,7 +954,7 @@ bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephen
           if  (!MoveThroughSpace(sausage.x1 + 1, sausage.y1 + 1, sausage.z, Right)) return false;
           sausage.x1++;
           sausage.y2++;
-          sausage.flags ^= Sausage::Flags::Swapped;
+          sausage.SwapCookBits();
         }
       } else if (sausage.x2 == _stephen.x + 1) {
         assert(sausage.x1 == _stephen.x); // ___
@@ -974,7 +974,7 @@ bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephen
           if  (!MoveThroughSpace(sausage.x2 - 1, sausage.y2 - 1, sausage.z, Left)) return false;
           sausage.x2--;
           sausage.y1--;
-          sausage.flags ^= Sausage::Flags::Swapped;
+          sausage.SwapCookBits();
         }
       } else if (sausage.y1 == _stephen.y - 1) {
         assert(sausage.x1 == _stephen.x); // _1_
@@ -987,7 +987,7 @@ bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephen
           if  (!MoveThroughSpace(sausage.x1 + 1, sausage.y1 + 1, sausage.z, Down)) return false;
           sausage.x2++;
           sausage.y1++;
-          sausage.flags ^= Sausage::Flags::Swapped;
+          sausage.SwapCookBits();
         } else { assert(stephenRotationDir == -1);
           if (!CanPhysicallyMove(sausage.x1 - 1, sausage.y1,     sausage.z, Left)
            || !CanPhysicallyMove(sausage.x1 - 1, sausage.y1 + 1, sausage.z, Down)) break;
@@ -1007,7 +1007,7 @@ bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephen
           if  (!MoveThroughSpace(sausage.x2 - 1, sausage.y2 - 1, sausage.z, Up)) return false;
           sausage.x1--;
           sausage.y2--;
-          sausage.flags ^= Sausage::Flags::Swapped;
+          sausage.SwapCookBits();
         } else { assert(stephenRotationDir == -1);
           if (!CanPhysicallyMove(sausage.x2 + 1, sausage.y2,     sausage.z, Right)
            || !CanPhysicallyMove(sausage.x2 + 1, sausage.y2 - 1, sausage.z, Up)) break;
@@ -1037,11 +1037,10 @@ bool Level::MoveThroughSpaceInternal(s8 x, s8 y, s8 z, Direction dir, s8 stephen
 }
 
 bool Level::CookSausage(Sausage& sausage, s8 sausageNo) {
-  // Cook bits track PHYSICAL halves, so map each grill cell through the Swapped flag.
+  // Cook bits are slot-indexed, so each grill cell browns its own slot: (x1,y1) -> Cook1A, (x2,y2) -> Cook2A.
   u8 sidesToCook = 0;
-  bool swapped = (sausage.flags & Sausage::Flags::Swapped) != 0;
-  if (IsGrill(sausage.x1, sausage.y1, sausage.z)) sidesToCook |= swapped ? Sausage::Flags::Cook2A : Sausage::Flags::Cook1A;
-  if (IsGrill(sausage.x2, sausage.y2, sausage.z)) sidesToCook |= swapped ? Sausage::Flags::Cook1A : Sausage::Flags::Cook2A;
+  if (IsGrill(sausage.x1, sausage.y1, sausage.z)) sidesToCook |= Sausage::Flags::Cook1A;
+  if (IsGrill(sausage.x2, sausage.y2, sausage.z)) sidesToCook |= Sausage::Flags::Cook2A;
   if (sidesToCook != 0) {
     if (sausage.flags & Sausage::Flags::Rolled) sidesToCook *= 2; // Shift cooking flags to the rolled side
     if (sausage.flags & sidesToCook) FAIL("Sausage %c would burn", 'a' + sausageNo);

@@ -62,7 +62,6 @@ class TestSymmetryHelper {
     add(Sausage::Cook2A, "Sausage::Cook2A");
     add(Sausage::Cook2B, "Sausage::Cook2B");
     add(Sausage::Rolled, "Sausage::Rolled");
-    add(Sausage::Swapped, "Sausage::Swapped");
     return out;
   }
 
@@ -157,17 +156,11 @@ public:
     if (expected.x1 > expected.x2 || (expected.x1 == expected.x2 && expected.y1 > expected.y2)) {
       std::swap(expected.x1, expected.x2);
       std::swap(expected.y1, expected.y2);
-      u8 cook1 = expected.flags & Sausage::Cook1;
-      u8 cook2 = expected.flags & Sausage::Cook2;
-      expected.flags = (expected.flags & ~(u8)Sausage::FullyCooked) | (u8)(cook1 << 2) | (u8)(cook2 >> 2);
+      expected.SwapCookBits();
     }
 
-    // Swapped tracks which physical half is in slot 1; rotation chirality flips it across mirror symmetries, so
-    // it isn't symmetry-invariant. Ignore it here (floor-only tests don't depend on it; cook tests assert cook bits).
-    expected.flags &= ~(u8)Sausage::Swapped;
     for (const Sausage& s : _level._sausages) {
-      Sausage masked = s; masked.flags &= ~(u8)Sausage::Swapped;
-      if (masked == expected) return;
+      if (s == expected) return;
     }
 
     wchar_t want[96];
