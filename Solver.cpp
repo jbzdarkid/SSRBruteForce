@@ -259,9 +259,7 @@ void Solver::ComputePenaltyAndRecurse(State* state, State* nextState, Direction 
   // This is gross. It gets a little cleaner if I can use for-each, but not much.
   bool sausageSpeared = false;
   if (state->stephen.HasFork()) {
-#define o(x) +1
-    for (u8 i=0; i<SAUSAGES; i++) {
-#undef o
+    for (u8 i=0; i<NUM_SAUSAGES; i++) {
       const Sausage& sausage = state->sausages[i];
       if (state->stephen.z != sausage.z) continue;
       if ((state->stephen.x == sausage.x1 && state->stephen.y == sausage.y1)

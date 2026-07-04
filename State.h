@@ -20,9 +20,7 @@ struct ShallowState {
 struct State {
   Stephen stephen;
 
-#define o(x) +1
-  Sausage sausages[SAUSAGES];
-#undef o
+  Sausage sausages[NUM_SAUSAGES];
 
   // Used to build the tree, ergo not part of the hashing or comparison algos
   State* next = nullptr;

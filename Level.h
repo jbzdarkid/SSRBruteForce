@@ -27,6 +27,7 @@ struct Level : public LevelData {
   // (see Solver.cpp / Solver2.cpp). Null by default (no pruning); set per-level in Main. IsDeadState() is called on
   // every freshly generated state, so keep the predicate cheap.
   bool (*deadStateCheck)(const Level&) = nullptr;
+  u32 hashtableSize = 27;
   bool IsDeadState() const { return deadStateCheck && deadStateCheck(*this); }
 private:
   // These 4 functions handle the different ways stephen can move on level terrain

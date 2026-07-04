@@ -11,14 +11,6 @@
 
 const char* DIR_NAMES[] = {"None", "North", "West", "Jump", "Crouch", "East", "South"};
 
-static bool ColdFingerDeadState(const Level& level) {
-  const Vector<Sausage>& sausages = level.Sausages();
-  #define o(x) if (sausages[x].z == 0 && sausages[x].IsHorizontal()) return true;
-  SAUSAGES
-  #undef o
-  return false;
-}
-
 bool TestLevel(Level* level, std::vector<Direction> moves) {
   printf("=== initial state ===\n");
   level->Print();
@@ -58,7 +50,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
 }
 
 bool SolveLevel(Level* level) {
-  Solver2 solver(level);
+  Solver2 solver(level, level->hashtableSize);
   std::vector<Direction> solution = solver.Solve();
 
   if (solution.empty()) return false;
@@ -153,9 +145,17 @@ int main(int argc, char* argv[]) {
       return 0;
 #endif
       printf("Solving level %s\n", test->name);
-      if (strcmp(test->name, "Cold Finger") == 0) test->deadStateCheck = ColdFingerDeadState;
 
-
+      // TODO: I need better places for these.
+      if (strcmp(test->name, "Cold Finger") == 0) {
+        test->deadStateCheck = [](const Level& level) {
+          const Vector<Sausage>& sausages = level.Sausages();
+#define o(x) if (sausages[x].z == 0 && sausages[x].IsHorizontal()) return true;
+          SAUSAGES
+#undef o
+          return false;
+        };
+      }
 
       bool success = SolveLevel(test);
       if (!success) printf("Solver could not solve the level.\n");

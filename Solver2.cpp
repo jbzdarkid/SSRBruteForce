@@ -2,13 +2,18 @@
 
 #include <iostream>
 
-Solver2::Solver2(Level* level) {
+Solver2::Solver2(Level* level, u32 hashtableSize) {
   _level = level;
 
-  u64 numSlots = 1ull << 31; // 2^31 slots * (1 control byte + 8 hash bytes) ~= 19.3 GB
+  // 2^27 slots * (1 control byte + 8 hash bytes) ~= 1.2 GB (default)
+  // 2^28 slots * (1 control byte + 8 hash bytes) ~= 2.4 GB
+  // 2^29 slots * (1 control byte + 8 hash bytes) ~= 4.8 GB
+  // 2^30 slots * (1 control byte + 8 hash bytes) ~= 9.6 GB
+  // 2^31 slots * (1 control byte + 8 hash bytes) ~= 19.3 GB
+  u64 numSlots = 1ull << hashtableSize;
   _maxStateHashes = numSlots * 7 / 8; // Abseil's load factor is 7/8, at which point it rehashes
   _exploredStateHashes.reserve(_maxStateHashes); // Abseil will allocate a table that fits this many elements
-  assert(_exploredStateHashes.capacity() == (1ull << 31) - 1);
+  assert(_exploredStateHashes.capacity() == numSlots - 1);
 }
 
 std::vector<Direction> Solver2::Solve() {
@@ -141,16 +146,10 @@ u32 Solver2::ComputeScore(const State2& state, Direction dir, const State2& newS
   u32 score = 0;
 
   // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.
-  // This is gross. It gets a little cleaner if I can use for-each, but not much.
   bool sausageSpeared = false;
   if (state.stephen.HasFork()) {
-#define o(x) +1
-    for (u8 i=0; i<SAUSAGES; i++) {
-#undef o
-      const Sausage& sausage = state.sausages[i];
-      if (state.stephen.z != sausage.z) continue;
-      if ((state.stephen.x == sausage.x1 && state.stephen.y == sausage.y1)
-        || (state.stephen.x == sausage.x2 && state.stephen.y == sausage.y2)) {
+    for (const Sausage& sausage : state.sausages) {
+      if (sausage.IsAt(state.stephen.x, state.stephen.y, state.stephen.z)) {
         sausageSpeared = true;
         break;
       }
