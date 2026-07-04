@@ -57,10 +57,8 @@ public:
   }
 
   bool MoveNext() {
-    if (!_in) return false;
     if (++_current < _buffer.size()) return true;
     ReadFromDisk();
-
     return !_buffer.empty();
   }
 
@@ -70,6 +68,10 @@ public:
 
 private:
   void ReadFromDisk() {
+    if (!_in) {
+      _buffer.clear();
+      return;
+    }
     _buffer.resize(MAX_BUFFER_SIZE);
     _in.read(reinterpret_cast<char*>(_buffer.data()), _buffer.size() * sizeof(T));
     _buffer.resize(_in.gcount() / sizeof(T));
