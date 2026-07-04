@@ -75,7 +75,7 @@ void Solver2::ProcessOneLayer(u32 depth) {
     }
   } while (previousLayer.MoveNext());
 
-  printf("Finished exploring depth %d with %zu states. Total states: %zu\n", depth, currentLayer.Size(), _exploredStateHashes.size());
+  printf("Finished exploring depth %d with %zu states. Total hashset size: %zu / %zu\n", depth, currentLayer.Size(), _exploredStateHashes.size(), _maxStateHashes);
 }
 
 void Solver2::FindWinningStates(u32 depth) {
