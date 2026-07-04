@@ -29,6 +29,10 @@ public:
     }
   }
 
+  size_t Size() {
+    return _out.tellp() / sizeof(T) +  _buffer.size();
+  }
+
 private:
   std::ofstream _out;
   std::vector<T> _buffer;

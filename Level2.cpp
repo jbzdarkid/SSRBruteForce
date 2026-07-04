@@ -479,6 +479,15 @@ bool Level2::HandleRotation(Direction dir, bool& handled) {
 
   // --- Validate / plan (nothing is mutated until the commit at the very end) ---
 
+  // A rider carried by a pushed sausage checks whether Stephen's body/fork ends up beneath it (the rotation-hold guard
+  // in PlanSausageCarry). During a turn the fork ends at its swung-to cell, so seed the carry checks with that POST-turn
+  // pose -- otherwise a sausage the fork swings directly under is wrongly carried off its new support instead of being
+  // left resting on the fork (3-11 Cold Terrace move 69: the fork swings under a cantilevered sausage).
+  Stephen mover = _stephen;
+  mover.dir = dir;
+  mover.forkX = forkX;
+  mover.forkY = forkY;
+
   // A wall in the corner blocks the swing outright;
   // a sausage there must be pushable (along the new facing) or the turn is refused.
   if (IsWall(cornerX, cornerY, z)) return false;
@@ -496,7 +505,7 @@ bool Level2::HandleRotation(Direction dir, bool& handled) {
   if (forkSausage != -1 && !(plan.mask & (1 << forkSausage))) {
     // (If the corner push already swept this sausage along, that push covered it.) PlanSausagePush refuses only when the
     // fork-dest sausage is wall-blocked, so a refused push here means the turn bonks: keep the corner push, drop this chain.
-    if (!PlanSausagePush(forkSausage, Inverse(_stephen.dir), plan)) {
+    if (!PlanSausagePush(forkSausage, Inverse(_stephen.dir), plan, &mover)) {
       bonk = true;
       plan.mask = cornerMask; // keep only the corner push
     }
@@ -664,20 +673,33 @@ bool Level2::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePla
     s8 below = GetSausage(cellX, cellY, cellZ - 1);
     return below != -1 && below != sausageNo && !(plan.mask & (1 << below));
   };
-  // Stephen's body or fork, at the cell they'll occupy AFTER this move, can also hold a sausage up -- enough to cancel
-  // a double-move (but, unlike terrain, not enough to stop the carry in the first place).
-  auto manUnder = [&](s8 cellX, s8 cellY, s8 cellZ) -> bool {
-    if (man.x == cellX && man.y == cellY && man.z == cellZ - 1) return true;
-    return man.HasFork() && man.forkX == cellX && man.forkY == cellY && man.forkZ == cellZ - 1;
-  };
-
   if (anchoredAt(orig.x1, orig.y1, orig.z) || anchoredAt(orig.x2, orig.y2, orig.z)) return true; // anchored -> stays put
 
-  // During a TURN, Stephen's body OR fork counts as a wall: a carried sausage with an end resting directly on his head
-  // or on the (departing) fork is held there and stays put, even as its other end's base slides out from under it. The
-  // body case is 3-3 Cold Escarpment move 69; the fork case is 3-2 Cold Finger move 20, where the rider's far end rides
-  // the corner-swept base but its near end sits on the fork that swings away -- so it drops rather than being carried.
-  if (plan.rotating && (manUnder(orig.x1, orig.y1, orig.z) || manUnder(orig.x2, orig.y2, orig.z))) return true;
+  // During a TURN, Stephen's body OR fork counts as a wall in its FINAL cell (mirrors the reference IsSausageCarried
+  // rotating branch). A rider end resting on his body is held (3-3 Cold Escarpment move 69). A rider end over the fork
+  // is held too -- but if a sausage sits in that fork cell, the fork only takes over once that base slides/rolls OUT of
+  // it (forkLeftBehind) AND the rider's OTHER end isn't itself riding a moving sausage; otherwise the rider is carried
+  // along with its base instead. 3-11 Cold Terrace move 69 holds (its far end cantilevers over open space); 3-2 Cold
+  // Finger move 12 carries (its far end rides the moving base).
+  if (plan.rotating && man.HasFork()) {
+    auto bodyUnder = [&](s8 cellX, s8 cellY, s8 cellZ) -> bool {
+      return man.x == cellX && man.y == cellY && man.z == cellZ - 1;
+    };
+    auto forkUnder = [&](s8 cellX, s8 cellY, s8 cellZ) -> bool {
+      return man.forkX == cellX && man.forkY == cellY && man.forkZ == cellZ - 1;
+    };
+    auto forkHolds = [&](s8 ex, s8 ey, s8 ox, s8 oy) -> bool {
+      if (!forkUnder(ex, ey, orig.z)) return false;
+      s8 base = GetSausage(ex, ey, orig.z - 1);            // pre-move sausage in the fork's cell
+      if (base == -1) return true;                          // bare fork -> it alone holds the rider
+      bool leftBehind = (plan.mask & (1 << base)) && !_sausages[base].IsAt(ex - dx, ey - dy, orig.z - 1);
+      s8 otherBase = GetSausage(ox, oy, orig.z - 1);        // pre-move sausage under the rider's OTHER end
+      bool otherOnMoving = otherBase != -1 && (plan.mask & (1 << otherBase));
+      return leftBehind && !otherOnMoving;
+    };
+    if (bodyUnder(orig.x1, orig.y1, orig.z) || bodyUnder(orig.x2, orig.y2, orig.z)) return true;
+    if (forkHolds(orig.x1, orig.y1, orig.x2, orig.y2) || forkHolds(orig.x2, orig.y2, orig.x1, orig.y1)) return true;
+  }
 
   s8 aboveA = GetSausage(orig.x1, orig.y1, orig.z + 1);
   s8 aboveB = GetSausage(orig.x2, orig.y2, orig.z + 1);
@@ -689,7 +711,15 @@ bool Level2::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePla
     s8 below = GetSausage(cellX, cellY, orig.z - 1);
     return below != -1 && below != sausageNo && _sausages[below].IsHorizontal() == orig.IsHorizontal();
   };
-  bool held = manUnder(orig.x1, orig.y1, orig.z) || manUnder(orig.x2, orig.y2, orig.z);
+  // Stephen's body under an end always holds the rider to a single cell; his fork holds it only when BARE. A fork
+  // embedded in a sausage lets that sausage be the real support, so a knock-on tumble still runs (3-4 Cold Trail move
+  // 75: the fork sits in the perpendicular base under the rider, which rolls, so the rider double-moves the extra cell).
+  auto heldEnd = [&](s8 ex, s8 ey) -> bool {
+    if (man.x == ex && man.y == ey && man.z == orig.z - 1) return true; // body under
+    return man.HasFork() && man.forkX == ex && man.forkY == ey && man.forkZ == orig.z - 1
+        && GetSausage(ex, ey, orig.z - 1) == -1;                        // bare fork under
+  };
+  bool held = heldEnd(orig.x1, orig.y1) || heldEnd(orig.x2, orig.y2);
   // A carried sausage aligned with the motion and resting on a PERPENDICULAR base that ROLLED doesn't just ride one
   // cell -- it tumbles an extra one. Per the staged model that extra cell is a separate DOUBLE-MOVE (stage 7) that runs
   // after the primary move has settled, so here we still carry it a single cell like any rider and just RECORD that it

@@ -1,10 +1,12 @@
 ﻿#include "Solver2.h"
 
-#include <fstream>
-#include <string>
-
 Solver2::Solver2(Level* level) {
   _level = level;
+
+  u64 numSlots = 1ull << 31; // 2^31 slots * (1 control byte + 8 hash bytes) ~= 19.3 GB
+  _maxStateHashes = numSlots * 7 / 8; // Abseil's load factor is 7/8, at which point it rehashes
+  _exploredStateHashes.reserve(_maxStateHashes); // Abseil will allocate a table that fits this many elements
+  assert(_exploredStateHashes.capacity() == (1ull << 31) - 1);
 }
 
 std::vector<Direction> Solver2::Solve() {
@@ -17,6 +19,8 @@ std::vector<Direction> Solver2::Solve() {
   _currentLayer.Add(initialState);
 
   for (u32 depth = 1; depth < maxDepth; depth++) {
+    printf("Finished exploring depth %d with %zu states. Total states: %zu\n", depth, _currentLayer.Size(), _exploredStateHashes.size());
+
     // Swap so that we iterate nodes from the previous layer
     _currentLayer = WritableLayerCache<State2>(depth); // Flushes the _currentLayer to disk
     _previousLayer = ReadableLayerCache<State2>(depth - 1);
@@ -24,9 +28,16 @@ std::vector<Direction> Solver2::Solve() {
     ProcessOneLayer(depth);
 
     if (_winningStateFound) {
+      printf("Winning state found at depth %d!\n", depth);
+
       // Allow for 2 extra interations to search for solutions which potentially take more moves, but are faster in realtime.
       maxDepth = std::min(maxDepth, depth + 2);
     }
+  }
+
+  if (_exploredStateHashes.size() >= _maxStateHashes && !_winningStateFound) {
+    printf("We ran out of hashtable size and stopped storing new states, and couldn't find a solution.\n");
+    return {};
   }
 
   // Free the stage 1 scratch space
@@ -48,14 +59,14 @@ std::vector<Direction> Solver2::Solve() {
 void Solver2::ProcessOneLayer(u32 depth) {
   while (_previousLayer.MoveNext()) {
     const State2& state = _previousLayer.Current();
-  // for (const State2& state : _previousLayer) {
     for (Direction dir : { Up, Down, Left, Right }) {
-      _level->SetState2(state); // TODO: Should be partially avoidable once Move is itempotent on failure
+      _level->SetState2(state); // Sadly our solver is still not completely transactional.
       if (_level->Won()) {
         _winningStateFound = true; // No need to explore further past a winning state
         continue;
       }
 
+      if (_exploredStateHashes.size() >= _maxStateHashes) continue; // Stop saving new states once we run out of capacity
       if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
 
       State2 newState = _level->GetState2();
@@ -68,8 +79,9 @@ void Solver2::ProcessOneLayer(u32 depth) {
 }
 
 void Solver2::FindWinningStates(u32 depth) {
-  std::vector<State2> layer = LoadLayerFromDisk(depth);
-  for (const State2& state : layer) {
+  ReadableLayerCache<State2> layer(depth);
+  while (layer.MoveNext()) {
+    const State2& state = layer.Current();
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState2(state);
       
@@ -175,18 +187,4 @@ u32 Solver2::ComputeScore(const State2& state, Direction dir, const State2& newS
   else if (state.stephen.dir == Right && dir == Left) score--;
 
   return score;
-}
-
-void Solver2::SaveLayerToDisk(const std::vector<State2>& layer, u32 depth) {
-  std::ofstream out("layer_" + std::to_string(depth) + ".bin", std::ios::binary);
-  out.write(reinterpret_cast<const char*>(layer.data()), layer.size() * sizeof(State2));
-}
-
-std::vector<State2> Solver2::LoadLayerFromDisk(u32 depth) {
-  std::ifstream in("layer_" + std::to_string(depth) + ".bin", std::ios::binary | std::ios::ate);
-  std::streamsize bytes = in.tellg();
-  in.seekg(0);
-  std::vector<State2> layer(bytes / sizeof(State2));
-  in.read(reinterpret_cast<char*>(layer.data()), bytes);
-  return layer;
 }

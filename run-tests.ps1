@@ -1,12 +1,14 @@
 ﻿# Replay every level's .dem under the build matching its sausage count, confirming it reaches Won().
 # Usage:
 #   .\run-tests.ps1                            # build + replay all levels (logs to run-tests.log)
+#   .\run-tests.ps1 -Solve "3-14"              # build + solve named level
 #   .\run-tests.ps1 -TestName "3-13 Cold Gate" # only levels whose name contains this substring
 #   .\run-tests.ps1 -DemoDir "C:\path\to\dems" # Custom path to a demo directory (default ..\SSRDecompile\App)
 [CmdletBinding()]
 param(
     [string] $TestName = "",
-    [string] $DemoDir = "..\SSRDecompile\App"
+    [string] $DemoDir = "..\SSRDecompile\App",
+    [switch] $Solve
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,11 +99,20 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
     foreach ($lvl in $candidates) {
         if ($lvl.Sausages -ne $n) { continue }
 
-        echo "Testing $($lvl.Name)"
-        if ($TestName) {
-            & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem)
+        if ($Solve) {
+            echo "Solving $($lvl.Name)"
+            if ($TestName) {
+                & $exe $lvl.Name
+            } else {
+                & $exe $lvl.Name *>> $null
+            }
         } else {
-            & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem) *>> $null
+            echo "Testing $($lvl.Name)"
+            if ($TestName) {
+                & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem)
+            } else {
+                & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem) *>> $null
+            }
         }
 
         if ($LASTEXITCODE -eq 4) { continue } # Wrong number of sausages, value will be set in another iteration
@@ -110,16 +121,11 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
     }
 }
 
-# Print unified table sorted by level name (natural sort on W-L prefix so 1-10 sorts after 1-2).
 echo "=== Results ==="
 $failCount = 0
-$sortedNames = $unified.Keys | Sort-Object {
-    if ($_ -match "^(\d+)-(\d+)") { "{0:D3}-{1:D3}-{2}" -f [int]$matches[1], [int]$matches[2], $_ }
-    else { "999-999-$_" }
-}
-foreach ($name in $sortedNames) {
-    $status = $unified[$name]
-    echo "[$status] $name"
+foreach ($level in $candidates) {
+    $status = $unified[$level.Name]
+    echo "[$status] $($level.Name)"
     if ($status -ne "PASS") { $failCount++ }
 }
 if ($failCount -gt 0) { exit 1 }

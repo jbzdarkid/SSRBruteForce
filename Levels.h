@@ -1,8 +1,8 @@
 #pragma once
-#include "Level.h"
 #include "Level2.h"
 
 #define Level Level2
+// #define Level Level
 
 Level LachrymoseHead(5, 4, "1-1 Lachrymose Head",
 	"_###_"
