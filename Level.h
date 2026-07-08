@@ -25,7 +25,6 @@ struct Level : public LevelData {
 
   // Level-specific heuristic which returns false from losing states to reduce the total state count.
   bool (*heuristic)(const Level*) = nullptr;
-  u32 hashtableSize = 27;
 
 private:
   // These 4 functions handle the different ways stephen can move on level terrain

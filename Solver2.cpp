@@ -1,32 +1,29 @@
 ﻿#include "Solver2.h"
+#include "FrontierBuilder.h"
 
-#include <chrono>
-#include <iostream>
+#include <filesystem>
 
-Solver2::Solver2(Level* level, u32 hashtableSize) {
+Solver2::Solver2(Level* level, u32 numBuckets) {
   _level = level;
-
-  // 2^27 slots * (1 control byte + 8 hash bytes) ~= 1.2 GB (default)
-  // 2^28 slots * (1 control byte + 8 hash bytes) ~= 2.4 GB
-  // 2^29 slots * (1 control byte + 8 hash bytes) ~= 4.8 GB
-  // 2^30 slots * (1 control byte + 8 hash bytes) ~= 9.6 GB
-  // 2^31 slots * (1 control byte + 8 hash bytes) ~= 19.3 GB
-  u64 numSlots = 1ull << hashtableSize;
-  _maxStateHashes = numSlots * 7 / 8; // Abseil's load factor is 7/8, at which point it rehashes
-  _exploredStateHashes.reserve(_maxStateHashes); // Abseil will allocate a table that fits this many elements
-  assert(_exploredStateHashes.capacity() == numSlots - 1);
+  _numBuckets = numBuckets;
 }
 
 std::vector<Direction> Solver2::Solve() {
+  // Start from a clean cache: the on-disk hashes are salted with a per-process seed, so inheriting a
+  // previous run's files would silently break dedup. Wipe the whole cache dir; LayerCache recreates it.
+  std::filesystem::remove_all("cache");
+  std::filesystem::create_directories("cache");
 
   // Step 1: BFS through all states, tracking states which are known 
   u32 maxDepth = 0xFFFF;
   State2 initialState = _level->GetState2();
 
+  // Initial layer with only one state
   {
-    WritableLayerCache<State2> initialLayer(0);
-    initialLayer.Add(initialState);
-  } // Flushes at end of scope
+    FrontierBuilder cache(0, _numBuckets);
+    cache.AddStateUnchecked(initialState);
+    cache.ProcessStates();
+  }
 
   for (u32 depth = 1; depth < maxDepth; depth++) {
     ProcessOneLayer(depth);
@@ -34,19 +31,10 @@ std::vector<Direction> Solver2::Solve() {
     if (_winningStateFound) {
       printf("Winning state found at depth %d!\n", depth);
 
-      // Allow for 2 extra interations to search for solutions which potentially take more moves, but are faster in realtime.
+      // Allow for 2 extra iterations to search for solutions which potentially take more moves, but are faster in realtime.
       maxDepth = std::min(maxDepth, depth + 2);
     }
-
-    if (_exploredStateHashes.size() >= _maxStateHashes) {
-      printf("We ran out of hashtable size and stopped storing new states.\n");
-      if (_winningStateFound) break;
-      return {};
-    }
   }
-
-  // Free the stage 1 scratch space
-  _exploredStateHashes = {};
 
   // Step 2: Re-traverse the tree backwards to identify winning states.
   for (u32 depth = maxDepth - 1; depth > 0; depth--) {
@@ -60,66 +48,54 @@ std::vector<Direction> Solver2::Solve() {
 }
 
 void Solver2::ProcessOneLayer(u32 depth) {
-  auto start = std::chrono::steady_clock::now();
+  FrontierBuilder cache(depth, _numBuckets);
 
-  ReadableLayerCache<State2> previousLayer(depth - 1);
-  WritableLayerCache<State2> currentLayer(depth);
+  for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
+    LayerCache<State2> previousLayer("depth", depth - 1, "bucket", bucket);
+    for (const State2& state : previousLayer) {
+      for (Direction dir : { Up, Down, Left, Right }) {
+        _level->SetState2(state); // Sadly our solver is still not completely transactional.
+        if (_level->Won()) {
+          _winningStateFound = true; // No need to explore further past a winning state
+          break;
+        }
 
-  do {
-    const State2& state = previousLayer.Current();
-    for (Direction dir : { Up, Down, Left, Right }) {
-      _level->SetState2(state); // Sadly our solver is still not completely transactional.
-      if (_level->Won()) {
-        _winningStateFound = true; // No need to explore further past a winning state
-        continue;
+        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (_level->heuristic && !_level->heuristic(_level)) continue; // Discard heuristically-pruned moves
+
+        cache.AddStateUnchecked(_level->GetState2());
       }
-
-      if (_exploredStateHashes.size() >= _maxStateHashes) continue; // Stop saving new states once we run out of capacity
-      if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
-
-      State2 newState = _level->GetState2();
-      bool inserted = _exploredStateHashes.insert(absl::HashOf(newState)).second;
-      if (!inserted) continue;
-
-      currentLayer.Add(newState);
     }
-  } while (previousLayer.MoveNext());
+  }
 
-
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::steady_clock::now() - start).count();
-
-  std::cout << "Finished exploring depth " << depth
-    << " with " << currentLayer.Size()
-    << " states. Total hashset size: " << _exploredStateHashes.size()
-    << " / " << _maxStateHashes
-    << " (" << elapsed << " ms)\n";
+  cache.ProcessStates();
 }
 
 void Solver2::FindWinningStates(u32 depth) {
-  ReadableLayerCache<State2> layer(depth);
-  while (layer.MoveNext()) {
-    const State2& state = layer.Current();
-    for (Direction dir : { Up, Down, Left, Right }) {
-      _level->SetState2(state);
+  for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
+    LayerCache<State2> layer("depth", depth, "bucket", bucket);
+    for (const State2& state : layer) {
+      for (Direction dir : { Up, Down, Left, Right }) {
+        _level->SetState2(state);
       
-      // We will have multiple 'winning' depths, so it's possible that we find immediately winning states.
-      if (_level->Won()) {
+        // We will have multiple 'winning' depths, so it's possible that we find immediately winning states.
+        if (_level->Won()) {
+          _winningStates.emplace(state, depth);
+          break;
+        }
+
+        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (_level->heuristic && !_level->heuristic(_level)) continue;
+
+        State2 newState = _level->GetState2();
+        auto search = _winningStates.find(newState);
+        if (search == std::end(_winningStates)) continue; // Not a winning move
+
+        // If any move is winning from this state, we can record it and move on.
+        // We don't actually care about the sequence of moves yet, just that there is a winning move.
         _winningStates.emplace(state, depth);
         break;
       }
-
-      if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
-      if (_level->heuristic && !_level->heuristic(_level)) continue;
-
-      State2 newState = _level->GetState2();
-      auto search = _winningStates.find(newState);
-      if (search == std::end(_winningStates)) continue; // Not a winning move
-
-      // If any move is winning from this state, we can record it and move on.
-      // We don't actually care about the sequence of moves yet, just that there is a winning move.
-      _winningStates.emplace(state, depth);
-      break;
     }
   }
 }

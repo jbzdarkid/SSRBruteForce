@@ -251,14 +251,12 @@ Level ColdFinger = [] {
     {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
     {Tile::Over3});
 
-  coldFinger.hashtableSize = 31; // BIG level
   coldFinger.heuristic = [](const Level* level) {
-    const Vector<Sausage>& sausages = level->Sausages();
-    // ColdFinger requires all sausages to be vertical to win, and we can't rotate sausages once they drop to the ground.
-    // If any sausage reaches the ground and is facing horizontal, the level is lost.
-#define o(x) if (sausages[x].z == 0 && sausages[x].IsHorizontal()) return false;
-    SAUSAGES
-#undef o
+    for (const Sausage& sausage : level->Sausages()) {
+      // ColdFinger requires all sausages to be vertical to win, and we can't rotate sausages once they drop to the ground.
+      // If any sausage reaches the ground and is facing horizontal, the level is lost.
+      if (sausage.z == 0 && sausage.IsHorizontal()) return false;
+    }
     return true;
   };
 
@@ -298,7 +296,16 @@ Level ColdTrail = [] {
   {},
   {},
   {Sausage{1, 2, 2, 2, 1}, Sausage{1, 3, 1, 4, 1}, Sausage{2, 3, 2, 4, 1}});
-  coldTrail.hashtableSize = 30;
+  coldTrail.heuristic = [](const Level* level) {
+    for (const Sausage& sausage : level->Sausages()) {
+      // There are 3 edges of this puzzle which a sausage overhanging is unrecoverable.
+      // Since the grills are all on the right, we also don't need to check for cooked flags.
+      if (sausage.x1 == -1) return false; // Left
+      if (sausage.y1 == -1) return false; // Top
+      if (sausage.y2 == 12) return false; // Bottom
+    }
+    return true;
+  };
   return coldTrail;
 }();
 

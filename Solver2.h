@@ -1,27 +1,21 @@
 ﻿#pragma once
-#include "LargePageAllocator.h"
-#include "LayerCache.h"
 #include "Level.h"
 #include "State.h"
 
 #include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
-#include <absl/hash/hash.h>
-#include <functional>
 #include <vector>
 
-struct Solver2 {
-  Solver2(Level* level, u32 hashtableSize = 27);
+class Solver2 {
+public:
+  Solver2(Level* level, u32 numBuckets = 32);
 
   std::vector<Direction> Solve();
 
 private:
   Level* _level = nullptr;
+  u32 _numBuckets = 0;
 
   // Stage 1
-  u64 _maxStateHashes = 0;
-  // Backed by large pages when built with USE_LARGE_PAGES; otherwise identical to the default allocator.
-  absl::flat_hash_set<size_t, absl::Hash<size_t>, std::equal_to<size_t>, LargePageAllocator<size_t>> _exploredStateHashes;
   bool _winningStateFound = false;
 
   void ProcessOneLayer(u32 depth);

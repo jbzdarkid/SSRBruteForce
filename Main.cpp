@@ -49,7 +49,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
 }
 
 bool SolveLevel(Level* level) {
-  Solver2 solver(level, level->hashtableSize);
+  Solver2 solver(level);
   std::vector<Direction> solution = solver.Solve();
 
   if (solution.empty()) return false;
@@ -99,9 +99,6 @@ static void DiffEngines(Level* level) {
 int main(int argc, char* argv[]) {
   setvbuf(stdout, nullptr, _IONBF, 0); // Disable stdout buffering so we see partial output on crash.
   std::cout.imbue(std::locale("en-US")); // Used for cout decimal formatting in some places.
-
-  // No-op unless built with USE_LARGE_PAGES. When enabled, backs the state hashtable with large pages.
-  printf("Large-page privilege %s\n", EnableLockMemoryPrivilege() ? "enabled" : "disabled");
 
   if (argc == 1) {
     std::cout << "Invalid args\n";

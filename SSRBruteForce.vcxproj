@@ -178,6 +178,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FrontierBuilder.cpp" />
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="Level2.cpp" />
     <ClCompile Include="LevelData.cpp" />
@@ -187,6 +188,7 @@
     <ClCompile Include="State.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FrontierBuilder.h" />
     <ClInclude Include="LayerCache.h" />
     <ClInclude Include="Level.h" />
     <ClInclude Include="Level2.h" />

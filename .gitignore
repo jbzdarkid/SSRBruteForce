@@ -8,4 +8,4 @@ Debug/
 vcpkg_installed
 *.idb
 *.pdb
-layer_cache/
+cache/

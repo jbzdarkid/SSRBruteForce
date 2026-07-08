@@ -2,7 +2,10 @@
 #include "LevelData.h"
 #include "WitnessRNG/StdLib.h"
 
+#include <cstring>
 #include <random>
+
+#include <absl/hash/hash.h>
 
 // This is a shallow copy of the State struct -- it does not include positions of stephen nor the sausages
 // and is thus much smaller. Fortunately, we can determine the shortest path without knowledge of actual state.
@@ -55,14 +58,19 @@ struct State2 {
     return true;
   }
 
-  template <typename H>
-  friend H AbslHashValue(H h, const State2& s) {
-    h = H::combine(std::move(h), _hashSalt);
-    return H::combine_contiguous(std::move(h), reinterpret_cast<const u8*>(&s), sizeof(State2));
+  bool operator<(const State2& other) const {
+    return std::memcmp(this, &other, sizeof(State2)) < 0;
   }
 
-private:
-  // There is about a 9% chance of a hash collision if we use all 2^31 states that fit in my RAM.
-  // Randomize the hash to ensure this won't mess up on subsequent runs.
-  static inline u32 _hashSalt = [] { return std::random_device{}(); }();
+  template <typename H>
+  friend H AbslHashValue(H hash, const State2& state) {
+    return H::combine_contiguous(std::move(hash), reinterpret_cast<const u8*>(&state), sizeof(State2));
+  }
+
+  u128 Hash128() const {
+    // Two separate seeds because absl picks a random seed per process, and this way we get a fully random 128 bits.
+    static const u32 seedA = std::random_device{}();
+    static const u32 seedB = std::random_device{}();
+    return absl::MakeUint128(absl::HashOf(seedA, this), absl::HashOf(seedB, this));
+  }
 };
