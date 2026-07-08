@@ -9,8 +9,7 @@ Solver2::Solver2(Level* level, u32 numBuckets) {
 }
 
 std::vector<Direction> Solver2::Solve() {
-  // Start from a clean cache: the on-disk hashes are salted with a per-process seed, so inheriting a
-  // previous run's files would silently break dedup. Wipe the whole cache dir; LayerCache recreates it.
+  // Clean out any previous solve data (which likely had a different salt)
   std::filesystem::remove_all("cache");
   std::filesystem::create_directories("cache");
 
@@ -50,6 +49,8 @@ std::vector<Direction> Solver2::Solve() {
 void Solver2::ProcessOneLayer(u32 depth) {
   FrontierBuilder cache(depth, _numBuckets);
 
+  // First, iterate through all the states in the previous layer (bucketed by the top hash bits)
+  // Note that we only do basic Move validation here, not deduplication.
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
     LayerCache<State2> previousLayer("depth", depth - 1, "bucket", bucket);
     for (const State2& state : previousLayer) {
@@ -68,7 +69,10 @@ void Solver2::ProcessOneLayer(u32 depth) {
     }
   }
 
-  cache.ProcessStates();
+  // Once we've finished iterating, process all the states to remove duplicates from the next layer.
+  u64 newStates = cache.ProcessStates();
+
+  std::cout << "Finished exploring depth " << depth << ", and found " << newStates << " new states.\n";
 }
 
 void Solver2::FindWinningStates(u32 depth) {

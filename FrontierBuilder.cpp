@@ -6,6 +6,7 @@
 FrontierBuilder::FrontierBuilder(u32 depth, u32 numBuckets) {
   _numBuckets = numBuckets;
 
+  _knownHashes.resize(_numBuckets);
   _currentLayer.resize(_numBuckets);
   _uncheckedStates.resize(_numBuckets);
   _uncheckedStateHashes.resize(_numBuckets);
@@ -27,7 +28,8 @@ void FrontierBuilder::AddStateUnchecked(const State2& state) {
   _uncheckedStateHashes[bucket].Add(hash);
 }
 
-void FrontierBuilder::ProcessStates() {
+u64 FrontierBuilder::ProcessStates() {
+  u64 totalNewStates = 0;
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
     _uncheckedStates[bucket].FinishWriteAndResetRead();
     _uncheckedStateHashes[bucket].FinishWriteAndResetRead();
@@ -43,11 +45,16 @@ void FrontierBuilder::ProcessStates() {
     i = 0;
     for (const State2& state : _uncheckedStates[bucket]) {
       // Add the state if its hash was newly added to the knownHashes
-      if (insertedHashes[i++]) _currentLayer[bucket].Add(state);
+      if (insertedHashes[i++]) {
+        _currentLayer[bucket].Add(state);
+        totalNewStates++;
+      }
     }
 
     _currentLayer[bucket].FinishWriteAndResetRead();
   }
+
+  return totalNewStates;
 }
 
 std::vector<bool> FrontierBuilder::MergeToDisk(LayerCache<u128>& knownHashes, std::vector<IndexedHash>&& hashesToInsert) {

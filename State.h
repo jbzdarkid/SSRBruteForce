@@ -71,6 +71,6 @@ struct State2 {
     // Two separate seeds because absl picks a random seed per process, and this way we get a fully random 128 bits.
     static const u32 seedA = std::random_device{}();
     static const u32 seedB = std::random_device{}();
-    return absl::MakeUint128(absl::HashOf(seedA, this), absl::HashOf(seedB, this));
+    return absl::MakeUint128(absl::HashOf(seedA, *this), absl::HashOf(seedB, *this));
   }
 };

@@ -16,7 +16,7 @@ public:
   FrontierBuilder(u32 depth, u32 numBuckets);
 
   void AddStateUnchecked(const State2& state);
-  void ProcessStates();
+  u64 ProcessStates();
 
 private:
   std::vector<bool> MergeToDisk(LayerCache<u128>& knownHashes, std::vector<IndexedHash>&& hashesToInsert);
