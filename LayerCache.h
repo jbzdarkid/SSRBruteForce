@@ -27,10 +27,10 @@ public:
   }
 
   void FinishWriteAndResetRead() {
-    if (!WriteToDisk()) return;
-    // Close file buffers, and copy the written data back to the primary name
+    WriteToDisk();
+    if (!_out.is_open()) return; // We may not have written anything *this time*, so just check if the output file was ever opened.
     _in.close();
-    if (_out.is_open()) _out.close();
+    _out.close();
     std::filesystem::rename(_name + ".tmp", _name);
     _in = std::ifstream(_name, std::ios::binary);
   }
@@ -78,12 +78,12 @@ public:
   iterator end() { return iterator(); }
 
 private:
-  bool WriteToDisk() {
-    if (_writeBuffer.size() == 0) return false;
+  void WriteToDisk() {
+    if (_writeBuffer.size() == 0) return; // Nothing to write
+
     if (!_out.is_open()) _out = std::ofstream(_name + ".tmp", std::ios::binary);
     _out.write(reinterpret_cast<const char*>(_writeBuffer.data()), _writeBuffer.size() * sizeof(T));
     _writeBuffer.clear();
-    return true;
   }
 
   std::string _name;
