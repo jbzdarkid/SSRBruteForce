@@ -116,6 +116,12 @@ public:
       InlineTransform(ladder.x, ladder.y);
       ladder.dir = sym(ladder.dir);
     }
+
+    // Initialize the engine's move scratch from the fully-transformed starting pose, exactly as the solver and
+    // DiffEngines do. Notably this sets the reference's _sausageSpeared, so a level that STARTS with the fork embedded
+    // in a sausage is recognised as speared (otherwise the first move would misbehave).
+    State s = _level.GetState();
+    _level.SetState(&s);
   }
 
   void AssertMoveSucceeds(Direction dir) {

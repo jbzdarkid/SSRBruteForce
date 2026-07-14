@@ -321,7 +321,26 @@ bool Level::HandleLadderMotion(Direction dir, bool& handled) {
       if (_stephen.z <= 0) FAIL("Stephen cannot descend through the floor");
       // ladderMotion=true: while descending, intermediate cells are unsupported (we're hanging on the ladder).
       // Mirrors the climb-up path which calls MoveStephenThroughSpace(Jump, true).
+      //
+      // Snapshot sausage positions before the rung: MoveStephenThroughSpace(Crouch) lowers Stephen and whatever rides
+      // him directly (speared / fork-borne / head hat), but its Crouch path skips CheckForSausageCarry, so a sausage
+      // merely RESTING on the descending base is never lowered and would be left floating a level up (3-8 Cold Head:
+      // the base rolls back down off the wall but its rider stays at z=2). After the rung, drop EXACTLY the riders a
+      // descending base orphaned -- not a global gravity sweep, which would also drop legitimately-parked floaters the
+      // move never disturbed (3-7 Cold Plateau decoys).
+      Sausage preRung[NUM_SAUSAGES];
+      for (s8 i = 0; i < (s8)_sausages.Size(); i++) preRung[i] = _sausages[i];
       if (!MoveStephenThroughSpace(Crouch, true)) return false;
+      for (s8 i = 0; i < (s8)_sausages.Size(); i++) {
+        if (_sausages[i].z >= preRung[i].z) continue; // sausage i did not descend this rung -- nothing rode off it
+        for (s8 j = 0; j < (s8)_sausages.Size(); j++) {
+          if (j == i) continue;
+          if (preRung[j].IsAt(preRung[i].x1, preRung[i].y1, preRung[i].z + 1)
+           || preRung[j].IsAt(preRung[i].x2, preRung[i].y2, preRung[i].z + 1))
+            if (!DropSausageIfUnsupported(j)) return false; // a rider that lost its footing falls (and cascades)
+        }
+      }
+
       if (CanWalkOnto(_stephen.x, _stephen.y, _stephen.z)) break; // If stephen is supported (by ground or sausage), he steps off the ladder.
 
       // There's air below us, check for another ladder
@@ -393,7 +412,13 @@ bool Level::HandleRotation(Direction dir, bool& handled) {
 
   if (dir == Up) {
     s8 clockwise = (_stephen.dir == Left ? +1 : -1);
-    if (!MoveThroughSpace( _stephen.forkX, _stephen.y - 1, _stephen.z, dir, clockwise)) return false;
+    // Support checks in the corner sweep must see the fork already at its swing-to cell, so a hat perched over that
+    // cell keeps its footing instead of dropping before the fork arrives (and then being speared and dragged along the
+    // fork-dest sweep). 3-3 Cold Escarpment: a turn must leave such a fork-tip hat put.
+    _stephenPendingForkX = _stephen.x; _stephenPendingForkY = _stephen.y - 1; _stephenPendingForkZ = _stephen.forkZ;
+    bool sweptA = MoveThroughSpace( _stephen.forkX, _stephen.y - 1, _stephen.z, dir, clockwise);
+    _stephenPendingForkX = _stephenPendingForkY = _stephenPendingForkZ = -127;
+    if (!sweptA) return false;
     if (!CanPhysicallyMove(_stephen.x,     _stephen.y - 1, _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
     _stephen.forkX = _stephen.x;
     _stephen.forkY = _stephen.y - 1;
@@ -401,7 +426,10 @@ bool Level::HandleRotation(Direction dir, bool& handled) {
     _stephen.dir = dir;
   } else if (dir == Down) {
     s8 clockwise = (_stephen.dir == Right ? +1 : -1);
-    if (!MoveThroughSpace( _stephen.forkX, _stephen.y + 1, _stephen.z, dir, clockwise)) return false;
+    _stephenPendingForkX = _stephen.x; _stephenPendingForkY = _stephen.y + 1; _stephenPendingForkZ = _stephen.forkZ; // fork's swing-to cell holds up a hat it lands under (see Up branch)
+    bool sweptA = MoveThroughSpace( _stephen.forkX, _stephen.y + 1, _stephen.z, dir, clockwise);
+    _stephenPendingForkX = _stephenPendingForkY = _stephenPendingForkZ = -127;
+    if (!sweptA) return false;
     if (!CanPhysicallyMove(_stephen.x,     _stephen.y + 1, _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
     _stephen.forkX = _stephen.x;
     _stephen.forkY = _stephen.y + 1;
@@ -409,7 +437,10 @@ bool Level::HandleRotation(Direction dir, bool& handled) {
     _stephen.dir = dir;
   } else if (dir == Left) {
     s8 clockwise = (_stephen.dir == Down ? +1 : -1);
-    if (!MoveThroughSpace( _stephen.x - 1, _stephen.forkY, _stephen.z, dir, clockwise)) return false;
+    _stephenPendingForkX = _stephen.x - 1; _stephenPendingForkY = _stephen.y; _stephenPendingForkZ = _stephen.forkZ; // fork's swing-to cell holds up a hat it lands under (see Up branch)
+    bool sweptA = MoveThroughSpace( _stephen.x - 1, _stephen.forkY, _stephen.z, dir, clockwise);
+    _stephenPendingForkX = _stephenPendingForkY = _stephenPendingForkZ = -127;
+    if (!sweptA) return false;
     if (!CanPhysicallyMove(_stephen.x - 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
     _stephen.forkX = _stephen.x - 1;
     _stephen.forkY = _stephen.y;
@@ -417,7 +448,10 @@ bool Level::HandleRotation(Direction dir, bool& handled) {
     _stephen.dir = dir;
   } else if (dir == Right) {
     s8 clockwise = (_stephen.dir == Up ? +1 : -1);
-    if (!MoveThroughSpace( _stephen.x + 1, _stephen.forkY, _stephen.z, dir, clockwise)) return false;
+    _stephenPendingForkX = _stephen.x + 1; _stephenPendingForkY = _stephen.y; _stephenPendingForkZ = _stephen.forkZ; // fork's swing-to cell holds up a hat it lands under (see Up branch)
+    bool sweptA = MoveThroughSpace( _stephen.x + 1, _stephen.forkY, _stephen.z, dir, clockwise);
+    _stephenPendingForkX = _stephenPendingForkY = _stephenPendingForkZ = -127;
+    if (!sweptA) return false;
     if (!CanPhysicallyMove(_stephen.x + 1, _stephen.y,     _stephen.z, Inverse(_stephen.dir), true)) return true; // Bonk
     _stephen.forkX = _stephen.x + 1;
     _stephen.forkY = _stephen.y;
@@ -540,12 +574,17 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   bool otherSupportIsSausage = (otherSausageNo != -1);
   bool thisSupportIsSausage = !(thisSupportIsStephen || thisSupportIsFork); // Someone must've called us.
 
+  // A sausage the fork already dragged in under this end THIS Move (it lives in _stepMovedSausages, not
+  // data.movedSausages) is moving along with us, not a fresh static support: it must neither disqualify a head hat nor
+  // anchor a carry (3-3 Cold Escarpment: dragging the speared base in under the head hat's cantilevered far half).
+  bool otherSausageForkDragged = otherSupportIsSausage && (_stepMovedSausages & (1 << otherSausageNo)) != 0;
+
   // Detect "sausage hat" (a sausage on Stephen's head) BEFORE the early returns below; it drives
   // sausage-hat rotation. The fork normally disqualifies a hat, EXCEPT mid-rotation when the fork
   // has swung under the hat's genuinely-cantilevered far half (4-2 move 77 rotates). If that far
   // half rested on another sausage (4-1 move 87), _hatFarHalfOnSausage keeps the fork disqualifying.
   bool forkMayBeIgnored = stephenIsRotating && !_hatFarHalfOnSausage;
-  if ((thisSupportIsStephen && !otherSupportIsSausage && (!otherSupportIsFork || forkMayBeIgnored))
+  if ((thisSupportIsStephen && (!otherSupportIsSausage || otherSausageForkDragged) && (!otherSupportIsFork || forkMayBeIgnored))
       || (otherSupportIsStephen && !thisSupportIsSausage && (!thisSupportIsFork || forkMayBeIgnored))) {
     data.sausageHat = sausageNo;
   }
@@ -581,7 +620,12 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   if (stephenIsRotating && _stephen.HasFork() && (thisForkSupports || otherForkSupports)) return false;
   if (otherSupportIsFork && !_stephen.HasFork() && !data.pushedFork) return false; // Disconnected forks act like a wall when not moving
 
-  if (otherSupportIsSausage && !data.movedSausages.Contains(otherSausageNo)) return false;  // Other support is a sausage which is not moving
+  // "Not moving" must also exclude a sausage the fork already dragged this Move -- if it just slid in under the hat's
+  // far end this step it is still MOVING, not a fresh static anchor. Since Stephen didn't unspear, the hat's real
+  // support (his head) is unchanged, so it must ride along -- it must NOT deposit onto the passing dragged sausage
+  // (3-3 Cold Escarpment: a head hat over the speared base as he drags it back).
+  if (otherSupportIsSausage && !data.movedSausages.Contains(otherSausageNo)
+      && !otherSausageForkDragged) return false;  // Other support is a sausage which is not moving
 
   // Check for double-move
   // bool canDoubleMove = true;

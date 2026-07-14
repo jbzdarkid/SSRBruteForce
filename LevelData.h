@@ -157,10 +157,14 @@ public:
     std::initializer_list<Tile> tiles = {});
   void Print() const;
   bool Won() const;
+  // Analysis hook: when set, Won() returns this predicate instead of the normal win test, so the ordinary solver can
+  // search for the shortest path to some OTHER condition (e.g. a state that reproduces an engine quirk). Null = normal.
+  bool (*winOverride)(const LevelData*) = nullptr;
 
   s8 GetSausage(s8 x, s8 y, s8 z) const;
   int NumSausages() const;
   const Vector<Sausage>& Sausages() const { return _sausages; } // read-only access for custom solver heuristics
+  const Stephen& GetStephen() const { return _stephen; }        // read-only access for custom solver heuristics
   bool IsWithinGrid(s8 x, s8 y, s8 z) const;
   bool IsWall(s8 x, s8 y, s8 z) const;
   bool CanWalkOnto(s8 x, s8 y, s8 z) const;

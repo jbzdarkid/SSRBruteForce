@@ -67,7 +67,7 @@ private:
   void PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const;
 
   // A sausage resting on Stephen's head or fork rides rigidly with a step (no roll); carries riders. Wall-blocked stays.
-  void PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, bool rolls) const;
+  void PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u16 rigidMask) const;
 
   // Common to every motion (Level1's HandleBurnedStep): a body left resting on a grill is on hot ground, so it recoils
   // straight back the way it came as its own fresh move. Sets |handled| when it fires.
@@ -83,9 +83,15 @@ private:
   // to use so ordinary walking/turning can take the move.
   bool HandleLadderMotion(Direction dir, bool& handled);
 
-  // Raise/lower Stephen's body and fork (and any speared sausage) by |dz| levels -- the rigid motion of a ladder rung.
-  // Returns false if the fork would move into a wall or into a sausage it isn't carrying (which blocks the climb).
-  bool LiftStephen(s8 dz, u16 carried);
+  // Raise/lower Stephen's body and fork by |dz| levels -- the rigid motion of a ladder rung. |carried| is the set that
+  // rides with him (grown here when a climb-up shoves a resting sausage upward); such body/fork-shoved sausages are also
+  // recorded in |hatMask| so the step-off treats them as a head hat rather than a rigid rider. Returns false if the
+  // fork/body would move into a wall, or into a sausage that itself can't rise (which blocks the climb).
+  bool LiftStephen(s8 dz, u16& carried, u16& hatMask);
+
+  // Shove sausage |sausageNo| (and everything stacked transitively on top of it) up by |dz| as Stephen climbs into it:
+  // record the whole tower into |carried| and |hatMask|. Returns false if any of them would rise into a wall.
+  bool LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask);
 
   // The mask of |base| plus every sausage stacked transitively on top of it -- a rigid tower the fork carries.
   u16 CarriedMask(s8 base) const;
@@ -96,18 +102,13 @@ private:
   // destination (the reference routes ladder motion through MoveStephenThroughSpace -- e.g. 3-8 Cold Head, the fork
   // shoves a sausage as he steps onto/over the ledge), then gravity and heat resolve. |carried| is the sausage riding on
   // the fork (it translates rigidly with him, -1 if none). Returns false on a wall, a missing ledge, or an immovable push.
-  bool StepOffLadder(Direction dir, u16 carried, bool ladderMotion);
+  bool StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 hatMask = 0, u16 rollMask = 0, s8 speared = -1);
 
   // If Stephen's fork is lodged in a sausage, drag it rigidly (the speared-motion dispatch handler). Sets |handled| and
   // performs the drag; leaves |handled| false when nothing is speared so the step/turn classification can take over.
   // Drag Stephen and the sausage speared on his fork rigidly one cell in |dir| (any direction; his facing is
   // unchanged). The speared sausage is the one at the fork's cell; it translates with the fork and never rolls.
   bool HandleSpearedMotion(Direction dir, bool& handled);
-
-  // Special case of HandleSpearedMotion: Stephen presses a speared sausage toward a grill, so he recoils to where he
-  // started. The sausage |lunged| onto the grill and back, so it keeps its original cell but earns the brand that
-  // excursion cooks in. Returns false if it would burn.
-  bool BounceSpearedSausageOffGrill(s8 sausageNo, Sausage lunged);
 
   // Compute (without committing) the result of pushing sausage |sausageNo| one cell in |dir|. The push chains: a
   // sausage in the way is pushed the same direction too (recursively). |plan| accumulates every sausage that shifts --
@@ -120,8 +121,8 @@ private:
   // shifts by the same horizontal displacement (so it stays on top) and rolls across its own long axis. Recurses for
   // sausages stacked on it. A carried sausage whose destination is a wall is left where it is (the parent move still
   // proceeds); the later Settle pass drops it if its support has gone. Motion only -- gravity and cooking come after.
-  // A double-mover is recorded into plan.doubleMoveMask/doubleMoveDir; a turn (plan.rotating) treats Stephen's body as a wall.
-  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr, bool baseRolled = true) const;
+  // Double-move is NOT decided here; the central MarkDoubleMoves detector resolves it post-hoc. A turn (plan.rotating) treats Stephen's body as a wall.
+  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr) const;
 
   // Stage 5 (gravity). Drop any disturbed sausage in |plan|'s working tableau whose ends have lost their support,
   // bottom-up to a fixed point. Only sausages this move touched -- those in |movedMask|, plus any that were stacked on
@@ -132,10 +133,18 @@ private:
   // then refused (the plan is discarded uncommitted).
   bool Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, const Stephen& prevStephen, u16 exclude = 0);
 
+  // Central double-move DETECTOR -- the single place every path resolves double-move. Double-move is fundamentally
+  // about ROLLING: a sausage left balanced across a perpendicular base that just rolled keeps tumbling one more cell.
+  // Scan the just-moved tableau once against the pre-move layout |preMove|, inferring each sausage's own move direction
+  // from its displacement (so one detector serves step, spear, log-roll, rotation and ladder alike, even when a plan
+  // mixes push directions), and record every such rider into |plan|'s doubleMoveMask/doubleMoveDir. Every move path
+  // calls this after its motion and before Settle to get uniform double-move handling.
+  void MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const;
+
   // Stage 7 (double-move). A sausage left balanced across a perpendicular base that just rolled keeps tumbling one more
-  // cell -- recorded during the carry in |plan|'s doubleMoveMask/doubleMoveDir. Run that extra tumble here, after the primary
-  // move has fully settled and cooked, as its own little motion -> settle -> cook on |plan|'s tableau. Returns false if it
-  // burns or falls out of the world.
+  // cell -- recorded (during a carry, or by MarkDoubleMoves) in |plan|'s doubleMoveMask/doubleMoveDir. Run that extra
+  // tumble here, after the primary move has fully settled and cooked, as its own little motion -> settle -> cook on
+  // |plan|'s tableau. Returns false if it burns or falls out of the world.
   bool DoubleMove(MovePlan& plan);
 
   // Stage 6 (heat). Cook every sausage in |plan|'s tableau flagged in |movedMask| (those that moved or settled this

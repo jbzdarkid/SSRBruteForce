@@ -1,8 +1,26 @@
 #pragma once
 #include "Level2.h"
 
-// #define Level Level2
-#define Level Level
+// The diff-engines / Level2 shadow build (compile with /DUSE_LEVEL2) swaps every level object -- and, through the
+// Level* signatures in Main.cpp, the solver and DiffEngines -- over to Level2, while keeping the reference engine
+// reachable as BaseLevel. BaseLevel is captured here BEFORE the remap, so it still names the reference Level (Level2's
+// base) even after Level has been redefined to Level2 below. Without USE_LEVEL2 this is a no-op and Level stays the
+// reference engine.
+using BaseLevel = Level;
+#ifdef USE_LEVEL2
+#define Level Level2
+#endif
+
+// A sausage whose BOTH ends lie outside the playfield has rolled entirely off the map -- an unwinnable, lost state. It
+// also drives a class of engine divergences: the reference keeps such a sausage floating over the void (its gravity
+// only re-checks sausages a move actually disturbed, so an unmoved off-grid stack is never dropped), whereas Level2
+// correctly finds it unsupported and refuses. Rejecting these lost states from a level's heuristic prunes that whole
+// degenerate subtree so the survey/solver ignore it (the sanctioned "reject genuine reference quirks" path).
+static inline bool HasOffGridSausage(const LevelData* level) {
+  for (const Sausage& s : level->Sausages())
+    if (!level->IsWithinGrid(s.x1, s.y1, s.z) && !level->IsWithinGrid(s.x2, s.y2, s.z)) return true;
+  return false;
+}
 
 Level LachrymoseHead(5, 4, "1-1 Lachrymose Head",
   "_###_"
@@ -252,6 +270,7 @@ Level ColdFinger = [] {
     {Tile::Over3});
 
   coldFinger.heuristic = [](const Level* level) {
+    if (HasOffGridSausage(level)) return false; // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
     for (const Sausage& sausage : level->Sausages()) {
       // ColdFinger requires all sausages to be vertical to win, and we can't rotate sausages once they drop to the ground.
       // If any sausage reaches the ground and is facing horizontal, the level is lost.
@@ -263,7 +282,8 @@ Level ColdFinger = [] {
   return coldFinger;
 }();
 
-Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
+Level ColdEscarpment = [] {
+  Level coldEscarpment(14, 16, "3-3 Cold Escarpment",
   "________      "
   "________      "
   "_______D      "
@@ -280,6 +300,11 @@ Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
   "___R1####_____"
   "     ####     "
   "      11      ");
+  coldEscarpment.heuristic = [](const Level* level) {
+    return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
+  };
+  return coldEscarpment;
+}();
 
 Level ColdTrail = [] {
   Level coldTrail(19, 10, "3-4 Cold Trail",
@@ -446,7 +471,8 @@ Level ColdGate(18, 11, "3-13 Cold Gate",
   Sausage{14, 5, 14, 6, 6}}, // tower sausage 6, z=6
   {Tile::Over2Grill, Tile::Over2Grill, Tile::Over2Grill});
 
-Level ColdFrustration(10, 9, "3-14 Cold Frustration",
+Level ColdFrustration = [] {
+  Level coldFrustration(10, 9, "3-14 Cold Frustration",
   "2  _____  "
   "111L_D__  "
   "1    222  "
@@ -459,6 +485,11 @@ Level ColdFrustration(10, 9, "3-14 Cold Frustration",
   {},
   {},
   {Sausage{4, 8, 5, 8, 2}});
+  coldFrustration.heuristic = [](const Level* level) {
+    return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
+  };
+  return coldFrustration;
+}();
 
 Level OverworldSausage3(13, 14, "3-final Overworld sausage",
   "__1_1_1_1    "

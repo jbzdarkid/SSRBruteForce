@@ -194,6 +194,7 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
+  if (winOverride) return winOverride(this);
 //  return (_stephen.x == 7 && _stephen.y == 13 && _stephen.dir == Up
 //      && ((_sausages[0].x1 == 7 && _sausages[0].y1 == 9 && _sausages[1].x1 == 7 && _sausages[1].y1 == 11)
 //          || (_sausages[1].x1 == 7 && _sausages[1].y1 == 9 && _sausages[0].x1 == 7 && _sausages[0].y1 == 11)));
