@@ -26,6 +26,13 @@ struct Level : public LevelData {
   // Level-specific heuristic which returns false from losing states to reduce the total state count.
   bool (*heuristic)(const Level*) = nullptr;
 
+  // A sausage the reference's lazy gravity left unsupported (floating) -- correct play never leaves a sausage in the
+  // air, so such a state is a reference quirk (and unwinnable). Uses the reference's own SausageSupported so "floating"
+  // means exactly "the reference would drop it if it re-checked". Two sausages sharing a cell is likewise an invalid
+  // reference-only state. Both are used by per-level heuristics to prune those degenerate subtrees.
+  bool HasFloatingSausage() const;
+  bool HasOverlappingSausages() const;
+
 private:
   // These 4 functions handle the different ways stephen can move on level terrain
   // Much like the parent Move function, their return value indicates a useless move.

@@ -637,6 +637,11 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
     if (thisSupportIsFork  && !thisForkInSausage)  canDoubleMove = false;
     if (otherSupportIsStephen) canDoubleMove = false;
     if (thisSupportIsStephen)  canDoubleMove = false;
+    // A rider resting on Stephen's head hat is part of the rigid load he supports STATICALLY: it translates one cell
+    // with him rather than tumbling an extra. (The head hat is his -- a static support -- so anything riding it moves
+    // rigidly, exactly as a sausage on his head does.) The head hat is the caller here, so |x,y,z| is its cell.
+    // (4-5 Crunchy Leaves: a rider on the head hat rides one cell; it does not double-move and drop to the floor.)
+    if (data.sausageHat != -1 && GetSausage(x, y, z) == data.sausageHat) canDoubleMove = false;
   }
 
   // Preconditions for double-move were satisfied, i.e. not being supported by stephen or his fork.
@@ -1091,6 +1096,24 @@ bool Level::CookSausage(Sausage& sausage, s8 sausageNo) {
     sausage.flags |= sidesToCook;
   }
   return true;
+}
+
+bool Level::HasFloatingSausage() const {
+  for (s8 i = 0; i < (s8)_sausages.Size(); i++) {
+    const Sausage& s = _sausages[i];
+    if (!SausageSupported(s, _stephen.x, _stephen.y, _stephen.z, _stephen.forkX, _stephen.forkY, _stephen.forkZ))
+      return true;
+  }
+  return false;
+}
+
+bool Level::HasOverlappingSausages() const {
+  for (s8 i = 0; i < (s8)_sausages.Size(); i++)
+    for (s8 j = i + 1; j < (s8)_sausages.Size(); j++) {
+      const Sausage& b = _sausages[j];
+      if (_sausages[i].IsAt(b.x1, b.y1, b.z) || _sausages[i].IsAt(b.x2, b.y2, b.z)) return true;
+    }
+  return false;
 }
 
 bool Level::SausageSupported(const Sausage& sausage, s8 sx, s8 sy, s8 sz, s8 fx, s8 fy, s8 fz) const {

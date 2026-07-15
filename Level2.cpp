@@ -339,7 +339,28 @@ bool Level2::HandleLadderMotion(Direction dir, bool& handled) {
     // A fork-borne sausage rolls when the step-off carries it across its axis; the SPEARED sausage itself translates
     // rigidly -- but a rider stacked on the speared sausage still rolls as it's carried across its own axis, so drop
     // only the speared sausage from |rollMask| (3-8 Cold Head: a stacked sausage rolls as the speared base climbs).
-    u16 rollMask = CarriedMask(carried);
+    // The head hat likewise rides rigidly (with anything SQUARELY stacked on it -- both ends resting on the stack), but
+    // a CANTILEVERED rider perched on the head hat rolls as it's carried across its axis (4-5 Crunchy Leaves: a rider on
+    // the head hat rolls as Stephen climbs). So the only rigid units are the speared sausage and that head-hat stack;
+    // everything else carried rolls. Computed from the PRE-climb layout, before LiftStephen shoves wall-top hats in.
+    u16 rigidStack = 0;
+    if (headHat != -1) {
+      rigidStack = (u16)(1 << headHat);
+      for (bool grew = true; grew; ) {
+        grew = false;
+        for (int i = 0; i < _sausages.Size(); i++) {
+          if (rigidStack & (1 << i)) continue;
+          const Sausage& s = _sausages[i];
+          s8 b1 = GetSausage(s.x1, s.y1, s.z - 1), b2 = GetSausage(s.x2, s.y2, s.z - 1);
+          if (b1 != -1 && b2 != -1 && (rigidStack & (1 << b1)) && (rigidStack & (1 << b2))) { rigidStack |= (u16)(1 << i); grew = true; }
+        }
+      }
+    }
+    // A fork-borne sausage is never rigid even when one end also rests on the head: it's a BRIDGE, which the reference's
+    // head-hat detection disqualifies (the fork end vetoes the hat), so it rolls across its axis. Drop the whole fork
+    // stack out of the rigid set (4-2 Toad's Folly / 4-4 Foul Fen bridges roll as they climb).
+    rigidStack &= ~CarriedMask(carried);
+    u16 rollMask = (u16)(carriedMask & ~rigidStack);
     if (speared != -1) rollMask &= ~(u16)(1 << speared);
     while (IsLadder(_stephen.x, _stephen.y, _stephen.z, dir))
       if (!LiftStephen(+1, carriedMask, hatMask)) return false;
@@ -384,7 +405,24 @@ bool Level2::HandleLadderMotion(Direction dir, bool& handled) {
   u16 hatMask = 0; // unused during a crouch (a descent never shoves a sausage upward); kept for LiftStephen's signature
   // The lateral step-off rolls a fork-borne sausage carried across its axis; the SPEARED sausage translates rigidly,
   // but a rider stacked on it still rolls, so drop only the speared sausage from |rollMask| (3-8 Cold Head descent).
-  u16 rollMask = CarriedMask(carried);
+  // The head hat (with anything SQUARELY stacked on it) rides rigidly, but a CANTILEVERED rider on it rolls across its
+  // axis as the step-off drags it (4-5 Crunchy Leaves: a rider on the descending head hat rolls). So the rigid units are
+  // the speared sausage and the head-hat stack (minus the fork stack, since a fork-borne bridge always rolls).
+  u16 rigidStack = 0;
+  if (descentHat != -1) {
+    rigidStack = (u16)(1 << descentHat);
+    for (bool grew = true; grew; ) {
+      grew = false;
+      for (int i = 0; i < _sausages.Size(); i++) {
+        if (rigidStack & (1 << i)) continue;
+        const Sausage& s = _sausages[i];
+        s8 b1 = GetSausage(s.x1, s.y1, s.z - 1), b2 = GetSausage(s.x2, s.y2, s.z - 1);
+        if (b1 != -1 && b2 != -1 && (rigidStack & (1 << b1)) && (rigidStack & (1 << b2))) { rigidStack |= (u16)(1 << i); grew = true; }
+      }
+    }
+  }
+  rigidStack &= ~CarriedMask(carried);
+  u16 rollMask = (u16)(carriedMask & ~rigidStack);
   if (speared != -1) rollMask &= ~(u16)(1 << speared);
   if (!StepOffLadder(dir, carriedMask, true, 0, rollMask, speared)) return false; // step out over the ladder (hanging, no footing yet)
   // Crouch down the ladder one rung at a time. Each rung lowers Stephen and his DIRECT cargo -- a speared sausage
@@ -551,9 +589,10 @@ bool Level2::StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 ha
     if ((rollMask & (1 << i)) && (cs.IsHorizontal() ? (dy != 0) : (dx != 0))) cs.flags ^= Sausage::Rolled;
   }
   // A sausage the climb shoved onto Stephen's head rides along as a hat -- but a wall in its path leaves it behind
-  // (it stays put, still resting on his head, 4-2 Toad's Folly move 72).
+  // (it stays put, still resting on his head, 4-2 Toad's Folly move 72). The head-hat stack rides rigidly, but a
+  // cantilevered rider perched on it rolls across its axis, so honor |rollMask| here too (4-5 Crunchy Leaves).
   for (int i = 0; i < _sausages.Size(); i++)
-    if (hatMask & (1 << i)) PlanHatCarry((s8)i, dx, dy, dir, plan, (u16)0xFFFF); // climb-shoved hats ride rigidly
+    if (hatMask & (1 << i)) PlanHatCarry((s8)i, dx, dy, dir, plan, (u16)~rollMask); // rigid unless flagged rolling
   // A carried rider left balanced across a base that just rolled under it tumbles an extra cell. The step-off carry has
   // no per-sausage hook (it translates the stack rigidly), so run the central double-move detector here so the climb
   // gets the same tumble ordinary steps do (3-8 Cold Head / 3-3 Cold Escarpment climb double-moves).

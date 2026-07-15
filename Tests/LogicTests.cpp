@@ -635,6 +635,31 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 2, 3, 2, 3, Sausage::Rolled}); // rode up and north, rolling across its long axis
   }
 
+  // 4-5 Crunchy Leaves (DiffEngines divergence): Stephen climbs a ladder carrying a GENUINE head hat (a vertical
+  // sausage on his head, its south end cantilevered -- NOT fork-borne) which itself carries a horizontal rider perched
+  // on its head end and cantilevered east. As he climbs and steps north, the head hat rides rigidly (it moves along its
+  // own axis anyway), but the rider is carried across its long axis, so it ROLLS. Level2 used to translate the whole
+  // head-hat stack rigidly (rollMask covered only the fork stack), leaving the rider's Rolled flag unset.
+  MAKE_SYMMETRICAL_TEST(ClimbLadderRollsHeadHatRider) {
+    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+      "          "
+      "          "
+      "  2       "
+      " 11       "
+      "  _       "
+      "        _ "
+      "        _ ",
+      Stephen{2, 3, 1, Left}, { Ladder{2, 3, 1, Up} },
+      { Sausage{2, 3, 2, 4, 2}, Sausage{2, 4, 3, 4, 3}, Sausage{8, 5, 8, 6, 0} }));
+    level.AssertPosition(2, 3, Left);
+    level.AssertSausage({2, 3, 2, 4, 2, Sausage::None}); // head hat: north end on head, south end cantilevered
+    level.AssertSausage({2, 4, 3, 4, 3, Sausage::None}); // rider: west end on the head hat, east end cantilevered
+    level.AssertMoveSucceeds(Up); // climb the rung and step off north onto the Wall2 top
+    level.AssertPosition(2, 2, Left);                     // rose a level, stepped one cell north; still facing west
+    level.AssertSausage({2, 2, 2, 3, 3, Sausage::None});   // head hat rode up+north along its own axis -- no roll
+    level.AssertSausage({2, 3, 3, 3, 4, Sausage::Rolled}); // rider carried across its axis -- it rolls
+  }
+
   // 4-2 Toad's Folly (DiffEngines divergence #1): Stephen stands on a Wall2 top facing NORTH, with a ladder immediately
   // to his EAST (descending the wall's east face) and a horizontal hat on his head whose far end cantilevers west over
   // the neighbouring Wall2 top. Pressing East steps him sideways onto the ladder and climbs him down to the ground; the

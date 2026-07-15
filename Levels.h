@@ -563,20 +563,29 @@ Level FoulFen(9, 9, "4-4 Foul Fen",
   {Ladder{2, 3, 1, Up}, Ladder{3, 3, 1, Up}},
   {Sausage{5, 3, 5, 4, 1}});
 
-Level CrunchyLeaves(8, 10, "4-5 Crunchy Leaves",
-  "     111"
-  "     121"
-  " 222 111"
-  " 232##__"
-  " 222##  "
-  "_U__  R1"
-  "_bb_  _1"
-  "___v_a_U"
-  "_1___a__"
-  "______  ",
-  {},
-  {Ladder{2, 4, 2, Up}},
-  {Sausage{7, 1, 7, 2, 1}});
+Level CrunchyLeaves = [] {
+  Level crunchyLeaves(8, 10, "4-5 Crunchy Leaves",
+    "     111"
+    "     121"
+    " 222 111"
+    " 232##__"
+    " 222##  "
+    "_U__  R1"
+    "_bb_  _1"
+    "___v_a_U"
+    "_1___a__"
+    "______  ",
+    {},
+    {Ladder{2, 4, 2, Up}},
+    {Sausage{7, 1, 7, 2, 1}});
+  crunchyLeaves.heuristic = [](const Level* level) {
+    // Prune the reference's physics-quirk subtrees so the survey/solver ignore states correct play never reaches:
+    // a sausage rolled entirely off the map, one the reference's lazy gravity left floating, or two overlapping after
+    // a buggy carry. All are unwinnable reference-only artifacts (the sanctioned "reject reference quirks" path).
+    return !HasOffGridSausage(level) && !level->HasFloatingSausage() && !level->HasOverlappingSausages();
+  };
+  return crunchyLeaves;
+}();
 
 Level GatorPaddock(12, 10, "4-6 Gator Paddock",
   "____11111211"
