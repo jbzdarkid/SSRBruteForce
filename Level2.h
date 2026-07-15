@@ -28,13 +28,15 @@ private:
   // are advanced -- by the planners (push/carry) then the reaction passes (Settle/CookMoved/DoubleMove) -- entirely off
   // to the side, so the live _stephen/_sausages stay untouched until the single Commit at the very end. |mask| marks
   // which sausages this move shifted; |doubleMoveMask|/|doubleMoveDir| record double-movers that owe one more tumble
-  // (consumed by DoubleMove); |rotating| is the one input the handler sets, when the press is a turn, so the carry
+  // (consumed by DoubleMove); |preCookedMask| marks sausages already browned inline (a spear-drag onto a grill) so
+  // CookMoved skips them; |rotating| is the one input the handler sets, when the press is a turn, so the carry
   // decision can treat Stephen's body as a wall.
   struct MovePlan {
     Stephen stephen;
     Sausage sausages[NUM_SAUSAGES];
     u16 mask = 0;
     u16 doubleMoveMask = 0;
+    u16 preCookedMask = 0;
     Direction doubleMoveDir[NUM_SAUSAGES] = {};
     bool rotating = false;
   };
@@ -46,6 +48,12 @@ private:
   // The single mutation point of a Move: copy the fully-resolved plan (Stephen's pose + every sausage) into the live
   // game state. Reached only once every stage has succeeded, so it is unconditional -- there is nothing to roll back.
   void Commit(const MovePlan& plan);
+
+  // The shared reaction tail (stages 5-7 + commit) for every motion that plans one rigid step into |plan| and then lets
+  // the world settle: MarkDoubleMoves -> Settle -> CookMoved -> DoubleMove -> Commit, reading the live _sausages/_stephen
+  // as the pre-move layout. Returns false (refusing the move) if a sausage falls out of the world or would burn. The
+  // log-roll and ladder paths, which interleave their own fix-ups with these passes, do NOT use this.
+  bool ReactAndCommit(MovePlan& plan);
 
   // GetSausage against the plan's working tableau (not the live, pre-move _sausages): the index of the sausage occupying
   // (x,y,z) in |plan.sausages|, or -1. Used by the reaction passes, which must see post-motion positions.
@@ -95,6 +103,12 @@ private:
 
   // The mask of |base| plus every sausage stacked transitively on top of it -- a rigid tower the fork carries.
   u16 CarriedMask(s8 base) const;
+
+  // The mask of |base| plus every sausage SQUARELY stacked on it -- one whose BOTH ends rest on stack members
+  // (transitively). This is the rigid unit that rides without rolling (a head hat and anything squarely stacked on it);
+  // a cantilevered rider (only one end on the stack) is excluded, so it rolls when carried across its axis. Returns 0
+  // for |base| == -1. Contrast CarriedMask, which grows through EITHER end (everything that rides along, rigid or not).
+  u16 FullySupportedStack(s8 base) const;
 
   // Step Stephen one cell in |dir| while keeping his facing, as part of a ladder climb -- either OFF the top of a ladder
   // onto a ledge (|ladderMotion| false: the body needs footing), or OUT over a ladder at the start of a descent

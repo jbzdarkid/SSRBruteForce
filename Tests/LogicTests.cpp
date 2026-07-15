@@ -826,6 +826,49 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 2, Sausage::None});   // fork-hat rode the roll west (slides along its axis)
   }
 
+  // Log roll carrying a fork-tip sausage that ITSELF has a rider stacked on it. The whole fork-borne stack rides west
+  // with the fork; sliding along the (horizontal) axis, nothing rolls. Level2's log-roll used to translate only the
+  // single fork-hat, orphaning the rider stacked on it.
+  MAKE_SYMMETRICAL_TEST(LogRollCarriesForkHatRider) {
+    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+      "        "
+      "        "
+      "  _____ "
+      "  _____ "
+      "        "
+      "        ",
+      Stephen{5, 3, 1, Left}, {},
+      { Sausage{5, 2, 5, 3, 0}, Sausage{3, 3, 4, 3, 2}, Sausage{3, 3, 4, 3, 3} }));
+    level.AssertPosition(5, 3, Left);
+    level.AssertSausage({3, 3, 4, 3, 2, Sausage::None}); // fork-hat
+    level.AssertSausage({3, 3, 4, 3, 3, Sausage::None}); // rider stacked on the fork-hat
+    level.AssertMoveSucceeds(Right);                     // press east -> log rolls west, Stephen rides
+    level.AssertPosition(4, 3, Left);
+    level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
+    level.AssertSausage({2, 3, 3, 3, 2, Sausage::None});   // fork-hat slid west
+    level.AssertSausage({2, 3, 3, 3, 3, Sausage::None});   // rider rode west with the fork-hat
+  }
+
+  // Log roll carrying a fork-tip sausage oriented ACROSS the roll direction: being fork-borne (not a rigid head hat),
+  // it rolls as it rides. Level2's log-roll used to translate the fork-hat without ever flipping it to its rolled face.
+  MAKE_SYMMETRICAL_TEST(LogRollForkHatRollsAcrossAxis) {
+    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+      "        "
+      "        "
+      "  _____ "
+      "  _____ "
+      "        "
+      "        ",
+      Stephen{5, 3, 1, Left}, {},
+      { Sausage{5, 2, 5, 3, 0}, Sausage{4, 3, 4, 4, 2}, Sausage{2, 2, 3, 2, 0} }));
+    level.AssertPosition(5, 3, Left);
+    level.AssertSausage({4, 3, 4, 4, 2, Sausage::None});   // vertical fork-hat balanced on the fork tip
+    level.AssertMoveSucceeds(Right);                       // press east -> log rolls west, Stephen rides
+    level.AssertPosition(4, 3, Left);
+    level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
+    level.AssertSausage({3, 3, 3, 4, 2, Sausage::Rolled}); // fork-hat rode west ACROSS its axis -> it rolled
+  }
+
   // 3-11 Cold Terrace (DiffEngines): Stephen is speared into a horizontal sausage to his west and stands on a Up-ladder.
   // Pressing up climbs a rung, then steps off north -- but that step would ride the rigidly-speared sausage north into a
   // Wall2, which it can't enter, so the reference refuses the whole move. Level2 used to leave the speared sausage
@@ -985,6 +1028,30 @@ TEST_CLASS(OneOffTests) {
     level.AssertPosition(6, 4, Left);
     level.AssertSausage({6, 3, 6, 4, 0, Sausage::Rolled}); // support rolled east under him
     level.AssertSausage({6, 4, 7, 4, 2, Sausage::None});   // head-hat slid east with him
+  }
+
+  // Log roll carrying a head-hat that ITSELF has a rider squarely stacked on it (both ends resting on the hat). The
+  // whole rigid hat stack rides one cell east with Stephen -- the reference carries the entire stack (MoveThroughSpace's
+  // hatStack), so the rider on top must ride too. Level2's log-roll used to translate only the single head-hat sausage,
+  // orphaning any rider stacked on it a cell behind (and now floating).
+  MAKE_SYMMETRICAL_TEST(LogRollCarriesHeadHatRider) {
+    TestSymmetryHelper level(symmetry, LevelType(11, 9, "arena",
+      "___________"
+      "___________"
+      "___________"
+      "___________"
+      "___________"
+      "___________"
+      "___________"
+      "___________"
+      "___________",
+      Stephen{5, 4, 1, Left}, {},
+      { Sausage{5, 3, 5, 4, 0}, Sausage{5, 4, 6, 4, 2}, Sausage{5, 4, 6, 4, 3} }));
+    level.AssertMoveSucceeds(Left);                        // press across the support -> log-roll east, riding the sausage
+    level.AssertPosition(6, 4, Left);
+    level.AssertSausage({6, 3, 6, 4, 0, Sausage::Rolled}); // support rolled east under him
+    level.AssertSausage({6, 4, 7, 4, 2, Sausage::None});   // head-hat slid east with him
+    level.AssertSausage({6, 4, 7, 4, 3, Sausage::None});   // rider on the head-hat rode east rigidly too
   }
 
   // 4-1 Wretch's Retreat (leading bothAcceptDiffer divergence): a horizontal base sausage carries a vertical rider on
