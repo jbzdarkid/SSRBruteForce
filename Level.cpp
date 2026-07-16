@@ -585,7 +585,10 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   // half rested on another sausage (4-1 move 87), _hatFarHalfOnSausage keeps the fork disqualifying.
   bool forkMayBeIgnored = stephenIsRotating && !_hatFarHalfOnSausage;
   if ((thisSupportIsStephen && (!otherSupportIsSausage || otherSausageForkDragged) && (!otherSupportIsFork || forkMayBeIgnored))
-      || (otherSupportIsStephen && !thisSupportIsSausage && (!thisSupportIsFork || forkMayBeIgnored))) {
+      || (otherSupportIsStephen && (!thisSupportIsSausage || data.movedSausages.Contains(GetSausage(x, y, z))) && (!thisSupportIsFork || forkMayBeIgnored))) {
+    // A hat whose non-Stephen end rests on a MOVING sausage (it slides out from under this turn) is still Stephen's head
+    // hat -- his head is the real static support, so it rides rigidly, not rolled (3-5 Cold Cliff: the hat bridges his
+    // head and the mid the log carries away).
     data.sausageHat = sausageNo;
   }
 
@@ -615,8 +618,13 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
   // Carry-prevention only (the double-move logic below keeps the original *ForkInSausage notion).
   bool thisSupportIsMovingSausage  = thisSupportIsSausage  && data.movedSausages.Contains(GetSausage(x, y, z));
   bool otherSupportIsMovingSausage = otherSupportIsSausage && data.movedSausages.Contains(otherSausageNo);
-  bool thisForkSupports  = thisSupportIsFork  && (!thisForkInSausage  || (forkLeftBehind(x, y)           && !otherSupportIsMovingSausage));
-  bool otherForkSupports = otherSupportIsFork && (!otherForkInSausage || (forkLeftBehind(otherX, otherY) && !thisSupportIsMovingSausage));
+  // The fork catches the rider only when it sits under the rider's LEADING end in the roll direction. A rider whose
+  // free end points the SAME way the base rolls tumbles AWAY from the fork and double-rolls off, rather than being held
+  // (3-5 Cold Cliff move 27). Only a fork under the leading end (the rider tumbling INTO it) holds it put.
+  bool thisEndLeads  = (x * fdx + y * fdy) >= (otherX * fdx + otherY * fdy);
+  bool otherEndLeads = (otherX * fdx + otherY * fdy) >= (x * fdx + y * fdy);
+  bool thisForkSupports  = thisSupportIsFork  && (!thisForkInSausage  || (forkLeftBehind(x, y)           && !otherSupportIsMovingSausage && thisEndLeads));
+  bool otherForkSupports = otherSupportIsFork && (!otherForkInSausage || (forkLeftBehind(otherX, otherY) && !thisSupportIsMovingSausage && otherEndLeads));
   if (stephenIsRotating && _stephen.HasFork() && (thisForkSupports || otherForkSupports)) return false;
   if (otherSupportIsFork && !_stephen.HasFork() && !data.pushedFork) return false; // Disconnected forks act like a wall when not moving
 
@@ -642,6 +650,15 @@ bool Level::IsSausageCarried(s8 x, s8 y, s8 z, Direction dir, bool stephenIsRota
     // rigidly, exactly as a sausage on his head does.) The head hat is the caller here, so |x,y,z| is its cell.
     // (4-5 Crunchy Leaves: a rider on the head hat rides one cell; it does not double-move and drop to the floor.)
     if (data.sausageHat != -1 && GetSausage(x, y, z) == data.sausageHat) canDoubleMove = false;
+    // A wall or sausage directly ABOVE the rider pins it: the extra tumble needs clear space overhead to roll up and
+    // over, so a tile above cancels the double-move and it shifts only the one cell (3-5 Cold Cliff: a head hat sits on
+    // the mid sausage as the log rolls out from under it, so the mid moves once, not twice).
+    auto blockedAbove = [&](s8 ex, s8 ey) -> bool {
+      if (IsWall(ex, ey, sausage.z + 1)) return true;
+      s8 above = GetSausage(ex, ey, sausage.z + 1);
+      return above != -1 && above != sausageNo;
+    };
+    if (blockedAbove(sausage.x1, sausage.y1) || blockedAbove(sausage.x2, sausage.y2)) canDoubleMove = false;
   }
 
   // Preconditions for double-move were satisfied, i.e. not being supported by stephen or his fork.

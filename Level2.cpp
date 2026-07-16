@@ -247,12 +247,17 @@ bool Level2::HandleLogRolling(Direction dir, bool& handled) {
   // Stephen" but never relocated it, so it's still at its pre-move footprint here and we own its actual translation.
   u16 headCarried = 0;
   if (headHat != -1 && headHat != speared) {
-    const Sausage& hat = plan.sausages[headHat];
+    const Sausage& hat = _sausages[headHat]; // the pre-move footprint: the log's push chain may have already shifted
+                                             // plan.sausages[headHat] (its far end rode the mid), which we now redo rigidly
     s8 heightDelta = plan.stephen.z - _stephen.z;
     bool wallBlocked = IsWall(hat.x1 + dx, hat.y1 + dy, hat.z + heightDelta) || IsWall(hat.x2 + dx, hat.y2 + dy, hat.z + heightDelta);
     bool firstOnHead = (hat.x1 == _stephen.x && hat.y1 == _stephen.y);
     s8 farX = firstOnHead ? hat.x2 : hat.x1, farY = firstOnHead ? hat.y2 : hat.y1;
-    bool anchored = IsWall(farX, farY, hat.z - 1) || GetSausage(farX, farY, hat.z - 1) != -1;
+    // Anchored only by a NON-MOVING support: a wall, or a sausage that isn't itself moving this turn. A far end resting
+    // on a sausage that rolls/slides away (the mid, carried by the log) does NOT anchor -- the hat rides Stephen rigidly
+    // (3-5 Cold Cliff: the hat bridges Stephen's head and the mid, so it moves one cell with him, no roll).
+    s8 farBelow = GetSausage(farX, farY, hat.z - 1);
+    bool anchored = IsWall(farX, farY, hat.z - 1) || (farBelow != -1 && !(plan.mask & (1 << farBelow)));
     if (!wallBlocked && !anchored) {
       // The head hat AND everything stacked on it rides by Stephen's total displacement. The hat and any SQUARELY
       // stacked rider ride rigidly; a CANTILEVERED rider rolls across its own axis (matching the reference's hatStack).
@@ -261,10 +266,12 @@ bool Level2::HandleLogRolling(Direction dir, bool& handled) {
       headCarried = stack;
       for (int i = 0; i < _sausages.Size(); i++) {
         if (!(stack & (1 << i))) continue;
-        Sausage& s = plan.sausages[i];
+        Sausage s = _sausages[i]; // rebuild from the pre-move footprint, discarding any push-chain carry that grabbed it
         s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; s.z += heightDelta;
         if (!(rigid & (1 << i)) && (s.IsHorizontal() ? (dy != 0) : (dx != 0))) s.flags ^= Sausage::Rolled;
+        plan.sausages[i] = s;
         movedMask |= (1 << i);
+        plan.mask |= (1 << i); // also record in plan.mask so the second MarkDoubleMoves considers this carried sausage
       }
     }
   }
@@ -287,13 +294,14 @@ bool Level2::HandleLogRolling(Direction dir, bool& handled) {
         s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; s.z += heightDelta;
         if (s.IsHorizontal() ? (dy != 0) : (dx != 0)) s.flags ^= Sausage::Rolled; // fork-borne -> rolls across its axis
         movedMask |= (1 << i);
+        plan.mask |= (1 << i); // also record in plan.mask so the second MarkDoubleMoves considers this carried sausage
       }
     }
   }
   // The hat carries above ran AFTER the first MarkDoubleMoves (they need Stephen's post-drop pose), so a sausage left
   // balanced across a hat rider that just rolled hasn't been checked for its extra tumble. Re-run the detector now that
-  // the hats are placed; it skips already-flagged sausages, adding only these hat-induced double-movers (needs 4+
-  // sausages to arise -- a rolled cantilevered hat rider with something aligned on top -- so it's inert at NUM_SAUSAGES=3).
+  // the hats are placed (they were recorded into plan.mask above); it skips already-flagged sausages, adding only these
+  // hat-induced double-movers (e.g. an aligned rider on a rolled fork-hat).
   MarkDoubleMoves(plan, _sausages.begin());
   if (!CookMoved(plan, movedMask, plan.doubleMoveMask)) return false;
   if (!DoubleMove(plan)) return false;
@@ -984,6 +992,11 @@ bool Level2::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePla
       s8 base = GetSausage(ex, ey, orig.z - 1);            // pre-move sausage in the fork's cell
       if (base == -1) return true;                          // bare fork -> it alone holds the rider
       bool leftBehind = (plan.mask & (1 << base)) && !_sausages[base].IsAt(ex - dx, ey - dy, orig.z - 1);
+      // The fork catches the rider only when it sits under the rider's LEADING end in the roll direction. A rider whose
+      // free end points the SAME way as the base's roll tumbles AWAY from the fork -- the fork is behind it, so it
+      // double-rolls off instead of being held (3-5 Cold Cliff move 27). Only when the fork is under the leading end
+      // (the rider tumbling INTO it) does it stay put.
+      if (leftBehind && (s8)(ex * dx + ey * dy) < (s8)(ox * dx + oy * dy)) return false;
       s8 otherBase = GetSausage(ox, oy, orig.z - 1);        // pre-move sausage under the rider's OTHER end
       bool otherOnMoving = otherBase != -1 && (plan.mask & (1 << otherBase));
       return leftBehind && !otherOnMoving;
@@ -1178,6 +1191,15 @@ void Level2::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
           && GetSausage(ex, ey, orig.z - 1) == -1;
     };
     if (heldEnd(orig.x1, orig.y1) || heldEnd(orig.x2, orig.y2)) continue;
+    // A wall or sausage directly ABOVE the rider pins it: the extra tumble needs clear space overhead to roll up and
+    // over, so a tile above cancels the double-move and it shifts only the one cell (3-5 Cold Cliff: a head hat sits on
+    // the mid sausage as the log rolls out from under it, so the mid moves once, not twice).
+    auto blockedAbove = [&](s8 ex, s8 ey) -> bool {
+      if (IsWall(ex, ey, orig.z + 1)) return true;
+      s8 above = GetSausage(ex, ey, orig.z + 1);
+      return above != -1 && above != rider;
+    };
+    if (blockedAbove(orig.x1, orig.y1) || blockedAbove(orig.x2, orig.y2)) continue;
     // The extra tumble is imparted only by a PERPENDICULAR base that actually ROLLED under it; a parallel base, or one
     // that merely slid, imparts none. Read the base and its roll (Rolled flag flipped) from the pre-move layout.
     bool baseRolled = false, onParallel = false;

@@ -58,6 +58,38 @@ bool IsEscarpmentRotationDrop(const LevelData* level) {
   return hat && base;
 }
 
+// winOverride goal for the "gap 2" log-roll head-hat divergence. Detects the pre-roll pose: Stephen stands ON a sausage
+// (the log), carries a head-hat, and that hat's FAR half (the end not over his head) rests on a THIRD sausage which is
+// itself riding the log. When he then presses ACROSS the log (a log-roll), the log rolls and carries that third sausage
+// out from under the hat's far end -- and the reference flings the head-hat off Stephen onto the moving sausage while
+// Level2 keeps it on his head. Point winOverride here, |findpath| to this pose, then press across the log to reproduce.
+bool IsLogRollHatDivergence(const LevelData* level) {
+  const Stephen& man = level->GetStephen();
+  const Vector<Sausage>& sausages = level->Sausages();
+  s8 logNo = level->GetSausage(man.x, man.y, man.z - 1);   // Stephen must be standing on a sausage
+  if (logNo == -1) return false;
+  s8 hatNo = level->GetSausage(man.x, man.y, man.z + 1);   // ...with a head-hat above him
+  if (hatNo == -1) return false;
+  const Sausage& log = sausages[logNo];
+  const Sausage& hat = sausages[hatNo];
+  // A log-roll only fires when Stephen faces ALONG the log's long axis and presses across it.
+  bool canRoll = (log.IsHorizontal() && (man.dir == Up || man.dir == Down))
+              || (log.IsVertical()   && (man.dir == Left || man.dir == Right));
+  if (!canRoll) return false;
+  // The hat's far half is the end that isn't over Stephen's head; it must actually bridge off that cell.
+  bool firstOnHead = (hat.x1 == man.x && hat.y1 == man.y);
+  s8 farX = firstOnHead ? hat.x2 : hat.x1;
+  s8 farY = firstOnHead ? hat.y2 : hat.y1;
+  if (farX == man.x && farY == man.y) return false;        // hat sits squarely on the head (no cantilever) -> no divergence
+  s8 midNo = level->GetSausage(farX, farY, man.z);         // the sausage under the hat's far end (hat.z-1 == man.z)
+  if (midNo == -1 || midNo == logNo || midNo == hatNo) return false;
+  // The "mid" must ride the LOG (rest on one of the log's ends) so that the roll carries it away this turn.
+  const Sausage& mid = sausages[midNo];
+  bool midOnLog = level->GetSausage(mid.x1, mid.y1, mid.z - 1) == logNo
+               || level->GetSausage(mid.x2, mid.y2, mid.z - 1) == logNo;
+  return midOnLog;
+}
+
 // Print Stephen's pose and every sausage's footprint/flags for a captured state -- the shared per-state dump used by
 // both the demo replay (TestLevel) and the exhaustive engine diff (DiffEngines).
 void PrintStateDetail(const State& state) {
@@ -209,7 +241,7 @@ int main(int argc, char* argv[]) {
         // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Build the
         // reference engine (no /DUSE_LEVEL2) so the path is reference-legal. Swap the goal predicate for the scenario
         // being reproduced.
-        test->winOverride = &IsEscarpmentRotationDrop;
+        test->winOverride = &IsLogRollHatDivergence;
         bool ok = SolveLevel(test);
         printf(ok ? "Wrote solved.dem: shortest path to the alt win state.\n" : "No such state reachable.\n");
         return ok ? 0 : 5;
