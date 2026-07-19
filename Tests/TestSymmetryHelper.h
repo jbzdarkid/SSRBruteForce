@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CppUnitTest.h"
-#include "Level.h"
+#include "Level2.h"
+#include "State.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -21,11 +23,9 @@ extern "C" __declspec(dllimport) void* __stdcall GetConsoleWindow(void);
 extern "C" __declspec(dllimport) int   __stdcall ShowWindow(void* hWnd, int nCmdShow);
 extern "C" __declspec(dllimport) int   __stdcall SetForegroundWindow(void* hWnd);
 
-using LevelType = Level;
-
 class TestSymmetryHelper {
   std::function<Direction(Direction)> _sym;
-  LevelType _level;
+  Level _level;
   int _width;  // logical (pre-transform) dims -- Transform always maps in this frame
   int _height;
   Sausage _expected{}; // the test's tracked sausage, in the logical frame (set by AssertSausage)
@@ -66,7 +66,7 @@ class TestSymmetryHelper {
   }
 
 public:
-  TestSymmetryHelper(const std::function<Direction(Direction)>& sym, LevelType&& level) : _sym(sym), _level(std::move(level)) {
+  TestSymmetryHelper(const std::function<Direction(Direction)>& sym, Level&& level) : _sym(sym), _level(std::move(level)) {
     _width = _level._width;
     _height = _level._height;
 
@@ -121,7 +121,7 @@ public:
     // DiffEngines do. Notably this sets the reference's _sausageSpeared, so a level that STARTS with the fork embedded
     // in a sausage is recognised as speared (otherwise the first move would misbehave).
     State s = _level.GetState();
-    _level.SetState(&s);
+    _level.SetState(s);
   }
 
   void AssertMoveSucceeds(Direction dir) {
@@ -131,7 +131,7 @@ public:
   void AssertMoveFails(Direction dir) {
     State before = _level.GetState();
     Assert::IsFalse(_level.Move(_sym(dir)));
-    _level.SetState(&before);
+    _level.SetState(before);
   }
 
   void AssertPosition(s8 x, s8 y, Direction dir) {
@@ -252,7 +252,7 @@ public:
       if (ch == 'z' || ch == 'Z') {
         if (undoHistory.Size() > 1) {
           undoHistory.Pop();
-          _level.SetState(&undoHistory[undoHistory.Size() - 1]);
+          _level.SetState(undoHistory[undoHistory.Size() - 1]);
           prevSausages = _level._sausages.Copy();
           if (!moves.empty()) {
             moves.pop_back();
@@ -314,7 +314,7 @@ public:
         undoHistory.Push(_level.GetState());
       } else {
         chunk += emit("    level.AssertMoveFails(", DIRS[dir], ");\n");
-        _level.SetState(&undoHistory[undoHistory.Size() - 1]); // undo the rejected move's side-effects
+        _level.SetState(undoHistory[undoHistory.Size() - 1]); // undo the rejected move's side-effects
         // Keep undoHistory in lockstep with |moves| (one entry per attempt) so a later 'z' rewinds
         // exactly one move. Without this, undoing a rejected move over-pops undoHistory and silently
         // rewinds _level an extra real step, corrupting every later assert.

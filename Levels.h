@@ -1,16 +1,6 @@
 #pragma once
 #include "Level2.h"
 
-// The diff-engines / Level2 shadow build (compile with /DUSE_LEVEL2) swaps every level object -- and, through the
-// Level* signatures in Main.cpp, the solver and DiffEngines -- over to Level2, while keeping the reference engine
-// reachable as BaseLevel. BaseLevel is captured here BEFORE the remap, so it still names the reference Level (Level2's
-// base) even after Level has been redefined to Level2 below. Without USE_LEVEL2 this is a no-op and Level stays the
-// reference engine.
-using BaseLevel = Level;
-#ifdef USE_LEVEL2
-#define Level Level2
-#endif
-
 // A sausage whose BOTH ends lie outside the playfield has rolled entirely off the map -- an unwinnable, lost state. It
 // also drives a class of engine divergences: the reference keeps such a sausage floating over the void (its gravity
 // only re-checks sausages a move actually disturbed, so an unmoved off-grid stack is never dropped), whereas Level2
@@ -578,12 +568,6 @@ Level CrunchyLeaves = [] {
     {},
     {Ladder{2, 4, 2, Up}},
     {Sausage{7, 1, 7, 2, 1}});
-  crunchyLeaves.heuristic = [](const Level* level) {
-    // Prune the reference's physics-quirk subtrees so the survey/solver ignore states correct play never reaches:
-    // a sausage rolled entirely off the map, one the reference's lazy gravity left floating, or two overlapping after
-    // a buggy carry. All are unwinnable reference-only artifacts (the sanctioned "reject reference quirks" path).
-    return !HasOffGridSausage(level) && !level->HasFloatingSausage() && !level->HasOverlappingSausages();
-  };
   return crunchyLeaves;
 }();
 

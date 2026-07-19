@@ -1,5 +1,6 @@
 #pragma once
-#include "Level.h"
+#include "LevelData.h"
+#include "State.h"
 
 // A from-scratch reimplementation of the move pipeline, following the staged "game-world" model in move-stages.md:
 // classify the input, prove the whole motion is legal, move everything, then let the world react.
@@ -10,16 +11,43 @@
 // left out until it has one. Currently handled: walking (forward and backward), turning in place, and pushing a
 // single sausage (slide/roll), around walls, grills, and the void at the edge of the playfield
 // (BasicLocomotion, SingleWall, SingleGrill, SingleSausage).
-struct Level2 : public Level {
-  using Level::Level; // Inherit the constructors
+struct Level : public LevelData {
+  using LevelData::LevelData; // Inherit the constructor
+
+  State GetState() const;
+  void SetState(const State& state);
 
   // Takes a player input (one of the 4 cardinal directions) and simulates the game's response. Returns false if the
   // move is refused outright (a wall or the void blocks it). A move the game accepts returns true even when nothing
   // ends up moving -- a grill bounces Stephen back, a fork bonks against a wall mid-turn.
   bool Move(Direction dir);
 
+  // Feature mask of which mechanics fired during the most recent Move -- used by the explorer's novelty search to
+  // recognize "distinctive" moves (and their interactions). Set in Move() and the reaction passes; mutable so the
+  // const planning helpers can OR into it.
+  enum Feat : u32 {
+    F_LOGROLL     = 1u << 0,
+    F_LADDER_UP   = 1u << 1,
+    F_LADDER_DOWN = 1u << 2,
+    F_SPEARMOVE   = 1u << 3,
+    F_STEP        = 1u << 4,
+    F_ROTATE      = 1u << 5,
+    F_BURNED      = 1u << 6,
+    F_SPEAR       = 1u << 7,
+    F_UNSPEAR     = 1u << 8,
+    F_DOUBLEMOVE  = 1u << 9,
+    F_DROP        = 1u << 10,
+    F_COOK        = 1u << 11,
+    F_ROTATE_BONK = 1u << 12,
+    F_SPEARDRAG   = 1u << 13,
+    F_HATCARRY    = 1u << 14,
+    F_HATROT      = 1u << 15,
+    F_PUSHCHAIN   = 1u << 16,
+  };
+  mutable u32 _feat = 0;
+
   // Level-specific heuristic which returns false from losing states to reduce the total state count.
-  bool (*heuristic)(const Level2*) = nullptr;
+  bool (*heuristic)(const Level*) = nullptr;
 
 private:
   // A move's entire planning scratch AND its working tableau -- created fresh on the stack by each leaf handler (see
@@ -37,6 +65,7 @@ private:
     u16 mask = 0;
     u16 doubleMoveMask = 0;
     u16 preCookedMask = 0;
+    u16 rigidLoad = 0; // sausages moving as ONE rigid load with Stephen this move (speared+riders, head/fork hat+stack); co-movers must never be treated as obstacles to each other
     Direction doubleMoveDir[NUM_SAUSAGES] = {};
     bool rotating = false;
   };
@@ -48,6 +77,11 @@ private:
   // The single mutation point of a Move: copy the fully-resolved plan (Stephen's pose + every sausage) into the live
   // game state. Reached only once every stage has succeeded, so it is unconditional -- there is nothing to roll back.
   void Commit(const MovePlan& plan);
+
+  // True if any two sausages share a cell in the plan's final tableau. A valid game state never overlaps sausages, so a
+  // planned overlap means a carry lapped onto a co-mover that didn't actually vacate (an over-broad rigidLoad member);
+  // the reaction tail refuses such a move rather than committing an impossible state.
+  bool PlanHasOverlap(const MovePlan& plan) const;
 
   // The shared reaction tail (stages 5-7 + commit) for every motion that plans one rigid step into |plan| and then lets
   // the world settle: MarkDoubleMoves -> Settle -> CookMoved -> DoubleMove -> Commit, reading the live _sausages/_stephen
@@ -136,7 +170,11 @@ private:
   // sausages stacked on it. A carried sausage whose destination is a wall is left where it is (the parent move still
   // proceeds); the later Settle pass drops it if its support has gone. Motion only -- gravity and cooking come after.
   // Double-move is NOT decided here; the central MarkDoubleMoves detector resolves it post-hoc. A turn (plan.rotating) treats Stephen's body as a wall.
-  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr) const;
+  // The set of sausages that ride |seed| this move -- |seed| plus everything resting (transitively) on it. Used to build
+  // the rigid co-moving load (move-stages.md: "motion is one simultaneous event") so carries never ram members of the
+  // same load into each other.
+  u16 RidingLoad(s8 seed) const;
+  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr, bool rigid = false) const;
 
   // Stage 5 (gravity). Drop any disturbed sausage in |plan|'s working tableau whose ends have lost their support,
   // bottom-up to a fixed point. Only sausages this move touched -- those in |movedMask|, plus any that were stacked on

@@ -1,6 +1,30 @@
 #include "Level2.h"
 
-bool Level2::Move(Direction dir) {
+
+State Level::GetState() const {
+  State s{_stephen};
+  assert(sizeof(s.sausages) / sizeof(Sausage) == _sausages.Size());
+#if 0 // Sorting is proven to work and also greatly reduces states in complex levels.
+  _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
+#else
+  _sausages.SortedCopyIntoArray(s.sausages, sizeof(s.sausages), [](const Sausage& a, const Sausage& b) -> s8 {
+    if (a.x1 != b.x1) return a.x1 < b.x1;
+    if (a.y1 != b.y1) return a.y1 < b.y1;
+    if (a.x2 != b.x2) return a.x2 < b.x2;
+    if (a.y2 != b.y2) return a.y2 < b.y2;
+    if (a.z != b.z) return a.z < b.z;
+    return a.flags < b.flags;
+    });
+#endif
+  return s;
+}
+
+void Level::SetState(const State& state) {
+  _stephen = state.stephen;
+  _sausages.CopyFromArray(state.sausages, sizeof(state.sausages));
+}
+
+bool Level::Move(Direction dir) {
   bool handled = false;
   if (!HandleLogRolling(dir, handled)) return false;
   if (!handled) {
@@ -23,20 +47,22 @@ bool Level2::Move(Direction dir) {
   return true;
 }
 
-bool Level2::HandleBurnedStep(Direction dir, bool& handled) {
+bool Level::HandleBurnedStep(Direction dir, bool& handled) {
   // Stage 8 (outcomes): a body that comes to rest on a grill recoils straight back the way it came, as its own move.
   // Applied commonly so EVERY motion (step, ladder climb/descent, log-roll, spear) bounces consistently.
   if (!IsGrill(_stephen.x, _stephen.y, _stephen.z)) return true;
   handled = true;
+  _feat |= F_BURNED;
   return Move(Inverse(dir));
 }
 
-bool Level2::HandleSpearedMotion(Direction dir, bool& handled) {
+bool Level::HandleSpearedMotion(Direction dir, bool& handled) {
   // If the fork is lodged in a sausage, Stephen drags it rigidly; otherwise leave |handled| false for the step/turn
   // classification. The speared sausage is whatever the fork currently occupies.
   s8 sausageNo = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
   if (sausageNo == -1) return true;
   handled = true;
+  _feat |= F_SPEARMOVE;
 
   s8 dx, dy;
   Delta(dir, dx, dy);
@@ -58,8 +84,15 @@ bool Level2::HandleSpearedMotion(Direction dir, bool& handled) {
   // backing away unspears it (the fork pulls free, leaving the sausage put). Driving it into the block any other way
   // is refused.
   MovePlan plan = NewPlan();
+
+  // Everything Stephen's move carries as one rigid load -- the speared sausage and its riders, plus a head hat and its
+  // stack -- translates by the SAME vector, so members must never treat each other as obstacles. Mark the whole load up
+  // front (order-independent) so a carry that reaches a co-mover's cell first steps over it instead of ramming and
+  // rolling it (3-2 Cold Finger: a head hat and a speared-drag rider swap cells). move-stages.md: motion is one event.
+  plan.rigidLoad = RidingLoad(sausageNo) | RidingLoad(GetSausage(_stephen.x, _stephen.y, z + 1));
   bool unspear = SausageBlocked(sausageNo, dir);
   if (unspear) {
+    _feat |= F_UNSPEAR;
     if (dir != Inverse(_stephen.dir)) return false;
     // Pulling free is a backward step, so the body still pushes any sausage at its destination (the speared one
     // stays put). If that sausage can't move, the move is refused.
@@ -107,8 +140,10 @@ bool Level2::HandleSpearedMotion(Direction dir, bool& handled) {
     // The sausage needs no ground -- the fork holds it up, so it can ride out over the void. CookMoved browns it later.
     plan.sausages[sausageNo] = moved;
 
-    // A sausage riding on top of the speared one is carried along the drag (and rolls across its own axis). Use
-    // Stephen's post-move pose so the body/fork test sees where he ends up.
+    // A sausage riding on top of the speared one is carried along the drag. It's held up by the fork-borne stack (whose
+    // base is dragged rigidly, never rolling), so like the real game it inherits that zero torsion and does NOT roll --
+    // rolling is reserved for a sausage sliding along the ground (3-2 Cold Finger). Use Stephen's post-move pose so the
+    // body/fork test sees where he ends up.
     {
       const Sausage& spearedSausage = _sausages[sausageNo];
       Stephen mover = _stephen;
@@ -119,9 +154,9 @@ bool Level2::HandleSpearedMotion(Direction dir, bool& handled) {
       s8 aboveA = GetSausage(spearedSausage.x1, spearedSausage.y1, spearedSausage.z + 1);
       s8 aboveB = GetSausage(spearedSausage.x2, spearedSausage.y2, spearedSausage.z + 1);
       if (aboveA != -1 && aboveA != sausageNo && !(plan.mask & (1 << aboveA)))
-        if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, &mover)) return false;
+        if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, &mover, /*rigid=*/true)) return false;
       if (aboveB != -1 && aboveB != sausageNo && aboveB != aboveA && !(plan.mask & (1 << aboveB)))
-        if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, &mover)) return false;
+        if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, &mover, /*rigid=*/true)) return false;
     }
 
     // Stephen's body also shoulders aside any sausage standing where it steps, pushing it the same way.
@@ -162,7 +197,7 @@ bool Level2::HandleSpearedMotion(Direction dir, bool& handled) {
   return ReactAndCommit(plan);
 }
 
-bool Level2::HandleLogRolling(Direction dir, bool& handled) {
+bool Level::HandleLogRolling(Direction dir, bool& handled) {
   // Log rolling only applies when Stephen is standing directly on top of a sausage.
   s8 onSausage = GetSausage(_stephen.x, _stephen.y, _stephen.z - 1);
   if (onSausage == -1) return true;
@@ -181,6 +216,13 @@ bool Level2::HandleLogRolling(Direction dir, bool& handled) {
   // Roll the sausage (and anything it pushes) one cell. If it can't roll there -- a wall, or out of the world -- this
   // isn't a legal log roll; fall through so the rest of the pipeline can refuse or reinterpret the press.
   MovePlan plan = NewPlan();
+
+  // The log, everything riding it, Stephen's head/fork hats and any speared sausage all ride the roll as ONE rigid load
+  // (same translation), so they must never treat each other as obstacles (move-stages.md: motion is one event).
+  plan.rigidLoad = RidingLoad(onSausage) | RidingLoad(speared)
+                 | RidingLoad(GetSausage(_stephen.x, _stephen.y, _stephen.z + 1))
+                 | RidingLoad(_stephen.HasFork() ? GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ + 1) : (s8)-1);
+
   if (!PlanSausagePush(onSausage, roll, plan)) return true;
 
   // Stephen rides the roll: his body and fork translate one cell with the sausage. Neither may ride into a wall
@@ -305,12 +347,14 @@ bool Level2::HandleLogRolling(Direction dir, bool& handled) {
   MarkDoubleMoves(plan, _sausages.begin());
   if (!CookMoved(plan, movedMask, plan.doubleMoveMask)) return false;
   if (!DoubleMove(plan)) return false;
+  if (PlanHasOverlap(plan)) return false; // a carry produced an impossible two-in-one-cell state -> refuse
   Commit(plan);
   handled = true;
+  _feat |= F_LOGROLL;
   return true;
 }
 
-bool Level2::HandleLadderMotion(Direction dir, bool& handled) {
+bool Level::HandleLadderMotion(Direction dir, bool& handled) {
   // With a fork, a vertical (Up/Down) ladder is mounted by pressing up/down while facing sideways, and a horizontal
   // (Left/Right) ladder while facing up/down. Forkless, Stephen simply climbs the ladder he faces along.
   bool climb;
@@ -361,6 +405,7 @@ bool Level2::HandleLadderMotion(Direction dir, bool& handled) {
       if (!LiftStephen(+1, carriedMask, hatMask)) return false;
     if (!StepOffLadder(dir, carriedMask, false, hatMask, rollMask, speared)) return false;
     handled = true;
+    _feat |= F_LADDER_UP;
     return true;
   }
 
@@ -434,10 +479,11 @@ bool Level2::HandleLadderMotion(Direction dir, bool& handled) {
     if (!IsLadder(_stephen.x, _stephen.y, _stephen.z - 1, Inverse(dir))) return false; // ladder ran out mid-air
   }
   handled = true;
+  _feat |= F_LADDER_DOWN;
   return true;
 }
 
-bool Level2::LiftStephen(s8 dz, u16& carried, u16& hatMask) {
+bool Level::LiftStephen(s8 dz, u16& carried, u16& hatMask) {
   // The fork can't ram into a wall.
   s8 newForkZ = _stephen.forkZ + dz;
   if (IsWall(_stephen.forkX, _stephen.forkY, newForkZ)) return false;
@@ -479,7 +525,7 @@ bool Level2::LiftStephen(s8 dz, u16& carried, u16& hatMask) {
   return true;
 }
 
-bool Level2::LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask) {
+bool Level::LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask) {
   if (carried & (1 << sausageNo)) return true;
   const Sausage& s = _sausages[sausageNo];
   // The cells it rises into must be clear of walls, or the whole climb is refused.
@@ -496,7 +542,7 @@ bool Level2::LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask) {
   return true;
 }
 
-u16 Level2::CarriedMask(s8 base) const {
+u16 Level::CarriedMask(s8 base) const {
   if (base == -1) return 0;
   u16 mask = (1 << base);
   bool grew = true;
@@ -512,7 +558,7 @@ u16 Level2::CarriedMask(s8 base) const {
   return mask;
 }
 
-u16 Level2::FullySupportedStack(s8 base) const {
+u16 Level::FullySupportedStack(s8 base) const {
   if (base == -1) return 0;
   u16 stack = (u16)(1 << base);
   for (bool grew = true; grew; ) {
@@ -527,7 +573,7 @@ u16 Level2::FullySupportedStack(s8 base) const {
   return stack;
 }
 
-bool Level2::StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 hatMask, u16 rollMask, s8 speared) {
+bool Level::StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 hatMask, u16 rollMask, s8 speared) {
   s8 dx, dy;
   Delta(dir, dx, dy);
   s8 bodyX = _stephen.x + dx, bodyY = _stephen.y + dy, bodyZ = _stephen.z;
@@ -541,6 +587,7 @@ bool Level2::StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 ha
   // The fork (and body) shove any sausage standing where they land -- everything but the stack Stephen is carrying. Use
   // Stephen's post-step pose so a rider on a pushed sausage is judged against where he ends up.
   MovePlan plan = NewPlan();
+  plan.rigidLoad = carried; // the whole carried stack co-moves by one vector; a carry must never ram a co-mover (move-stages.md: motion is one event)
   Stephen mover = _stephen;
   mover.x = bodyX; mover.y = bodyY;
   mover.forkX = forkX; mover.forkY = forkY;
@@ -590,11 +637,12 @@ bool Level2::StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 ha
   return ReactAndCommit(plan);
 }
 
-bool Level2::HandleStepMotion(Direction dir, bool& handled) {
+bool Level::HandleStepMotion(Direction dir, bool& handled) {
   // A press along Stephen's facing axis is an ordinary walk (forward or backward); a perpendicular press is a turn, so
   // leave |handled| false and let HandleRotation take it.
   if (dir != _stephen.dir && dir != Inverse(_stephen.dir)) return true;
   handled = true;
+  _feat |= F_STEP;
 
   s8 dx, dy;
   Delta(dir, dx, dy);
@@ -615,6 +663,11 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
   // pushes one cell along. Plan the push now; commit it only at the end.
   s8 sausageNo = GetSausage(forward ? forkX : bodyX, forward ? forkY : bodyY, z);
   MovePlan plan = NewPlan();
+
+  // The head hat and fork hat (and their stacks) ride Stephen's step as ONE rigid load -- they translate by the same
+  // vector and must never treat each other as obstacles (move-stages.md: motion is one simultaneous event).
+  plan.rigidLoad = RidingLoad(GetSausage(_stephen.x, _stephen.y, z + 1)) | RidingLoad(GetSausage(_stephen.forkX, _stephen.forkY, z + 1));
+
   bool spear = false;
   // Where Stephen's body and fork end up. A carried sausage checks against this final pose to see whether his body or
   // fork ends up holding it (catching a falling sausage and cancelling a double-move).
@@ -627,6 +680,7 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
       // sausage spears it: the fork lodges in the sausage and Stephen steps onto its old cell -- unless his body bounces
       // off a grill (below), when the recoil drags the freshly-speared sausage back onto the grill.
       spear = true;
+      _feat |= F_SPEAR;
     } else {
       // Backing into a wall-blocked sausage is refused.
       return false;
@@ -665,6 +719,7 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
 
     if (dragOk) {
       spearDrag = true;
+      _feat |= F_SPEARDRAG;
       plan.preCookedMask |= (u16)(1 << sausageNo); // the base browned on the fork's grill above; don't re-cook it
       const Sausage& base = _sausages[sausageNo];
       s8 riderA = GetSausage(base.x1, base.y1, base.z + 1);
@@ -687,12 +742,15 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
     plan.stephen.y = bodyY;
     plan.stephen.forkX = forkX;
     plan.stephen.forkY = forkY;
-    // A sausage on Stephen's HEAD rides rigidly and never rolls; one on the FORK rolls when carried across its axis
-    // (3-7 Cold Plateau). The rigid hat stack is the head hat plus any sausage whose BOTH ends rest on it; a rider with
-    // only one end on the hat rolls (4-2 Toad's Folly).
+    // A sausage held up by Stephen -- on his HEAD or balanced on his bare fork tip -- rides rigidly and never rolls;
+    // rolling is reserved for a sausage sliding along the GROUND. (Reaching HandleStepMotion means the fork is un-speared,
+    // so a fork hat here always rests on the bare tip, not on a rolling base -- 3-5 Cold Cliff: it translates one cell
+    // without flipping.) The rigid stack is those hats plus any sausage whose BOTH ends rest on it; a rider with only one
+    // end on the stack still rolls (4-2 Toad's Folly).
     u16 rigidStack = 0;
-    if (headHat != -1) {
-      rigidStack = (u16)(1 << headHat);
+    if (headHat != -1) rigidStack |= (u16)(1 << headHat);
+    if (forkHat != -1) rigidStack |= (u16)(1 << forkHat);
+    if (rigidStack) {
       for (bool grew = true; grew; ) {
         grew = false;
         for (int i = 0; i < _sausages.Size(); i++) {
@@ -704,7 +762,7 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
       }
     }
     PlanHatCarry(headHat, dx, dy, dir, plan, rigidStack);
-    PlanHatCarry(forkHat, dx, dy, dir, plan, (u16)0); // fork-borne (and its riders) roll across their axis
+    PlanHatCarry(forkHat, dx, dy, dir, plan, rigidStack); // fork-tip hat is supported by Stephen -> rides rigidly, no roll
   } else if (headHat != -1) {
     // A grill bounce is a step immediately recoiled. The step carries the head hat one cell along the press; the recoil
     // then LEAVES it there if its far end just came to rest on a wall-top or non-moving sausage (3-3 Cold Escarpment),
@@ -742,15 +800,15 @@ bool Level2::HandleStepMotion(Direction dir, bool& handled) {
   return ReactAndCommit(plan);
 }
 
-bool Level2::HandleRotation(Direction dir, bool& handled) {
+bool Level::HandleRotation(Direction dir, bool& handled) {
   // A press perpendicular to Stephen's facing turns him in place; a press along his facing axis is a walk, so leave
   // |handled| false and let HandleStepMotion take it.
   if (dir == _stephen.dir || dir == Inverse(_stephen.dir)) return true;
   handled = true;
+  _feat |= F_ROTATE;
 
   MovePlan plan = NewPlan();
-  plan.rotating = true;
-  // The fork swings from its current cell to the perpendicular one; the corner it sweeps through is the diagonal
+  plan.rotating = true;  // The fork swings from its current cell to the perpendicular one; the corner it sweeps through is the diagonal
   // between them -- the fork's destination, offset back along the old facing.
   s8 dx, dy;
   Delta(dir, dx, dy);
@@ -809,7 +867,7 @@ bool Level2::HandleRotation(Direction dir, bool& handled) {
   return ReactAndCommit(plan);
 }
 
-void Level2::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const {
+void Level::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const {
   s8 headX = _stephen.x, headY = _stephen.y, z = _stephen.z;
   s8 hatNo = GetSausage(headX, headY, z + 1);
   if (hatNo == -1) return;
@@ -839,13 +897,19 @@ void Level2::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const 
     // A wall at a destination cell blocks the swing; so does one in the corner an end sweeps through (the cell diagonally
     // between its old and new spot = old + new - head). Either way the whole hat stays put. (3-14 Cold Frustration m101,
     // where the far half would sweep through a 2-tall Wall2's upper cell.)
-    if (IsWall(s.x1, s.y1, s.z) || IsWall(s.x2, s.y2, s.z)
-     || IsWall(ox1 + s.x1 - headX, oy1 + s.y1 - headY, s.z)
-     || IsWall(ox2 + s.x2 - headX, oy2 + s.y2 - headY, s.z)) return; // swing blocked -> leave the hat put
+    //
+    // A wall in a CORNER cell (the diagonal an end sweeps through, = old + new - head) blocks the swing before it even
+    // starts: the hat stays put and nothing is shoved (3-14 Cold Frustration m101). A wall only at a DESTINATION cell is
+    // different -- the sweep's FIRST leg still happens (shoving whatever sits in the corner), and only the landing is
+    // blocked, so the hat settles back put AFTER that corner shove, just as a fork's corner push lands even on a bonk
+    // (3-2 Cold Finger m42: the corner shove rolls a stacked sausage off the edge while the wall keeps the hat home).
+    if (IsWall(ox1 + s.x1 - headX, oy1 + s.y1 - headY, s.z)
+     || IsWall(ox2 + s.x2 - headX, oy2 + s.y2 - headY, s.z)) return; // a corner wall blocks the sweep -> hat stays put
+    bool destBlocked = IsWall(s.x1, s.y1, s.z) || IsWall(s.x2, s.y2, s.z);
 
     // The far end sweeps through a corner cell into its destination; a sausage sitting in either is shoved out of the
-    // way (corner along the sweep's first leg, destination along its second). A shove that can't happen leaves the hat
-    // put (4-2 move 81).
+    // way (corner along the sweep's first leg, destination along its second). The corner shove lands even when the
+    // destination is walled; a shove that can't happen leaves the hat put (4-2 move 81).
     if ((ox1 == headX && oy1 == headY) || (ox2 == headX && oy2 == headY)) {
       bool firstOnHead = (ox1 == headX && oy1 == headY);
       s8 oldFarX = firstOnHead ? ox2 : ox1, oldFarY = firstOnHead ? oy2 : oy1;
@@ -862,12 +926,13 @@ void Level2::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const 
         return PlanSausagePush(other, toDir(pdx, pdy), plan);
       };
       MovePlan snapshot = plan;
-      if (!shove(cornerX, cornerY, cornerX - oldFarX, cornerY - oldFarY)   // corner cell, first leg of the sweep
-       || !shove(newFarX, newFarY, newFarX - cornerX, newFarY - cornerY)) { // destination cell, second leg
+      if (!shove(cornerX, cornerY, cornerX - oldFarX, cornerY - oldFarY)                       // corner cell, first leg -- always
+       || (!destBlocked && !shove(newFarX, newFarY, newFarX - cornerX, newFarY - cornerY))) {  // destination, only if reachable
         plan = snapshot;
         return; // a swept sausage couldn't be shoved -> the hat stays put
       }
     }
+    if (destBlocked) return; // the corner shove stands, but a wall blocks the landing -> the hat settles back put
 
     if (s.x1 > s.x2 || (s.x1 == s.x2 && s.y1 > s.y2)) { // restore upper-left; the cook bits ride with the halves
       s8 tx = s.x1; s.x1 = s.x2; s.x2 = tx;
@@ -880,7 +945,7 @@ void Level2::PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const 
   }
 }
 
-void Level2::PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u16 rigidMask) const {
+void Level::PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u16 rigidMask) const {
   // A sausage riding on Stephen's head/fork translates with him. Whether it rolls is decided per sausage by |rigidMask|:
   // the rigid hat stack rides without rolling; any other carried sausage (a fork-borne base, or a cantilevered rider)
   // rolls when carried across its long axis. A wall in its path, or a far end anchored on a non-moving sausage/wall,
@@ -900,10 +965,10 @@ void Level2::PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& p
   // Another sausage where it shifts must be shoved first; if it can't be shoved, the hat has nowhere to ride and is left
   // behind for Settle to resolve (3-2 Cold Finger).
   s8 destA = GetSausage(s.x1 + dx, s.y1 + dy, s.z);
-  if (destA != -1 && destA != sausageNo && !(plan.mask & (1 << destA)))
+  if (destA != -1 && destA != sausageNo && !(plan.mask & (1 << destA)) && !(plan.rigidLoad & (1 << destA)))
     if (!PlanSausagePush(destA, dir, plan)) return;
   s8 destB = GetSausage(s.x2 + dx, s.y2 + dy, s.z);
-  if (destB != -1 && destB != sausageNo && destB != destA && !(plan.mask & (1 << destB)))
+  if (destB != -1 && destB != sausageNo && destB != destA && !(plan.mask & (1 << destB)) && !(plan.rigidLoad & (1 << destB)))
     if (!PlanSausagePush(destB, dir, plan)) return;
   s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
   // Only sausages in the rigid hat stack ride rigidly; anyone else rolls when carried across their long axis.
@@ -917,7 +982,7 @@ void Level2::PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& p
   if (aboveB != aboveA) PlanHatCarry(aboveB, dx, dy, dir, plan, rigidMask);
 }
 
-bool Level2::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const Stephen* mover) const {
+bool Level::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const Stephen* mover) const {
   Sausage sausage = _sausages[sausageNo];
   s8 dx, dy;
   Delta(dir, dx, dy);
@@ -950,19 +1015,43 @@ bool Level2::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const 
   plan.sausages[sausageNo] = sausage;
   plan.mask |= (1 << sausageNo);
 
-  // A sausage stacked directly on top is carried along by the same displacement and rolls across its own axis. Read our
-  // ORIGINAL footprint, since plan.sausages now holds our new spot.
+  // This base is now committed to moving (it cleared the wall/chain checks above), so everything riding on it co-moves
+  // by the same vector: none of these riders may ram another. Fold them into the co-moving set BEFORE carrying them, so
+  // one rider's carry never shoves (and rolls) a sibling rider it laps over -- 3-2 Cold Finger m41: the fork-hat and the
+  // mid's rider both slide, and the hat's carry must not ram the rider. (Only riders of a base that actually moves are
+  // added, so a refused push leaves a stationary stack un-marked -- 3-2 Cold Finger m40 keeps its fork hat anchored.)
+  plan.rigidLoad |= RidingLoad(sausageNo);
+
+  // A sausage stacked directly on top rides along by the same displacement, but it shares THIS base's torsion: it rolls
+  // only when the base itself rolled. A base that SLIDES (moves along its own axis) carries its passenger flat -- the
+  // game's zero-torsion rule (GameState.CalculateTorsion): equal support+rider speed => no roll. Read our ORIGINAL
+  // footprint, since plan.sausages now holds our new spot.
   const Sausage& orig = _sausages[sausageNo];
   s8 aboveA = GetSausage(orig.x1, orig.y1, orig.z + 1);
   s8 aboveB = GetSausage(orig.x2, orig.y2, orig.z + 1);
   if (aboveA != -1 && aboveA != sausageNo && !(plan.mask & (1 << aboveA)))
-    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover)) return false;
+    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) return false;
   if (aboveB != -1 && aboveB != sausageNo && aboveB != aboveA && !(plan.mask & (1 << aboveB)))
-    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover)) return false;
+    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) return false;
   return true;
 }
 
-bool Level2::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover) const {
+u16 Level::RidingLoad(s8 seed) const {
+  if (seed == -1) return 0;
+  u16 load = (u16)(1 << seed);
+  for (bool grew = true; grew; ) {
+    grew = false;
+    for (int i = 0; i < _sausages.Size(); i++) {
+      if (load & (1 << i)) continue;
+      const Sausage& s = _sausages[i];
+      s8 b1 = GetSausage(s.x1, s.y1, s.z - 1), b2 = GetSausage(s.x2, s.y2, s.z - 1);
+      if ((b1 != -1 && (load & (1 << b1))) || (b2 != -1 && (load & (1 << b2)))) { load |= (u16)(1 << i); grew = true; }
+    }
+  }
+  return load;
+}
+
+bool Level::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover, bool rigid) const {
   const Sausage& orig = _sausages[sausageNo];
   const Stephen& actor = mover ? *mover : _stephen;
 
@@ -1021,25 +1110,27 @@ bool Level2::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePla
   // A non-carried sausage where this carried sausage lands is shoved the same way first (the carry propagates as a
   // push); if it can't be shoved, this sausage is left behind like the wall case above (3-2 Cold Finger).
   s8 destA = GetSausage(sausage.x1, sausage.y1, sausage.z);
-  if (destA != -1 && destA != sausageNo && !(plan.mask & (1 << destA)))
+  if (destA != -1 && destA != sausageNo && !(plan.mask & (1 << destA)) && !(plan.rigidLoad & (1 << destA)))
     if (!PlanSausagePush(destA, dir, plan)) return true;
   s8 destB = GetSausage(sausage.x2, sausage.y2, sausage.z);
-  if (destB != -1 && destB != sausageNo && destB != destA && !(plan.mask & (1 << destB)))
+  if (destB != -1 && destB != sausageNo && destB != destA && !(plan.mask & (1 << destB)) && !(plan.rigidLoad & (1 << destB)))
     if (!PlanSausagePush(destB, dir, plan)) return true;
 
   bool rolls = sausage.IsHorizontal() ? (dir == Up || dir == Down) : (dir == Left || dir == Right);
-  if (rolls) sausage.flags ^= Sausage::Rolled;
+  bool rolled = rolls && !rigid; // a rider on a rigidly-dragged (fork-held) or sliding base inherits its zero torsion -> no roll
+  if (rolled) sausage.flags ^= Sausage::Rolled;
   plan.sausages[sausageNo] = sausage;
   plan.mask |= (1 << sausageNo);
 
+  // Anything stacked on THIS rider shares its torsion in turn: it rolls only if this rider actually rolled.
   if (aboveA != -1 && aboveA != sausageNo && !(plan.mask & (1 << aboveA)))
-    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover)) return false;
+    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover, /*rigid=*/!rolled)) return false;
   if (aboveB != -1 && aboveB != sausageNo && aboveB != aboveA && !(plan.mask & (1 << aboveB)))
-    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover)) return false;
+    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover, /*rigid=*/!rolled)) return false;
   return true;
 }
 
-bool Level2::CookSausage(Sausage& sausage) const {
+bool Level::CookSausage(Sausage& sausage) const {
   // Each end resting on a grill browns its down-facing side: the unrolled ("A") face normally, the rolled ("B") face
   // once the sausage has been flipped.
   u8 sides = 0;
@@ -1049,10 +1140,11 @@ bool Level2::CookSausage(Sausage& sausage) const {
   if (sausage.flags & Sausage::Rolled) sides *= 2; // shift A-faces to their rolled-over B-faces
   if (sausage.flags & sides) return false;         // that face is already cooked -- it would burn
   sausage.flags |= sides;
+  _feat |= F_COOK;
   return true;
 }
 
-bool Level2::CookMoved(MovePlan& plan, u16 movedMask, u16 preCookedMask) {
+bool Level::CookMoved(MovePlan& plan, u16 movedMask, u16 preCookedMask) {
   for (int i = 0; i < _sausages.Size(); i++) {
     if (!(movedMask & (1 << i)) || (preCookedMask & (1 << i))) continue;
     if (!CookSausage(plan.sausages[i])) return false; // would burn
@@ -1060,7 +1152,7 @@ bool Level2::CookMoved(MovePlan& plan, u16 movedMask, u16 preCookedMask) {
   return true;
 }
 
-Level2::MovePlan Level2::NewPlan() const {
+Level::MovePlan Level::NewPlan() const {
   // Seed the plan with a full copy of the live state, so it's a complete working tableau the move can advance without
   // touching the object.
   MovePlan plan;
@@ -1069,13 +1161,29 @@ Level2::MovePlan Level2::NewPlan() const {
   return plan;
 }
 
-void Level2::Commit(const MovePlan& plan) {
+void Level::Commit(const MovePlan& plan) {
   // The one and only mutation of the live state, reached after every stage has succeeded -- nothing to roll back.
   _stephen = plan.stephen;
   for (int i = 0; i < _sausages.Size(); i++) _sausages[i] = plan.sausages[i];
 }
 
-bool Level2::ReactAndCommit(MovePlan& plan) {
+bool Level::PlanHasOverlap(const MovePlan& plan) const {
+  // Two sausages sharing a cell is impossible in the real game: it means a carry lapped onto a co-mover that didn't
+  // actually vacate its cell (an anchored or wall-blocked rider wrongly folded into rigidLoad). The game instead can't
+  // place the carried sausage, so it drops (and drowns off the map). Level has no "lost" state, so we refuse the move
+  // -- the explorer then never walks this path, matching the game's dead-end (3-2 Cold Finger: a speared drag laps a
+  // wall-pinned rider onto a co-mover).
+  for (int i = 0; i < _sausages.Size(); i++) {
+    const Sausage& a = plan.sausages[i];
+    for (int j = i + 1; j < _sausages.Size(); j++) {
+      const Sausage& b = plan.sausages[j];
+      if (b.IsAt(a.x1, a.y1, a.z) || b.IsAt(a.x2, a.y2, a.z)) return true;
+    }
+  }
+  return false;
+}
+
+bool Level::ReactAndCommit(MovePlan& plan) {
   // Stages 5-7 (gravity -> heat -> knock-on) + the single commit. The live _sausages/_stephen are still the pre-move
   // layout the gravity pass needs, so pass them straight in (no snapshot). |preCookedMask| excludes sausages already
   // browned inline (a spear-drag) from CookMoved; double-movers are held back from Settle and cooked by DoubleMove.
@@ -1084,18 +1192,19 @@ bool Level2::ReactAndCommit(MovePlan& plan) {
   if (!Settle(plan, movedMask, _sausages.begin(), _stephen, plan.doubleMoveMask)) return false;
   if (!CookMoved(plan, movedMask, plan.doubleMoveMask | plan.preCookedMask)) return false;
   if (!DoubleMove(plan)) return false;
+  if (PlanHasOverlap(plan)) return false; // a carry produced an impossible two-in-one-cell state -> refuse
   Commit(plan);
   return true;
 }
 
-s8 Level2::GetPlannedSausage(const MovePlan& plan, s8 x, s8 y, s8 z) const {
+s8 Level::GetPlannedSausage(const MovePlan& plan, s8 x, s8 y, s8 z) const {
   if (z < 0) return -1;
   for (int i = 0; i < _sausages.Size(); i++)
     if (plan.sausages[i].IsAt(x, y, z)) return (s8)i;
   return -1;
 }
 
-bool Level2::SausageSupported(const MovePlan& plan, s8 x, s8 y, s8 z) const {
+bool Level::SausageSupported(const MovePlan& plan, s8 x, s8 y, s8 z) const {
   // Stephen's body or held fork, at the plan's post-move pose, directly beneath holds a sausage up -- even out over the
   // void at the grid's edge (4-4 Foul Fen off-path). Checked FIRST so an off-grid cell isn't dismissed before we notice
   // the fork under it.
@@ -1112,10 +1221,28 @@ bool Level2::SausageSupported(const MovePlan& plan, s8 x, s8 y, s8 z) const {
   return false;
 }
 
-bool Level2::Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, const Stephen& prevStephen, u16 exclude) {
+bool Level::Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, const Stephen& prevStephen, u16 exclude) {
   // The sausage on the held fork is carried rigidly, not subject to gravity -- exempt it from the fall. The fork is at
   // the plan's post-move pose; the speared sausage is whatever sits in its cell in the working tableau.
   s8 speared = GetPlannedSausage(plan, plan.stephen.forkX, plan.stephen.forkY, plan.stephen.forkZ);
+
+  // The fork holds up the whole stack that rests (post-move) on the speared sausage, not just the sausage itself -- the
+  // entire load rides the fork and stays put, even out over the void where SausageSupported would otherwise bail on the
+  // off-grid cell (3-2 Cold Finger: a rider dragged off the grid's edge on the speared base must not drop).
+  u16 forkHeld = 0;
+  if (speared != -1) {
+    forkHeld = (u16)(1 << speared);
+    for (bool grew = true; grew; ) {
+      grew = false;
+      for (int i = 0; i < _sausages.Size(); i++) {
+        if (forkHeld & (1 << i)) continue;
+        const Sausage& s = plan.sausages[i];
+        s8 b1 = GetPlannedSausage(plan, s.x1, s.y1, s.z - 1);
+        s8 b2 = GetPlannedSausage(plan, s.x2, s.y2, s.z - 1);
+        if ((b1 != -1 && (forkHeld & (1 << b1))) || (b2 != -1 && (forkHeld & (1 << b2)))) { forkHeld |= (u16)(1 << i); grew = true; }
+      }
+    }
+  }
 
   // A sausage that rode on Stephen pre-move (resting on his body or fork) becomes subject to gravity when he steps
   // out from under it: seed it active so the fall pass below drops it if its footing is now gone.
@@ -1125,7 +1252,12 @@ bool Level2::Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, cons
     bool rode = (pre.x1 == prevStephen.x && pre.y1 == prevStephen.y && pre.z - 1 == prevStephen.z)
              || (pre.x2 == prevStephen.x && pre.y2 == prevStephen.y && pre.z - 1 == prevStephen.z)
              || (pre.x1 == prevStephen.forkX && pre.y1 == prevStephen.forkY && pre.z - 1 == prevStephen.forkZ)
-             || (pre.x2 == prevStephen.forkX && pre.y2 == prevStephen.forkY && pre.z - 1 == prevStephen.forkZ);
+             || (pre.x2 == prevStephen.forkX && pre.y2 == prevStephen.forkY && pre.z - 1 == prevStephen.forkZ)
+             // ...or was SPEARED on the fork (same z, sharing the fork's cell). When a backward step pulls the fork free
+             // it leaves the sausage put but no longer held up, so it must fall if nothing else supports it (3-11 Cold
+             // Terrace: backing a speared sausage off the top edge drops it into the void). A still-speared/dragged
+             // sausage is already in |movedMask|, so this only fires once the fork has actually let go.
+             || (prevStephen.HasFork() && pre.IsAt(prevStephen.forkX, prevStephen.forkY, prevStephen.forkZ));
     if (rode) movedMask |= (1 << i);
   }
 
@@ -1158,11 +1290,12 @@ bool Level2::Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, cons
   while (changed) {
     changed = false;
     for (int i = 0; i < _sausages.Size(); i++) {
-      if (i == speared || !(active & (1 << i))) continue;
+      if ((forkHeld & (1 << i)) || !(active & (1 << i))) continue;
       Sausage& sausage = plan.sausages[i];
       if (SausageSupported(plan, sausage.x1, sausage.y1, sausage.z) || SausageSupported(plan, sausage.x2, sausage.y2, sausage.z)) continue;
       if (sausage.z <= 0) return false; // fell out of the bottom of the world -> the move is refused
       sausage.z--;
+      _feat |= F_DROP;
       movedMask |= (1 << i);
       changed = true;
     }
@@ -1170,7 +1303,7 @@ bool Level2::Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, cons
   return true;
 }
 
-void Level2::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
+void Level::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
   for (int rider = 0; rider < _sausages.Size(); rider++) {
     if (!(plan.mask & (1 << rider)) || (plan.doubleMoveMask & (1 << rider))) continue; // only just-moved sausages, not already flagged
     const Sausage& orig = preMove[rider];
@@ -1218,8 +1351,9 @@ void Level2::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
   }
 }
 
-bool Level2::DoubleMove(MovePlan& plan) {
+bool Level::DoubleMove(MovePlan& plan) {
   if (plan.doubleMoveMask == 0) return true;
+  _feat |= F_DOUBLEMOVE;
 
   // Snapshot the just-settled working tableau: it's the "pre-move" layout for the double-move's own settle pass.
   Sausage preMove[NUM_SAUSAGES];
@@ -1247,7 +1381,7 @@ bool Level2::DoubleMove(MovePlan& plan) {
 }
 
 
-bool Level2::SausageBlocked(s8 sausageNo, Direction dir) const {
+bool Level::SausageBlocked(s8 sausageNo, Direction dir) const {
   Sausage sausage = _sausages[sausageNo];
   s8 dx, dy;
   Delta(dir, dx, dy);
@@ -1266,7 +1400,7 @@ bool Level2::SausageBlocked(s8 sausageNo, Direction dir) const {
   return false;
 }
 
-void Level2::Delta(Direction dir, s8& dx, s8& dy) const {
+void Level::Delta(Direction dir, s8& dx, s8& dy) const {
   dx = 0;
   dy = 0;
   if (dir == Up)         dy = -1;

@@ -114,14 +114,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="LogicTests.cpp" />
-    <ClCompile Include="..\Level.cpp" />
     <ClCompile Include="..\Level2.cpp" />
     <ClCompile Include="..\LevelData.cpp" />
-    <ClCompile Include="..\State.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestSymmetryHelper.h" />
-    <ClInclude Include="..\Level.h" />
     <ClInclude Include="..\Level2.h" />
     <ClInclude Include="..\LevelData.h" />
     <ClInclude Include="..\State.h" />

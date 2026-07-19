@@ -14,14 +14,14 @@ FrontierBuilder::FrontierBuilder(u32 depth, u32 numBuckets) {
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
     _knownHashes[bucket] = LayerCache<u128>("depth", "global", "bucket", bucket);
 
-    _currentLayer[bucket] = LayerCache<State2>("depth", depth, "bucket", bucket);
+    _currentLayer[bucket] = LayerCache<State>("depth", depth, "bucket", bucket);
 
-    _uncheckedStates[bucket] = LayerCache<State2>("depth", "scratch", "bucket", bucket);
+    _uncheckedStates[bucket] = LayerCache<State>("depth", "scratch", "bucket", bucket);
     _uncheckedStateHashes[bucket] = LayerCache<u128>("depth", "scratch", "bucket", bucket, "hash");
   }
 }
 
-void FrontierBuilder::AddStateUnchecked(const State2& state) {
+void FrontierBuilder::AddStateUnchecked(const State& state) {
   u128 hash = state.Hash128();
   u32 bucket = Uint128High64(hash) % _numBuckets;
   _uncheckedStates[bucket].Add(state);
@@ -43,7 +43,7 @@ u64 FrontierBuilder::ProcessStates() {
     _knownHashes[bucket].FinishWriteAndResetRead();
 
     i = 0;
-    for (const State2& state : _uncheckedStates[bucket]) {
+    for (const State& state : _uncheckedStates[bucket]) {
       // Add the state if its hash was newly added to the knownHashes
       if (insertedHashes[i++]) {
         _currentLayer[bucket].Add(state);

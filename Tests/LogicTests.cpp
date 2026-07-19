@@ -1,8 +1,7 @@
 #include "CppUnitTest.h"
-#include "Level.h"
 #include "Level2.h"
+
 #include <string>
-#include <utility>
 
 #include "TestSymmetryHelper.h"
 
@@ -58,7 +57,7 @@ Direction Flip(Direction dir) {
 
 TEST_CLASS(OneOffTests) {
   MAKE_SYMMETRICAL_TEST(SpearSausageDuringBurnedStep) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -74,7 +73,7 @@ TEST_CLASS(OneOffTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SpearedSausageBouncesOffGrill) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -95,7 +94,7 @@ TEST_CLASS(OneOffTests) {
   // 2c) Staircase roll where the top sausage is carried onto a Wall1 top, then a further push rolls the bottom on
   // while the top STAYS floating on the wall (it now has non-moving support, so it isn't carried).
   MAKE_SYMMETRICAL_TEST(StackedStaircaseRollOntoWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " ___1___  "
@@ -117,10 +116,27 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({4, 2, 4, 3, 1, Sausage::Rolled});
   }
 
+  // A head-hat whose rotation is blocked by a wall at its DESTINATION still shoves the sausage in its swept CORNER cell
+  // out of the way -- exactly like a rotating fork's corner push, which lands even when the swing bonks. Stephen faces
+  // East at (1,2) under a clean head-hat c=(1,1)-(1,2)@z1; a North press swings c's free end CCW toward the height-3 wall
+  // at (0,2) (blocked, so c stays), sweeping through the corner (0,1) where the top of a west-edge 2-stack sits. The
+  // sweep shoves that top sausage west off the map, so the turn is a losing move and must be refused (3-2 Cold Finger m42).
+  MAKE_SYMMETRICAL_TEST(HeadHatRotationShovesCornerSausageOffEdge) {
+    TestSymmetryHelper level(symmetry, Level(6, 4, "arena",
+      "______"
+      "______"
+      "3>____"
+      "______",
+      {}, {}, { Sausage{0, 0, 0, 1, 0}, Sausage{0, 0, 0, 1, 1}, Sausage{1, 1, 1, 2, 1} }));
+    level.AssertPosition(1, 2, Right);
+    level.AssertSausage({1, 1, 1, 2, 1, Sausage::None}); // the clean head-hat
+    level.AssertMoveFails(Up);                           // North turn: hat blocked by the wall, its sweep rolls the stack-top off the west edge
+  }
+
   // 2d) Staircase roll where the top sausage's carry is blocked by a Wall2: it's left behind, then drops to the ground
   // once the bottom rolls out from under it (the fork is clear of it, so nothing catches it).
   MAKE_SYMMETRICAL_TEST(StackedStaircaseRollDrop) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -141,7 +157,7 @@ TEST_CLASS(OneOffTests) {
   // 3a) Perpendicular stack (horizontal bottom, vertical top overhanging south). Pushing the bottom east slides it;
   // the top is carried east one cell and rolls (it moves across its own axis). No double-move.
   MAKE_SYMMETRICAL_TEST(StackedPerpendicularPush) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -156,7 +172,8 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Right);
     level.AssertPosition(2, 3, Right);
     level.AssertSausage({4, 3, 5, 3, 0, Sausage::None});
-    level.AssertSausage({5, 3, 5, 4, 1, Sausage::Rolled});
+    // The base SLIDES east along its own axis; the vertical top rides it flat (zero torsion) -> it does NOT roll.
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None});
     level.AssertMoveSucceeds(Right);
     level.AssertPosition(3, 3, Right);
     level.AssertSausage({5, 3, 6, 3, 0, Sausage::None});
@@ -166,7 +183,7 @@ TEST_CLASS(OneOffTests) {
   // 3d) Perpendicular stack, Stephen behind the overhang. Pushing the bottom north rolls it; the vertical top, aligned
   // with the motion and supported by a perpendicular base, DOUBLE-MOVES north by two cells (sliding).
   MAKE_SYMMETRICAL_TEST(StackedPerpendicularDoubleMove) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -187,7 +204,7 @@ TEST_CLASS(OneOffTests) {
   // 3b) Perpendicular stack, Stephen steps UNDER the south overhang as he pushes. His body holding one end cancels the
   // double-move, so the top is carried just one cell (not two).
   MAKE_SYMMETRICAL_TEST(StackedPerpendicularHeld) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -208,7 +225,7 @@ TEST_CLASS(OneOffTests) {
   // Staircase roll where the top's carry is wall-blocked, but Stephen's fork ends up directly under it: instead of
   // dropping, the top is caught and held at z=1 on the fork.
   MAKE_SYMMETRICAL_TEST(StackedStaircaseRollForkCatch) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " ___2___  "
@@ -229,7 +246,7 @@ TEST_CLASS(OneOffTests) {
   // A 3-high vertical tower. Pushing the bottom east rolls the whole stack east as a unit -- each level is carried by the
   // one beneath it (the carry recurses up the tower), and every sausage rolls across its own long axis.
   MAKE_SYMMETRICAL_TEST(StackedTowerThreeHighRoll) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -252,7 +269,7 @@ TEST_CLASS(OneOffTests) {
   // Perpendicular stack whose vertical top would double-move north by two, but the second cell of that slide is a Wall2.
   // The double-move is capped to a single cell rather than refused: the top slides north just one cell.
   MAKE_SYMMETRICAL_TEST(StackedDoubleMoveBlockedByWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " ___2___  "
       " _______  "
@@ -273,7 +290,7 @@ TEST_CLASS(OneOffTests) {
   // Staircase roll where the carried top's destination is a Wall2 (so it is left behind and drops to z=0), and the cell
   // it lands on is a grill: the dropped top cooks on landing.
   MAKE_SYMMETRICAL_TEST(StackedRollDropOntoGrill) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -292,9 +309,10 @@ TEST_CLASS(OneOffTests) {
   }
 
   // Stephen spears the bottom of a stack (jammed against a wall), then drags it sideways. The speared bottom translates
-  // rigidly (no roll), but the sausage riding on top is carried along and DOES roll across its own axis.
+  // rigidly, and the sausage riding on it inherits that zero torsion -- it rides flat and does NOT roll (a passenger on a
+  // fork-held base moves with its support).
   MAKE_SYMMETRICAL_TEST(StackedCarryWhileSpeared) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -310,17 +328,69 @@ TEST_CLASS(OneOffTests) {
     level.AssertPosition(2, 3, Right);
     level.AssertSausage({3, 3, 4, 3, 0, Sausage::None});
     level.AssertSausage({3, 3, 4, 3, 1, Sausage::None});
-    level.AssertMoveSucceeds(Up); // drag north: bottom slides rigidly, top is carried and rolls
+    level.AssertMoveSucceeds(Up); // drag north: bottom slides rigidly, top rides on the fork-held base -> no roll
     level.AssertPosition(2, 2, Right);
     level.AssertSausage({3, 2, 4, 2, 0, Sausage::None});
-    level.AssertSausage({3, 2, 4, 2, 1, Sausage::Rolled});
+    level.AssertSausage({3, 2, 4, 2, 1, Sausage::None});
+  }
+
+  // The whole load Stephen drags translates as one simultaneous event (move-stages.md): a speared base + its rider AND a
+  // head hat all shift by the same vector. Here backing east makes the rider's carry destination land exactly where the
+  // head hat currently sits (and vice versa) -- they SWAP cells. Neither may treat the other as an obstacle: co-movers
+  // ride rigidly and must NOT ram/roll each other (3-2 Cold Finger: order-dependent ram used to roll one of them).
+  MAKE_SYMMETRICAL_TEST(SpearedDragHeadHatCoMove) {
+    TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
+      "         "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      "         ",
+      Stephen{5, 3, 0, Left}, {},
+      { Sausage{4, 3, 4, 4, 0}, Sausage{4, 3, 4, 4, 1}, Sausage{5, 3, 5, 4, 1} }));
+    level.AssertPosition(5, 3, Left);
+    level.AssertSausage({4, 3, 4, 4, 0, Sausage::None}); // speared base
+    level.AssertSausage({4, 3, 4, 4, 1, Sausage::None}); // rider squarely on the base
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // head hat on Stephen (its east end cantilevered)
+    level.AssertMoveSucceeds(Right); // back east: base+rider drag east, head hat rides east -- they swap the (5,3)-(5,4) column
+    level.AssertPosition(6, 3, Left);
+    level.AssertSausage({5, 3, 5, 4, 0, Sausage::None}); // base dragged east, rigid
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // rider rode with the base -- NOT rammed/rolled by the head hat
+    level.AssertSausage({6, 3, 6, 4, 1, Sausage::None}); // head hat rode east, rigid -- NOT rammed/rolled by the rider
+  }
+
+  // The push-path analogue of SpearedDragHeadHatCoMove. A horizontal base is pushed along its own axis (it SLIDES, no
+  // roll), carrying TWO vertical riders that both rest on it. The near rider's carry laps exactly onto the far rider's
+  // cell -- they co-move by the same vector and must NOT ram/roll each other. Without folding the pushed base's riders
+  // into the co-moving set (rigidLoad), the near rider's carry would shove (and roll) the far one (3-2 Cold Finger m41).
+  MAKE_SYMMETRICAL_TEST(PushedBaseRidersCoMove) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      "          ",
+      Stephen{2, 4, 0, Right}, {},
+      { Sausage{4, 4, 5, 4, 0}, Sausage{4, 3, 4, 4, 1}, Sausage{5, 3, 5, 4, 1} }));
+    level.AssertPosition(2, 4, Right);
+    level.AssertSausage({4, 4, 5, 4, 0, Sausage::None}); // horizontal base
+    level.AssertSausage({4, 3, 4, 4, 1, Sausage::None}); // near rider (west) on the base's west end
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // far rider (east) on the base's east end
+    level.AssertMoveSucceeds(Right); // push east: base slides, both riders ride flat; near rider laps the far rider's cell
+    level.AssertPosition(3, 4, Right);
+    level.AssertSausage({5, 4, 6, 4, 0, Sausage::None}); // base slid east one cell (along its axis) -> no roll
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // near rider rode east rigidly -- NOT rammed/rolled by the far rider
+    level.AssertSausage({6, 3, 6, 4, 1, Sausage::None}); // far rider rode east rigidly -- NOT rammed/rolled by the near rider
   }
 
   // A vertical top sausage spans two supports: one end on a horizontal base, the other on Stephen's head. When Stephen
   // TURNS, his body counts as a wall, so the top is held in place even as the turn shoves the base out from under it.
   // (During a STEP his body would only cancel a double-move; only a turn pins the sausage. 3-3 Cold Escarpment move 69.)
   MAKE_SYMMETRICAL_TEST(StackedTopHeldByBodyDuringTurn) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " _______  "
@@ -343,7 +413,7 @@ TEST_CLASS(OneOffTests) {
   // and the fork swings away, so the rider loses BOTH supports and drops straight down -- it is NOT carried north with
   // the base (the reference's rotation corner-sweep never carries riders).
   MAKE_SYMMETRICAL_TEST(TurnDropsForkBorneRider) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "__________"
       "___a______"
       "___a______"
@@ -368,7 +438,7 @@ TEST_CLASS(OneOffTests) {
   // fork tip at z=1; it is NOT speared/tipped down to the ground. (The old engine wrongly captured it during the
   // fork-dest sweep; Level2 keeps it put.)
   MAKE_SYMMETRICAL_TEST(TurnLeavesForkTipHatPerched) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "    _    _"
       "    _2   _"
@@ -392,7 +462,7 @@ TEST_CLASS(OneOffTests) {
   // east (backs up): b is dragged east to right under a, but a's support (his head) never changed, so a rides east with
   // him rather than being deposited onto the passing base.
   MAKE_SYMMETRICAL_TEST(DragUnderHeadHatKeepsCarrying) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "         _"
       "         _"
@@ -416,7 +486,7 @@ TEST_CLASS(OneOffTests) {
   // check); Level2's PlanHatCarry only checks for a non-moving SAUSAGE below, so it wrongly carries it. Passes on the
   // reference; currently FAILS on Level2, pinning the gap.
   MAKE_SYMMETRICAL_TEST(ForkHatAnchoredOnWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______  "
       " ___1___  "
@@ -438,7 +508,7 @@ TEST_CLASS(OneOffTests) {
   // dragged one cell east by the recoil onto the grill column (cooking both ends), and the rider rides east off the
   // fork onto Stephen's head. Stephen ends where he started.
   MAKE_SYMMETRICAL_TEST(RiderCarriedByMovingBaseOffFork) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____    "
       " _____    "
@@ -464,7 +534,7 @@ TEST_CLASS(OneOffTests) {
   // sausage riding one level higher at the same (x,y). Stephen starts one cell south of the ladder (so his '^' shows in
   // the grid) and steps north onto the base rung into that start pose before climbing.
   MAKE_SYMMETRICAL_TEST(ClimbLadderLiftsRestingSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _2L__   A"
@@ -486,7 +556,7 @@ TEST_CLASS(OneOffTests) {
   // pivots to horizontal, and its far end sweeps into a second sausage resting one cell east; the reference shoves that
   // sausage the way the far end is travelling (north), where it rolls off a Wall1 ledge and drops to the ground.
   MAKE_SYMMETRICAL_TEST(HatRotationShovesSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -509,7 +579,7 @@ TEST_CLASS(OneOffTests) {
   // him (it slides one cell and drops a level, staying on the fork). Level2's descent only carried a *speared* sausage,
   // so the fork-borne one was left to fall straight down instead.
   MAKE_SYMMETRICAL_TEST(DescendLadderCarriesForkSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " __1__   A"
       " _21__   A"
@@ -531,7 +601,7 @@ TEST_CLASS(OneOffTests) {
   // blocked by the Over2Grill overhang (solid at head height, z1) to the NE, so the recoil rolls it one cell west off
   // his head, where it drops to the ground.
   MAKE_SYMMETRICAL_TEST(HatRollsOffDuringGrillBounce) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " ___?_   A"
       " __>#_   A"
@@ -555,7 +625,7 @@ TEST_CLASS(OneOffTests) {
   // column beneath the fork, so the whole move is refused. Level2 used to lower the sausage straight through the wall
   // because the descent only wall-checked the fork, not what it carries.
   MAKE_SYMMETRICAL_TEST(SpearedSausageBlocksLadderDescent) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _2___   A"
       " 22___   A"
@@ -575,7 +645,7 @@ TEST_CLASS(OneOffTests) {
   // Level2 used to pivot it because its "clean hat" test only rejected a far end resting on another sausage, not one
   // resting on wall terrain.
   MAKE_SYMMETRICAL_TEST(WallAnchoredHatDoesNotRotate) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _2___   A"
       " _1___   A"
@@ -596,7 +666,7 @@ TEST_CLASS(OneOffTests) {
   // edge, out over the void. It hangs there, held up by the fork -- Level2 used to refuse the move because its support
   // check dismissed the off-grid cell before noticing the fork beneath the sausage.
   MAKE_SYMMETRICAL_TEST(ForkSausageHangsOffEdge) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "      ___1"
       "      ___1"
@@ -610,7 +680,7 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({9, 2, 9, 3, 2, Sausage::None});
     level.AssertMoveSucceeds(Right); // walk toward the edge; the fork carries the sausage off it
     level.AssertPosition(9, 3, Right);                     // stepped to the last column, fork now off-grid
-    level.AssertSausage({10, 2, 10, 3, 2, Sausage::Rolled}); // sausage rolled off the edge, hanging on the fork
+    level.AssertSausage({10, 2, 10, 3, 2, Sausage::None});   // carried off the edge on the fork tip -> rides rigidly, no roll
   }
 
   // 4-4 Foul Fen (off-path divergence): a "bridge" sausage spans Stephen's head and fork. He climbs a rung of the
@@ -618,7 +688,7 @@ TEST_CLASS(OneOffTests) {
   // fork-borne (not a genuine head hat, which the fork disqualifies), the carry across its long axis ROLLS it. Level2
   // used to translate the carried sausage rigidly, leaving the Rolled flag unset.
   MAKE_SYMMETRICAL_TEST(ClimbLadderRollsBridgeSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _21__   A"
@@ -641,7 +711,7 @@ TEST_CLASS(OneOffTests) {
   // own axis anyway), but the rider is carried across its long axis, so it ROLLS. Level2 used to translate the whole
   // head-hat stack rigidly (rollMask covered only the fork stack), leaving the rider's Rolled flag unset.
   MAKE_SYMMETRICAL_TEST(ClimbLadderRollsHeadHatRider) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "          "
       "  2       "
@@ -667,7 +737,7 @@ TEST_CLASS(OneOffTests) {
   // because it now rests on the wall. Level2 used to keep the hat in its carried set for every rung, ramming its west
   // end into the Wall2 column at head height, and so refused the whole descent.
   MAKE_SYMMETRICAL_TEST(DescendLadderDepositsHatOnWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "       AA "
       "          "
@@ -690,7 +760,7 @@ TEST_CLASS(OneOffTests) {
   // the rider along too -- but the rider is NOT part of the rigid hat (only one of its ends sits on the bridge), so it
   // rolls across its long axis. Level2 used to treat the whole stack as a rigid head hat and left the rider unrolled.
   MAKE_SYMMETRICAL_TEST(HatRiderRollsWhenCarriedAcrossAxis) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -715,7 +785,7 @@ TEST_CLASS(OneOffTests) {
   // pulling the speared sausage back with him -- but the shoved neighbour STAYS where the lunge pushed it (rolled and
   // branded on the grill). Level2 used to discard the whole lunge on the bounce, so the neighbour never moved.
   MAKE_SYMMETRICAL_TEST(SpearedBounceStillShovesNeighbor) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "   a    BB"
       "   a<     "
@@ -740,7 +810,7 @@ TEST_CLASS(OneOffTests) {
   // sausage one cell ahead (rolling it). Level2 used to shortcut a backward-unspear-onto-grill as "nothing moves", so
   // the sausage stayed frozen; the reference completes the step + bounce and shoves it.
   MAKE_SYMMETRICAL_TEST(UnspearBounceShovesSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "    BB CC "
       " ________ "
       " ___1a___ "
@@ -761,7 +831,7 @@ TEST_CLASS(OneOffTests) {
   // body slides under it, it comes to rest on his head. Level2 used to ignore the blocked shove and carry the hat
   // anyway, landing it squarely on top of the stack (two sausages in the same cells -- an impossible overlap).
   MAKE_SYMMETRICAL_TEST(ForkHatLeftBehindWhenBlocked) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "        "
       " ____   "
       "3____   "
@@ -784,7 +854,7 @@ TEST_CLASS(OneOffTests) {
   // head hat must ride with him too. Level2's speared-motion path dragged the base but forgot the head hat, leaving it
   // floating a cell behind.
   MAKE_SYMMETRICAL_TEST(SpearedBackstepCarriesHeadHat) {
-    TestSymmetryHelper level(symmetry, LevelType(9, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(9, 8, "arena",
       "         "
       "         "
       "  ____   "
@@ -808,7 +878,7 @@ TEST_CLASS(OneOffTests) {
   // sausage balances on his fork-tip a level above. The fork-hat must ride the roll with the fork. Level2's log-roll
   // carried a head hat but not a fork-hat, so the balanced sausage was left floating where it started.
   MAKE_SYMMETRICAL_TEST(LogRollCarriesForkHat) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "        "
       "        "
       "  _____ "
@@ -830,7 +900,7 @@ TEST_CLASS(OneOffTests) {
   // with the fork; sliding along the (horizontal) axis, nothing rolls. Level2's log-roll used to translate only the
   // single fork-hat, orphaning the rider stacked on it.
   MAKE_SYMMETRICAL_TEST(LogRollCarriesForkHatRider) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "        "
       "        "
       "  _____ "
@@ -852,7 +922,7 @@ TEST_CLASS(OneOffTests) {
   // Log roll carrying a fork-tip sausage oriented ACROSS the roll direction: being fork-borne (not a rigid head hat),
   // it rolls as it rides. Level2's log-roll used to translate the fork-hat without ever flipping it to its rolled face.
   MAKE_SYMMETRICAL_TEST(LogRollForkHatRollsAcrossAxis) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "        "
       "        "
       "  _____ "
@@ -873,7 +943,7 @@ TEST_CLASS(OneOffTests) {
   // the rolling fork-hat (a double-move). This exercises the second MarkDoubleMoves pass that runs after the log-roll
   // hat carry -- reachable at 3 sausages only because the fork-hat (fork-borne) rolls, unlike a rigid head hat.
   MAKE_SYMMETRICAL_TEST(LogRollForkHatRiderDoubleMoves) {
-    TestSymmetryHelper level(symmetry, LevelType(9, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(9, 6, "arena",
       "         "
       "         "
       "  ______ "
@@ -897,7 +967,7 @@ TEST_CLASS(OneOffTests) {
   // Wall2, which it can't enter, so the reference refuses the whole move. Level2 used to leave the speared sausage
   // behind against the wall (as if it were a loose rider) and complete the climb, reaching a state the game can't.
   MAKE_SYMMETRICAL_TEST(SpearedClimbRefusedWhenBaseHitsWall) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "  2 1   "
       "  ___   "
       "  ___   "
@@ -918,7 +988,7 @@ TEST_CLASS(OneOffTests) {
   // (cantilevered on a Wall1). The carry must PROPAGATE as a push: the neighbour is shoved east and, now over open
   // ground, falls a level. Level2 used to let the carried rider overlap the neighbour instead of shoving it.
   MAKE_SYMMETRICAL_TEST(CarriedRiderShovesNeighbor) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 6, "arena",
       "          "
       "   _______"
       "   _______"
@@ -934,7 +1004,7 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Right);                     // step east: base drags, rider carried into the neighbour
     level.AssertPosition(4, 1, Right);
     level.AssertSausage({5, 1, 5, 2, 0, Sausage::None});   // speared base rode east rigidly (no roll)
-    level.AssertSausage({5, 1, 5, 2, 1, Sausage::Rolled}); // rider carried east across its axis -> rolled
+    level.AssertSausage({5, 1, 5, 2, 1, Sausage::None});   // rider rides the fork-held base rigidly -> no roll
     level.AssertSausage({6, 2, 6, 3, 0, Sausage::Rolled}); // neighbour shoved east and dropped a level
   }
 
@@ -942,7 +1012,7 @@ TEST_CLASS(OneOffTests) {
   // (presses east). The fork pulls the speared sausage east along with him; it rams a horizontal neighbour, which must
   // be shoved east too. This isolates the backward-drag push-propagation (no grill/bounce).
   MAKE_SYMMETRICAL_TEST(SpearedBackDragShovesNeighbor) {
-    TestSymmetryHelper level(symmetry, LevelType(9, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
       "         "
       "         "
       "         "
@@ -966,7 +1036,7 @@ TEST_CLASS(OneOffTests) {
   // straight back east, and on the recoil his fork drags the speared sausage east into a horizontal neighbour, which
   // must be shoved east too. Reproduces the neighbour-shove specifically in the grill-bounce recoil path.
   MAKE_SYMMETRICAL_TEST(GrillBounceDragShovesNeighbor) {
-    TestSymmetryHelper level(symmetry, LevelType(9, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
       "         "
       "         "
       "         "
@@ -992,7 +1062,7 @@ TEST_CLASS(OneOffTests) {
   // rolls under it), only rising with the climb. Level2 used to translate the whole carried stack rigidly, with no wall
   // check, and shoved the rider into the Wall5 column.
   MAKE_SYMMETRICAL_TEST(LadderStepOffRiderWallBlocked) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "          "
       "          "
@@ -1016,7 +1086,7 @@ TEST_CLASS(OneOffTests) {
   // a done face back onto the fire would burn it, so the whole descent is refused. Level2 used to never cook the
   // carried sausage during a descent, and so accepted the burning move.
   MAKE_SYMMETRICAL_TEST(SpearedDescentOntoGrillBurns) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       "          "
       "          "
@@ -1035,7 +1105,7 @@ TEST_CLASS(OneOffTests) {
   // axis, log-rolling it and riding it one cell; a sausage resting on his head rides rigidly with him. Level2 used to
   // carry nothing on his head during a log roll, orphaning the head hat in place.
   MAKE_SYMMETRICAL_TEST(LogRollCarriesHeadHat) {
-    TestSymmetryHelper level(symmetry, LevelType(11, 9, "arena",
+    TestSymmetryHelper level(symmetry, Level(11, 9, "arena",
       "___________"
       "___________"
       "___________"
@@ -1058,7 +1128,7 @@ TEST_CLASS(OneOffTests) {
   // hatStack), so the rider on top must ride too. Level2's log-roll used to translate only the single head-hat sausage,
   // orphaning any rider stacked on it a cell behind (and now floating).
   MAKE_SYMMETRICAL_TEST(LogRollCarriesHeadHatRider) {
-    TestSymmetryHelper level(symmetry, LevelType(11, 9, "arena",
+    TestSymmetryHelper level(symmetry, Level(11, 9, "arena",
       "___________"
       "___________"
       "___________"
@@ -1084,7 +1154,7 @@ TEST_CLASS(OneOffTests) {
   // double-move against Stephen's POST-step pose: since he steps under the rider's end, it wrongly looked "held" and
   // Level2 carried the rider only one cell (still elevated). The reference tests his PRE-step pose, so it tumbles.
   MAKE_SYMMETRICAL_TEST(RolledBaseDoubleMovesRider) {
-    TestSymmetryHelper level(symmetry, LevelType(13, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(13, 8, "arena",
       "aa___________"
       "_____________"
       "_____________"
@@ -1107,7 +1177,7 @@ TEST_CLASS(OneOffTests) {
   // the third sausage; the speared rider rides rigidly one cell with Stephen. Level2 used to move the rider TWICE --
   // once as a chain rider (which also rolled it) and once as the speared sausage -- landing it a cell too far, rolled.
   MAKE_SYMMETRICAL_TEST(SpearedRiderOnRolledChain) {
-    TestSymmetryHelper level(symmetry, LevelType(12, 6, "arena",
+    TestSymmetryHelper level(symmetry, Level(12, 6, "arena",
       "____________"
       "____________"
       "____________"
@@ -1128,7 +1198,7 @@ TEST_CLASS(OneOffTests) {
   // slides along its own axis (no roll), but the rider is carried across ITS axis and rolls. Level2 zeroed the entire
   // roll set whenever a sausage was speared, so the rider climbed the step without ever flipping to its rolled face.
   MAKE_SYMMETRICAL_TEST(SpearedClimbRollsRider) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 8, "arena",
       "__________"
       "__________"
       "__________"
@@ -1151,7 +1221,7 @@ TEST_CLASS(OneOffTests) {
   // rider was orphaned a level up (left floating at z=2); the fix drops it. Climb east onto the wall then descend back
   // west is a clean no-op -- the rider returns to z=1, never floating.
   MAKE_SYMMETRICAL_TEST(DescendLadderLowersRiderNoFloat) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 8, "arena",
       "__________"
       "__________"
       "__________"
@@ -1178,7 +1248,7 @@ TEST_CLASS(OneOffTests) {
   // it: 'b' double-rolls south off the cliff and drops to the ground. It would only stay put if it were north of 'a'
   // (its south end over the fork, tumbling INTO it). Both engines used to hold 'b' still via the trailing-end fork.
   MAKE_SYMMETRICAL_TEST(RotationDoubleRollsUnsupportedRider) {
-    TestSymmetryHelper level(symmetry, LevelType(8, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(8, 8, "arena",
       "2222    "
       "2222    "
       "2222    "
@@ -1205,7 +1275,7 @@ TEST_CLASS(OneOffTests) {
   // (NO roll) even though its far end sat on the moving mid; and the mid rides the log but the hat sitting directly
   // ABOVE it cancels its double-move, so it shifts only ONE cell (a wall above would do the same).
   MAKE_SYMMETRICAL_TEST(LogRollHeadHatOverMovingMid) {
-    TestSymmetryHelper level(symmetry, LevelType(9, 8, "arena",
+    TestSymmetryHelper level(symmetry, Level(9, 8, "arena",
       "_________"
       "_________"
       "_________"
@@ -1230,7 +1300,7 @@ TEST_CLASS(OneOffTests) {
 
 TEST_CLASS(LogicTests) {
   MAKE_SYMMETRICAL_TEST(BasicLocomotion) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -1312,7 +1382,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleGrill) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -1370,7 +1440,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleSausage) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -1524,7 +1594,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " _____   A"
@@ -1572,7 +1642,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleSausageAndWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " ___1_   A"
@@ -1813,7 +1883,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleSausageAndGrill) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
       " __cc_   A"
@@ -1879,7 +1949,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SingleSausageAndGrillAndWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " ______  A"
       " ______  A"
@@ -2065,7 +2135,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(TwoSausages) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______ A"
       " _______ A"
@@ -2164,7 +2234,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(TwoSausagesAndWall) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______ A"
       " _______ A"
@@ -2317,7 +2387,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(TwoSausagesAndWallSpear) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______ A"
       " _______ A"
@@ -2455,7 +2525,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(LogRoll) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _D___   A"
       " 11cc_   A"
@@ -2542,7 +2612,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(CarrySausageUpLadder) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
     "          "
     " __c____ A"
     " __c111_ A"
@@ -2606,7 +2676,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(ParallelSausages) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _______ A"
       " _______ A"
@@ -2740,7 +2810,7 @@ TEST_CLASS(LogicTests) {
   }
 
   MAKE_SYMMETRICAL_TEST(SausageHat) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "         A"
       " _______ A"
       " _______ B"
@@ -2784,24 +2854,24 @@ TEST_CLASS(LogicTests) {
     level.AssertPosition(4, 3, Left);
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(3, 3, Left);
-    level.AssertSausageMoved(Left, Sausage::Rolled);
+    level.AssertSausageMoved(Left); // fork-borne hat rides rigidly -> no roll
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(2, 3, Left);
-    level.AssertSausageMoved(Left, Sausage::Rolled);
+    level.AssertSausageMoved(Left);
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(1, 3, Left);
-    level.AssertSausageMoved(Left, Sausage::Rolled);
+    level.AssertSausageMoved(Left);
     level.AssertMoveFails(Up);
     level.AssertMoveSucceeds(Right);
     level.AssertPosition(2, 3, Left);
-    level.AssertSausageMoved(Right, Sausage::Rolled);
+    level.AssertSausageMoved(Right);
     level.AssertMoveSucceeds(Down);
     level.AssertPosition(2, 3, Down);
     level.AssertSausage({1, 3, 1, 4, 0, Sausage::None});
   }
 
   MAKE_SYMMETRICAL_TEST(SausageDoubleHat) {
-    TestSymmetryHelper level(symmetry, LevelType(10, 7, "arena",
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "         A"
       " _______ A"
       " _______  "
@@ -2857,16 +2927,16 @@ TEST_CLASS(LogicTests) {
     // (transfer onto the overhang -- unasserted in the single-hat original; both halves asserted next)
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(3, 3, Left);
-    level.AssertSausage({2, 3, 2, 4, 1, Sausage::Rolled});
-    level.AssertSausage({2, 3, 2, 4, 2, Sausage::Rolled});
+    level.AssertSausage({2, 3, 2, 4, 1, Sausage::None}); // fork-borne stack rides rigidly -> no roll
+    level.AssertSausage({2, 3, 2, 4, 2, Sausage::None});
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(2, 3, Left);
     level.AssertSausage({1, 3, 1, 4, 1, Sausage::None});
     level.AssertSausage({1, 3, 1, 4, 2, Sausage::None});
     level.AssertMoveSucceeds(Left);
     level.AssertPosition(1, 3, Left);
-    level.AssertSausage({0, 3, 0, 4, 1, Sausage::Rolled});
-    level.AssertSausage({0, 3, 0, 4, 2, Sausage::Rolled});
+    level.AssertSausage({0, 3, 0, 4, 1, Sausage::None});
+    level.AssertSausage({0, 3, 0, 4, 2, Sausage::None});
     level.AssertMoveFails(Up);
     level.AssertMoveSucceeds(Right);
     level.AssertPosition(2, 3, Left);
