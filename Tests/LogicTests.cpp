@@ -683,11 +683,13 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({10, 2, 10, 3, 2, Sausage::None});   // carried off the edge on the fork tip -> rides rigidly, no roll
   }
 
-  // 4-4 Foul Fen (off-path divergence): a "bridge" sausage spans Stephen's head and fork. He climbs a rung of the
-  // ladder in his cell and steps off onto a Wall2 top; the bridge sausage rides up and North with him. Because it is
-  // fork-borne (not a genuine head hat, which the fork disqualifies), the carry across its long axis ROLLS it. Level2
-  // used to translate the carried sausage rigidly, leaving the Rolled flag unset.
-  MAKE_SYMMETRICAL_TEST(ClimbLadderRollsBridgeSausage) {
+  // 3-5 Cold Cliff / 4-4 Foul Fen: a "bridge" sausage spans Stephen's head and fork. He climbs a rung of the ladder in
+  // his cell and steps off onto a Wall2 top; the bridge rides up and North with him. Its entire lower footprint is
+  // Stephen himself (head under the west end, fork under the east end), a rigid co-mover moving at the sausage's own
+  // speed, so the Oracle gives it ZERO torsion and it rides up rigidly -- it does NOT roll. (Measured directly on 3-5
+  // Cold Cliff m62; corroborated by 21598 real Foul Fen rolls, none of which roll a co-mover-supported sausage. An
+  // earlier version of this test asserted a Rolled flag, which was a mis-strip of the real head+wall bridge geometry.)
+  MAKE_SYMMETRICAL_TEST(ClimbLadderCarriesBridgeSausageRigidly) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
@@ -702,7 +704,7 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 2, Sausage::None}); // bridge: west end on head, east end on fork
     level.AssertMoveSucceeds(Up); // climb the rung, step off North onto the Wall2 top
     level.AssertPosition(2, 2, Right);                    // rose a level, stepped one cell north; still facing east
-    level.AssertSausage({2, 2, 3, 2, 3, Sausage::Rolled}); // rode up and north, rolling across its long axis
+    level.AssertSausage({2, 2, 3, 2, 3, Sausage::None}); // rode up and north rigidly on head+fork -- no roll
   }
 
   // 4-5 Crunchy Leaves (DiffEngines divergence): Stephen climbs a ladder carrying a GENUINE head hat (a vertical
@@ -1057,10 +1059,11 @@ TEST_CLASS(OneOffTests) {
 
   // 4-2 Toad's Folly (DiffEngines divergence #1): Stephen climbs a Left-ladder up the east face of a Wall2, carrying a
   // vertical bridge sausage on his head+fork and a horizontal rider resting across the bridge's head end and the Wall2
-  // top to the west. He climbs to the wall-top and steps off west; the bridge rolls one cell west onto the wall, but
-  // the rider's own west end would ram the Wall5 beyond -- so its carry is BLOCKED and it stays put (the bridge just
-  // rolls under it), only rising with the climb. Level2 used to translate the whole carried stack rigidly, with no wall
-  // check, and shoved the rider into the Wall5 column.
+  // top to the west. He climbs to the wall-top and steps off west; the bridge rides one cell west onto the wall. Its
+  // lower footprint while carried is Stephen himself (head + fork), a rigid co-mover, so the Oracle gives it zero torsion
+  // -- it slides rigidly, it does NOT roll. The rider's own west end would ram the Wall5 beyond, so its carry is BLOCKED
+  // and it stays put, only rising with the climb. Level2 used to translate the whole carried stack rigidly with no wall
+  // check, shoving the rider into the Wall5 column.
   MAKE_SYMMETRICAL_TEST(LadderStepOffRiderWallBlocked) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
@@ -1077,7 +1080,7 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 5, 3, 5, 2, Sausage::None}); // horizontal rider on the bridge + the Wall2 top
     level.AssertMoveSucceeds(Left); // climb the ladder to the wall-top and step off west
     level.AssertPosition(2, 5, Down);                      // ended on the Wall2 top, still facing south
-    level.AssertSausage({2, 5, 2, 6, 3, Sausage::Rolled}); // bridge rolled one cell west onto the wall
+    level.AssertSausage({2, 5, 2, 6, 3, Sausage::None});   // bridge rode one cell west onto the wall rigidly -- no roll
     level.AssertSausage({2, 5, 3, 5, 4, Sausage::None});   // rider carry wall-blocked -- stayed put, just rose
   }
 

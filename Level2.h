@@ -174,7 +174,7 @@ private:
   // the rigid co-moving load (move-stages.md: "motion is one simultaneous event") so carries never ram members of the
   // same load into each other.
   u16 RidingLoad(s8 seed) const;
-  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr, bool rigid = false) const;
+  bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr, bool rigid = false, bool baseDragRolled = false) const;
 
   // Stage 5 (gravity). Drop any disturbed sausage in |plan|'s working tableau whose ends have lost their support,
   // bottom-up to a fixed point. Only sausages this move touched -- those in |movedMask|, plus any that were stacked on
