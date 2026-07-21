@@ -196,6 +196,135 @@ static void Explore(Level* level, int rollouts, int maxDepth, u32 seed, const st
   printf("Explored %s: wrote %zu demos -> %s/ (%zu masks, %zu 2-grams)\n",
          level->name, archive.size(), outDir.c_str(), seenMask.size(), seen2gram.size());
 }
+
+// -------- RRT-style novelty explorer: grow a SPARSE tree of "landmark" states over the reachable graph. Memory is
+// O(distinct regions), NOT O(all states), so it never becomes a BFS closed set. Sparsification is an OCCUPANCY GRID:
+// each state's signature (positions quantized by |bin|, plus exact cook/facing) hashes to a u64 cell id, and a
+// landmark is kept only for the FIRST state to fall in each cell -- an O(1) hash check that replaces the old O(N) L1
+// nearest-neighbor scan, so a single tree can grow arbitrarily deep without slowing down. Growth is frontier-biased:
+// each iteration expands the least-fanned-out of a few random candidates (fewest children = the growing frontier),
+// then random-rollouts from it, planting a chain of new landmarks wherever the walk enters a fresh cell. Each
+// landmark's root-anchored path (segments up the parent chain) is a long demo -- ideal for the oracle, which validates
+// every intermediate move of a path in one replay. Not complete; it's a sampler. |bin| is the resolution dial (1 =
+// every distinct state; larger = coarser regions).
+static u64 BucketKey(const State& s, int bin) {
+  u64 h = 1469598103934665603ull; // FNV-1a offset basis
+  auto mix = [&](s64 v) { h = (h ^ (u64)v) * 1099511628211ull; };
+  mix(s.stephen.x / bin); mix(s.stephen.y / bin); mix(s.stephen.z / bin); mix((s64)s.stephen.dir);
+  mix(s.stephen.forkX / bin); mix(s.stephen.forkY / bin); mix(s.stephen.forkZ / bin); mix((s64)s.stephen.forkDir);
+  for (int i = 0; i < NUM_SAUSAGES; i++) {
+    const Sausage& sa = s.sausages[i];
+    mix(sa.x1 / bin); mix(sa.y1 / bin); mix(sa.x2 / bin); mix(sa.y2 / bin); mix(sa.z / bin); mix((s64)sa.flags);
+  }
+  return h;
+}
+
+struct RRTNode {
+  State state;
+  int parent;
+  std::vector<Direction> segment; // moves from |parent|'s state to this state
+  int depth;                       // total moves from the root
+};
+
+static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, int frontierK, u32 seed, const std::string& outDir) {
+  const int INF = 1 << 30;
+  if (bin < 1) bin = 1;
+  std::mt19937 rng(seed);
+  State start = level->GetState();
+  std::vector<RRTNode> tree;
+  std::vector<int> childCount;            // per node -- frontier proxy + leaf detection
+  std::unordered_set<u64> occupied;       // O(1) sparsifier: one landmark per grid cell
+  tree.push_back({ start, -1, {}, 0 });
+  childCount.push_back(0);
+  occupied.insert(BucketKey(start, bin));
+  Direction dirs[4] = { Up, Down, Left, Right };
+
+  int maxDepth = 0, productiveRollouts = 0;
+  for (int it = 0; it < iterations; it++) {
+    // Frontier proxy: of |frontierK| random candidates, expand the one with the FEWEST children -- interior nodes have
+    // already fanned out, so the least-branched ones are the growing frontier. O(1) each (vs the old O(N) isolation scan).
+    int from = 0;
+    if (tree.size() > 1) {
+      int bestChildren = INF;
+      for (int k = 0; k < frontierK; k++) {
+        int cand = (int)(rng() % tree.size());
+        if (childCount[cand] < bestChildren) { bestChildren = childCount[cand]; from = cand; }
+      }
+    }
+
+    level->SetState(tree[from].state);
+    std::vector<Direction> segment;
+    bool grew = false;
+    for (int step = 0; step < rolloutLen; step++) {
+      State before = level->GetState();
+      int order[4] = { 0, 1, 2, 3 };
+      for (int i = 3; i > 0; i--) { int j = (int)(rng() % (i + 1)); std::swap(order[i], order[j]); }
+      bool moved = false;
+      for (int oi = 0; oi < 4; oi++) {
+        level->SetState(before);
+        if (level->Move(dirs[order[oi]])) { segment.push_back(dirs[order[oi]]); moved = true; break; }
+      }
+      if (!moved) { level->SetState(before); break; } // dead end -- every move refused
+
+      State cur = level->GetState();
+      if (occupied.insert(BucketKey(cur, bin)).second) { // first state in this grid cell -> a genuinely new region
+        int depth = tree[from].depth + (int)segment.size();
+        childCount[from]++;
+        tree.push_back({ cur, from, segment, depth });
+        childCount.push_back(0);
+        if (depth > maxDepth) maxDepth = depth;
+        grew = true;
+        from = (int)tree.size() - 1; // chain: further landmarks this rollout branch off the one just planted
+        segment.clear();
+      }
+      if (level->Won()) break;
+    }
+    if (grew) productiveRollouts++;
+  }
+
+  // Root-anchored path for a landmark: walk up the parent chain, concatenating segments front-to-back.
+  auto rootPath = [&](int idx) {
+    std::vector<int> chain;
+    for (int i = idx; i != -1; i = tree[i].parent) chain.push_back(i);
+    std::vector<Direction> path;
+    for (int ci = (int)chain.size() - 1; ci >= 0; ci--) {
+      const auto& seg = tree[chain[ci]].segment;
+      path.insert(path.end(), seg.begin(), seg.end());
+    }
+    return path;
+  };
+
+  // Only LEAF landmarks (childCount 0) need a demo: a leaf's root-anchored path already traverses every one of its
+  // ancestors, so replaying leaves implicitly validates all interior landmark states (one long path checks every
+  // intermediate for free). Write them, tracking the longest leaf demo as we go.
+  std::filesystem::create_directories(outDir);
+  for (const auto& e : std::filesystem::directory_iterator(outDir))
+    if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
+  int n = 0, longestDemo = 0;
+  for (int i = 1; i < (int)tree.size(); i++) {
+    if (childCount[i] != 0) continue; // interior landmark -- already on some leaf's root path
+    std::vector<Direction> path = rootPath(i);
+    if ((int)path.size() > longestDemo) longestDemo = (int)path.size();
+    char name[32]; snprintf(name, sizeof(name), "%05d.dem", n++);
+    std::ofstream out(outDir + "/" + name);
+    for (Direction d : path) out << DIR_NAMES[d] << '\n';
+    out << "Stop\n" << tree[i].state << '\n';
+  }
+
+  // --- Diagnostics (all O(N) -- no pairwise distance) ---
+  int landmarks = (int)tree.size() - 1;
+  int depthBuckets[8] = { 0 };
+  for (int i = 1; i < (int)tree.size(); i++) { int db = tree[i].depth / 10; if (db > 7) db = 7; depthBuckets[db]++; }
+
+  printf("RRT %s [iters=%d rollout=%d bin=%d frontierK=%d seed=0x%X]\n",
+         level->name, iterations, rolloutLen, bin, frontierK, seed);
+  printf("  landmarks=%d  leaves=%d  maxDepth=%d moves  longestLeafDemo=%d moves  productiveIters=%d/%d\n",
+         landmarks, n, maxDepth, longestDemo, productiveRollouts, iterations);
+  printf("  depth histogram (0-9,10-19,...,70+): ");
+  for (int b = 0; b < 8; b++) printf("%d%s ", depthBuckets[b], b == 7 ? "+" : "");
+  printf("\n");
+  printf("  wrote %d leaf demos (of %d landmarks) -> %s/\n", n, landmarks, outDir.c_str());
+}
 #endif
 
 // Replay every .dem in |dir| through THIS build's engine and compare the engine's end-of-simulation geometry to the
@@ -299,6 +428,16 @@ int main(int argc, char* argv[]) {
         std::string safe = test->name;
         for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
         Explore(test, rollouts, 80, seed, "oracle-demos/" + safe);
+        return 0;
+      }
+      if (demoPath == "rrt") {
+        int iterations = (argc >= 4) ? atoi(argv[3]) : 2000;
+        int rolloutLen = (argc >= 5) ? atoi(argv[4]) : 40;
+        int bin        = (argc >= 6) ? atoi(argv[5]) : 3;
+        u32 seed       = (argc >= 7) ? (u32)strtoul(argv[6], nullptr, 0) : 0xC0FFEEu;
+        std::string safe = test->name;
+        for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
+        RRTExplore(test, iterations, rolloutLen, bin, 8, seed, "oracle-demos/" + safe);
         return 0;
       }
 #endif
