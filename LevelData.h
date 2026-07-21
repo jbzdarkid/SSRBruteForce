@@ -1,5 +1,6 @@
 #pragma once
 #include <initializer_list>
+#include <ostream>
 #include "WitnessRNG/StdLib.h"
 
 #define OVERWORLD_HACK 0
@@ -22,6 +23,8 @@ enum Direction : u8 {
   Right = 5,
   Down = 6,
 };
+
+extern const char* DIR_NAMES[]; // defined in Main.cpp; indexed by Direction
 
 struct Stephen {
   s8 x;
@@ -66,6 +69,13 @@ struct Stephen {
     return a == b;
   }
   bool operator!=(const Stephen& other) const { return !(*this == other); }
+
+  // Raw-int dump for the oracle to diff against: body pose + facing, then fork pose + fork facing. Directions go out as
+  // names (via DIR_NAMES), which the game's Direction enum matches ("North"/"South"/"West"/"East"/"None").
+  friend std::ostream& operator<<(std::ostream& o, const Stephen& s) {
+    return o << (int)s.x << ' ' << (int)s.y << ' ' << (int)s.z << ' ' << DIR_NAMES[s.dir] << ' '
+             << (int)s.forkX << ' ' << (int)s.forkY << ' ' << (int)s.forkZ << ' ' << DIR_NAMES[s.forkDir];
+  }
 };
 
 struct Ladder {
@@ -122,6 +132,17 @@ struct Sausage {
     return a == b; // Assuming the padding bytes are always 0
   }
   bool operator!=(const Sausage& other) const { return !(*this == other); }
+
+  friend std::ostream& operator<<(std::ostream& o, const Sausage& s) {
+    o << (int)s.x1 << ' ' << (int)s.y1 << ' ' << (int)s.x2 << ' ' << (int)s.y2 << ' ' << (int)s.z;
+    if (s.flags & Sausage::Flags::Cook1A) o << " Cook1A";
+    if (s.flags & Sausage::Flags::Cook1B) o << " Cook1B";
+    if (s.flags & Sausage::Flags::Cook2A) o << " Cook2A";
+    if (s.flags & Sausage::Flags::Cook2B) o << " Cook2B";
+    if (s.flags & Sausage::Flags::Rolled) o << " Rolled";
+    if (s.flags == 0) o << " NoFlags";
+    return o;
+  }
 };
 
 // Note the bit-masking here -- this allows us to natively represent overhangs

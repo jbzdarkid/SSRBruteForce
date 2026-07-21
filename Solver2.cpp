@@ -3,19 +3,19 @@
 
 #include <filesystem>
 
-Solver2::Solver2(Level* level, u32 numBuckets) {
+Solver::Solver(Level* level, u32 numBuckets) {
   _level = level;
   _numBuckets = numBuckets;
 }
 
-std::vector<Direction> Solver2::Solve() {
+std::vector<Direction> Solver::Solve() {
   // Clean out any previous solve data (which likely had a different salt)
   std::filesystem::remove_all("cache");
   std::filesystem::create_directories("cache");
 
   // Step 1: BFS through all states, tracking states which are known 
   u32 maxDepth = 0xFFFF;
-  State2 initialState = _level->GetState2();
+  State initialState = _level->GetState();
 
   // Initial layer with only one state
   {
@@ -46,16 +46,16 @@ std::vector<Direction> Solver2::Solve() {
   return _bestSolution;
 }
 
-void Solver2::ProcessOneLayer(u32 depth) {
+void Solver::ProcessOneLayer(u32 depth) {
   FrontierBuilder cache(depth, _numBuckets);
 
   // First, iterate through all the states in the previous layer (bucketed by the top hash bits)
   // Note that we only do basic Move validation here, not deduplication.
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
-    LayerCache<State2> previousLayer("depth", depth - 1, "bucket", bucket);
-    for (const State2& state : previousLayer) {
+    LayerCache<State> previousLayer("depth", depth - 1, "bucket", bucket);
+    for (const State& state : previousLayer) {
       for (Direction dir : { Up, Down, Left, Right }) {
-        _level->SetState2(state); // Sadly our solver is still not completely transactional.
+        _level->SetState(state); // Sadly our solver is still not completely transactional.
         if (_level->Won()) {
           _winningStateFound = true; // No need to explore further past a winning state
           break;
@@ -64,7 +64,7 @@ void Solver2::ProcessOneLayer(u32 depth) {
         if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level)) continue; // Discard heuristically-pruned moves
 
-        cache.AddStateUnchecked(_level->GetState2());
+        cache.AddStateUnchecked(_level->GetState());
       }
     }
   }
@@ -75,12 +75,12 @@ void Solver2::ProcessOneLayer(u32 depth) {
   std::cout << "Finished exploring depth " << depth << ", and found " << newStates << " new states.\n";
 }
 
-void Solver2::FindWinningStates(u32 depth) {
+void Solver::FindWinningStates(u32 depth) {
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
-    LayerCache<State2> layer("depth", depth, "bucket", bucket);
-    for (const State2& state : layer) {
+    LayerCache<State> layer("depth", depth, "bucket", bucket);
+    for (const State& state : layer) {
       for (Direction dir : { Up, Down, Left, Right }) {
-        _level->SetState2(state);
+        _level->SetState(state);
       
         // We will have multiple 'winning' depths, so it's possible that we find immediately winning states.
         if (_level->Won()) {
@@ -91,7 +91,7 @@ void Solver2::FindWinningStates(u32 depth) {
         if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level)) continue;
 
-        State2 newState = _level->GetState2();
+        State newState = _level->GetState();
         auto search = _winningStates.find(newState);
         if (search == std::end(_winningStates)) continue; // Not a winning move
 
@@ -104,8 +104,8 @@ void Solver2::FindWinningStates(u32 depth) {
   }
 }
 
-void Solver2::FindFastestSolution(const State2& state, std::vector<Direction>& solution, u32 score) {
-  _level->SetState2(state);
+void Solver::FindFastestSolution(const State& state, std::vector<Direction>& solution, u32 score) {
+  _level->SetState(state);
   if (_level->Won()) {
     if (score < _bestScore) {
       _bestSolution = solution;
@@ -115,11 +115,11 @@ void Solver2::FindFastestSolution(const State2& state, std::vector<Direction>& s
   }
 
   for (Direction dir : { Up, Down, Left, Right }) {
-    _level->SetState2(state);
+    _level->SetState(state);
 
     if (!_level->Move(dir)) continue;
 
-    State2 newState = _level->GetState2();
+    State newState = _level->GetState();
     auto search = _winningStates.find(newState);
     if (search == std::end(_winningStates) || search->second != solution.size() + 1) continue; // Not a winning move, or not an optimal winning move.
 
@@ -130,7 +130,7 @@ void Solver2::FindFastestSolution(const State2& state, std::vector<Direction>& s
   }
 }
 
-u32 Solver2::ComputeScore(const State2& state, Direction dir, const State2& newState) {
+u32 Solver::ComputeScore(const State& state, Direction dir, const State& newState) {
   u32 score = 0;
 
   // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.

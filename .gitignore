@@ -9,3 +9,4 @@ vcpkg_installed
 *.idb
 *.pdb
 cache/
+Extracted/

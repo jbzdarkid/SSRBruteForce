@@ -1,13 +1,16 @@
+#include "Levels.h"
 #include "Solver2.h"
-#include "Levels.h" // Ordered second because it redefines Level
 
+#include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <locale>
+#include <sstream>
 #include <string>
-#include <unordered_set>
+#include <utility>
 #include <vector>
 
 const char* DIR_NAMES[] = {"None", "North", "West", "Jump", "Crouch", "East", "South"};
@@ -58,27 +61,185 @@ bool IsEscarpmentRotationDrop(const LevelData* level) {
   return hat && base;
 }
 
-// Print Stephen's pose and every sausage's footprint/flags for a captured state -- the shared per-state dump used by
-// both the demo replay (TestLevel) and the exhaustive engine diff (DiffEngines).
-void PrintStateDetail(const State& state) {
-  printf("  stephen: body=(%d,%d,%d) dir=%s  fork=(%d,%d,%d) forkDir=%s\n",
-    state.stephen.x, state.stephen.y, state.stephen.z, DIR_NAMES[state.stephen.dir],
-    state.stephen.forkX, state.stephen.forkY, state.stephen.forkZ,
-    DIR_NAMES[state.stephen.forkDir]);
-  for (int j = 0; j < NUM_SAUSAGES; ++j) {
-    const Sausage& s = state.sausages[j];
-    std::string flags;
-    if (s.flags & Sausage::Flags::Cook1A) flags += "Cook1A ";
-    if (s.flags & Sausage::Flags::Cook1B) flags += "Cook1B ";
-    if (s.flags & Sausage::Flags::Cook2A) flags += "Cook2A ";
-    if (s.flags & Sausage::Flags::Cook2B) flags += "Cook2B ";
-    if (s.flags & Sausage::Flags::Rolled) flags += "Rolled ";
-    if (flags.empty()) flags = "none";
-    else flags.pop_back(); // drop trailing space
+// winOverride goal for the "gap 2" log-roll head-hat divergence. Detects the pre-roll pose: Stephen stands ON a sausage
+// (the log), carries a head-hat, and that hat's FAR half (the end not over his head) rests on a THIRD sausage which is
+// itself riding the log. When he then presses ACROSS the log (a log-roll), the log rolls and carries that third sausage
+// out from under the hat's far end -- and the reference flings the head-hat off Stephen onto the moving sausage while
+// Level2 keeps it on his head. Point winOverride here, |findpath| to this pose, then press across the log to reproduce.
+bool IsLogRollHatDivergence(const LevelData* level) {
+  const Stephen& man = level->GetStephen();
+  const Vector<Sausage>& sausages = level->Sausages();
+  s8 logNo = level->GetSausage(man.x, man.y, man.z - 1);   // Stephen must be standing on a sausage
+  if (logNo == -1) return false;
+  s8 hatNo = level->GetSausage(man.x, man.y, man.z + 1);   // ...with a head-hat above him
+  if (hatNo == -1) return false;
+  const Sausage& log = sausages[logNo];
+  const Sausage& hat = sausages[hatNo];
+  // A log-roll only fires when Stephen faces ALONG the log's long axis and presses across it.
+  bool canRoll = (log.IsHorizontal() && (man.dir == Up || man.dir == Down))
+              || (log.IsVertical()   && (man.dir == Left || man.dir == Right));
+  if (!canRoll) return false;
+  // The hat's far half is the end that isn't over Stephen's head; it must actually bridge off that cell.
+  bool firstOnHead = (hat.x1 == man.x && hat.y1 == man.y);
+  s8 farX = firstOnHead ? hat.x2 : hat.x1;
+  s8 farY = firstOnHead ? hat.y2 : hat.y1;
+  if (farX == man.x && farY == man.y) return false;        // hat sits squarely on the head (no cantilever) -> no divergence
+  s8 midNo = level->GetSausage(farX, farY, man.z);         // the sausage under the hat's far end (hat.z-1 == man.z)
+  if (midNo == -1 || midNo == logNo || midNo == hatNo) return false;
+  // The "mid" must ride the LOG (rest on one of the log's ends) so that the roll carries it away this turn.
+  const Sausage& mid = sausages[midNo];
+  bool midOnLog = level->GetSausage(mid.x1, mid.y1, mid.z - 1) == logNo
+               || level->GetSausage(mid.x2, mid.y2, mid.z - 1) == logNo;
+  return midOnLog;
+}
 
-    printf("  sausage[%d]: (%d,%d)-(%d,%d) z=%d flags=0x%02x [%s]\n",
-      j, s.x1, s.y1, s.x2, s.y2, s.z, (unsigned)s.flags, flags.c_str());
+#ifdef USE_LEVEL2
+static int PopCount(u32 v) { int c = 0; while (v) { v &= v - 1; c++; } return c; }
+
+// Novelty + complexity guided Monte-Carlo explorer (runs on Level2, the engine under test). From the level start it
+// does many random rollouts, at each step sampling the next input with weight proportional to how "distinctive" it is
+// (how many mechanics its feature mask fired, whether the state changed) plus a novelty bonus for feature masks and
+// consecutive-mask 2-grams not seen before. The path is archived whenever a move reaches a NOVEL Level2 state (so
+// every first-entry transition -- including pure-geometry ones with no special feature -- gets probed) or produces a
+// novel feature signature. Each archived path is a pure demo; the oracle replays it independently and an external
+// diff compares trajectories. Broad state coverage is what lets the geometry-only divergences surface.
+static void Explore(Level* level, int rollouts, int maxDepth, u32 seed, const std::string& outDir) {
+  std::mt19937 rng(seed);
+  State start = level->GetState();
+  std::unordered_set<u32> seenMask;
+  std::unordered_set<u64> seen2gram;
+  std::set<State> seenState;
+  seenState.insert(start);
+  struct Archived { std::vector<Direction> path; State end; u32 mask; }; // path + Level2 end-state + the move's feature mask
+  std::vector<Archived> archive;
+  std::unordered_map<u32, std::vector<int>> maskBuckets; // feature mask -> its archive slots, for mechanic-diverse eviction
+  Direction dirs[4] = { Up, Down, Left, Right };
+  const int kMaxArchive = 40000;
+
+  for (int r = 0; r < rollouts; r++) {
+    level->SetState(start);
+    std::vector<Direction> path;
+    u32 prevMask = 0;
+    for (int step = 0; step < maxDepth; step++) {
+      State cur = level->GetState();
+      double score[4]; u32 feat4[4]; bool acc4[4];
+      double total = 0;
+      for (int i = 0; i < 4; i++) {
+        level->SetState(cur);
+        level->_feat = 0;
+        bool ok = level->Move(dirs[i]);
+        feat4[i] = level->_feat; acc4[i] = ok;
+        State res = level->GetState();
+        bool changed = !(res == cur);
+        u32 m = feat4[i];
+        u64 gram = ((u64)prevMask << 32) | m;
+        double nov = 0;
+        if (m && seenMask.find(m) == seenMask.end()) nov += 6.0;
+        if (m && seen2gram.find(gram) == seen2gram.end()) nov += 3.0;
+        double s = 0.15 + PopCount(m) * 1.0 + nov + (changed ? 0.5 : 0.0);
+        if (!ok) s = 0.0; // reject: never sample a refused move -- reroll among the accepted ones instead
+        score[i] = s; total += s;
+      }
+      if (total <= 0.0) break; // no accepted move from here -- end the rollout rather than emit a rejected no-op
+      double pick = (rng() / (double)0xFFFFFFFFu) * total;
+      int d = 0; for (; d < 3; d++) { if (pick < score[d]) break; pick -= score[d]; }
+      level->SetState(cur);
+      level->_feat = 0;
+      level->Move(dirs[d]);
+      path.push_back(dirs[d]);
+      u32 mask = feat4[d];
+      u64 gram = ((u64)prevMask << 32) | mask;
+      bool novel = false;
+      if (seenState.insert(level->GetState()).second) novel = true;   // first time we reach this Level2 state
+      if (mask && seenMask.insert(mask).second) novel = true;
+      if (mask && seen2gram.insert(gram).second) novel = true;
+      if (novel) {
+        // Archive the demo. Below the (fixed) size cap we just append; once full we keep exploring and reservoir-evict,
+        // but bias the eviction to preserve MECHANIC diversity: drop a demo from whichever feature mask is currently the
+        // most over-represented (with a uniformly random pick *within* that dominant bucket). Rare/unique mechanics are
+        // thus never crowded out by common ones (e.g. plain-geometry mask==0 moves), and the retained sample stays an
+        // unbiased reservoir across the whole exploration instead of just the first-40000 prefix.
+        State end = level->GetState();
+        if ((int)archive.size() < kMaxArchive) {
+          maskBuckets[mask].push_back((int)archive.size());
+          archive.push_back({ path, end, mask });
+        } else {
+          u32 evMask = 0; size_t best = 0;
+          for (const auto& kv : maskBuckets) if (kv.second.size() > best) { best = kv.second.size(); evMask = kv.first; }
+          auto& bucket = maskBuckets[evMask];
+          int pos = (int)(rng() % bucket.size());
+          int slot = bucket[pos];
+          bucket[pos] = bucket.back(); bucket.pop_back(); // swap-pop the evicted slot out of its bucket
+          archive[slot] = { path, end, mask };
+          maskBuckets[mask].push_back(slot);
+        }
+      }
+      prevMask = mask;
+      if (level->Won()) break;
+    }
   }
+
+  // Write each archived path as a standard .dem: the moves, then a "Stop" line, then Level2's end-of-simulation
+  // geometry as raw ints (Stephen's body+fork pose, then each sausage's two cells + z). GetState already sorted the
+  // sausages, so it's canonical. Move-replayers ignore the trailing non-move lines; the oracle replays the moves and
+  // compares its own end geometry to that final line for a position divergence (and reports a loss on death).
+  std::filesystem::create_directories(outDir);
+  for (const auto& e : std::filesystem::directory_iterator(outDir))
+    if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
+  int n = 0;
+  for (const auto& a : archive) {
+    char name[32]; snprintf(name, sizeof(name), "%05d.dem", n++);
+    std::ofstream out(outDir + "/" + name);
+    for (Direction d : a.path) out << DIR_NAMES[d] << '\n';
+    out << "Stop\n" << a.end << '\n'; // State operator<< = Stephen + oracle-sorted sausages (matches the oracle's line)
+  }
+  printf("Explored %s: wrote %zu demos -> %s/ (%zu masks, %zu 2-grams)\n",
+         level->name, archive.size(), outDir.c_str(), seenMask.size(), seen2gram.size());
+}
+#endif
+
+// Replay every .dem in |dir| through THIS build's engine and compare the engine's end-of-simulation geometry to the
+// state recorded on the demo's trailing line (written by whichever engine generated it). Prints how many demos the
+// current engine ends differently on. Built into both engines, so running it from the reference build over Level2's
+// demos reports exactly where the reference disagrees with Level2 (and, since Level2 tracks the game almost perfectly,
+// with the game). Non-destructive: the demos are only read.
+static void Reverify(Level* level, const std::string& dir) {
+  State start = level->GetState();
+  int total = 0, changed = 0;
+  std::vector<std::string> mismatches;
+  for (const auto& e : std::filesystem::directory_iterator(dir)) {
+    if (e.path().extension() != ".dem") continue;
+    std::vector<Direction> moves;
+    std::string recorded;
+    {
+      std::ifstream in(e.path());
+      std::string line;
+      bool afterStop = false;
+      while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "Stop") { afterStop = true; continue; }
+        if (afterStop) { if (recorded.empty()) recorded = line; continue; }
+        if      (line == "North") moves.push_back(Up);
+        else if (line == "South") moves.push_back(Down);
+        else if (line == "East")  moves.push_back(Right);
+        else if (line == "West")  moves.push_back(Left);
+      }
+    }
+    level->SetState(start);
+    for (Direction d : moves) {
+      if (!level->Move(d)) break;
+      if (level->Won()) break;
+    }
+    std::ostringstream oss;
+    oss << level->GetState();
+    total++;
+    if (oss.str() != recorded) {
+      changed++;
+      if (mismatches.size() < 20) mismatches.push_back(e.path().filename().string());
+    }
+  }
+  printf("Reverify %s: %d demos, %d end differently from the recorded state.\n", dir.c_str(), total, changed);
+  for (const std::string& m : mismatches) printf("  %s\n", m.c_str());
 }
 
 bool TestLevel(Level* level, std::vector<Direction> moves) {
@@ -91,7 +252,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
 
     State state = level->GetState();
     printf("\n=== move %d: %s %s ===\n", (i+1), DIR_NAMES[dir], (success ? "SUCCEEDED" : "FAILED"));
-    PrintStateDetail(state);
+    std::cout << state << std::endl;
     level->Print();
 
     if (level->Won()) break; // Demos have trailing moves
@@ -102,7 +263,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
 }
 
 bool SolveLevel(Level* level) {
-  Solver2 solver(level);
+  Solver solver(level);
   std::vector<Direction> solution = solver.Solve();
 
   if (solution.empty()) return false;
@@ -111,74 +272,6 @@ bool SolveLevel(Level* level) {
   for (Direction dir : solution) out << DIR_NAMES[dir] << '\n';
   return true;
 }
-
-#ifdef USE_DIFF_ENGINES
-// Exhaustively BFS the reference-reachable state space from the level's start, replaying every direction through both
-// the reference (BaseLevel::Move) and the Level2 shadow (Move) at each state, and report the first few divergences. A
-// state is compared/expanded only when the reference ACCEPTS the move: a rejected move leaves garbage in _stephen
-// (Move mutates before its support check), so its post-state is meaningless. Build /DUSE_LEVEL2 /DUSE_DIFF_ENGINES and
-// run with a level name but NO demo path.
-static void DiffEngines(Level* level, bool summaryOnly = false) {
-  if (summaryOnly) printf("== %s ==\n", level->name);
-  State start = level->GetState();
-  std::unordered_set<State> visited;
-  std::vector<State> frontier;
-  visited.insert(start);
-  frontier.push_back(start);
-  const size_t kCap = 60'000'000; // hard cap so a huge level can't OOM
-  size_t explored = 0, diverged = 0;
-  // Classify divergences so we can tell harmless no-ops (Level2 accepts a move the reference refuses but nothing moves)
-  // from real ones (Level2 reaches a state the reference cannot, or the two accepted results disagree).
-  size_t noopAccept = 0, newStateAccept = 0, refAcceptsL2Refuses = 0, bothAcceptDiffer = 0;
-  Direction dirs[] = { Up, Down, Left, Right };
-  while (!frontier.empty()) {
-    State cur = frontier.back();
-    frontier.pop_back();
-    explored++;
-    for (Direction d : dirs) {
-      level->SetState(&cur);
-      bool retRef = level->BaseLevel::Move(d);
-      State stateRef = level->GetState();
-      // A level may flag genuinely-buggy reference scenarios via its heuristic (returns false for them). When the
-      // reference lands in such a state, ignore the whole transition -- don't diff it, don't explore past it -- so the
-      // survey can focus on fixable divergences elsewhere (per the "reject genuine bugs to drill in" workflow).
-      if (retRef && level->heuristic) {
-        level->SetState(&stateRef);
-        if (!level->heuristic(level)) continue;
-      }
-      level->SetState(&cur);
-      bool ret2 = level->Move(d);
-      State state2 = level->GetState();
-      bool div = (retRef != ret2) || (retRef && !(stateRef == state2));
-      if (div) {
-        if      (!retRef && ret2 && (state2 == cur)) noopAccept++;
-        else if (!retRef && ret2)                    newStateAccept++;
-        else if (retRef && !ret2)                    refAcceptsL2Refuses++;
-        else                                         bothAcceptDiffer++;
-        // Dump the first few divergences in full: the pre-move board/pose and each engine's post-move result. A
-        // rejected move's post-state is meaningless (the reference mutates before failing; Level2 leaves it untouched),
-        // so only print an engine's "after" when it actually accepted.
-        ++diverged;
-        if (!summaryOnly && diverged <= 3) {
-          printf("\n===== DIVERGENCE #%zu  dir=%s  retRef=%d ret2=%d =====\n", diverged, DIR_NAMES[d], retRef, ret2);
-          printf("--- before ---\n");
-          level->SetState(&cur); level->Print(); PrintStateDetail(cur);
-          if (retRef) { printf("--- reference after ---\n"); level->SetState(&stateRef); level->Print(); PrintStateDetail(stateRef); }
-          if (ret2)   { printf("--- level2 after ---\n");    level->SetState(&state2);  level->Print(); PrintStateDetail(state2); }
-        }
-      }
-      if (retRef && visited.size() < kCap && visited.insert(stateRef).second)
-        frontier.push_back(stateRef);
-    }
-    // Detail drill-down only prints the first 3 divergences, so stop once we have them instead of grinding to the 60M
-    // cap -- makes per-level diagnosis fast. The ALL/count survey (summaryOnly) still explores fully for exact totals.
-    if (!summaryOnly && diverged >= 3) break;
-  }
-  printf("DiffEngines: explored=%zu diverged=%zu visited=%zu\n", explored, diverged, visited.size());
-  printf("  breakdown: noopAccept=%zu newStateAccept=%zu refAcceptsL2Refuses=%zu bothAcceptDiffer=%zu\n",
-         noopAccept, newStateAccept, refAcceptsL2Refuses, bothAcceptDiffer);
-}
-#endif
 
 int main(int argc, char* argv[]) {
   setvbuf(stdout, nullptr, _IONBF, 0); // Disable stdout buffering so we see partial output on crash.
@@ -191,7 +284,7 @@ int main(int argc, char* argv[]) {
 
   std::string filter = std::string{ argv[1] };
   std::string demoPath;
-  if (argc == 3) demoPath = std::string{ argv[2] };
+  if (argc >= 3) demoPath = std::string{ argv[2] };
 
   bool surveyAll = (filter == "ALL");
   for (Level* test : tests) {
@@ -199,17 +292,28 @@ int main(int argc, char* argv[]) {
     if (!surveyAll && !std::strstr(test->name, filter.c_str())) continue; // Failed to match filter
 
     if (!demoPath.empty()) {
-#ifdef USE_DIFF_ENGINES
-      if (demoPath == "count") { // full exact divergence count for a single level (no per-divergence dumps)
-        DiffEngines(test, true);
+#ifdef USE_LEVEL2
+      if (demoPath == "explore") {
+        int rollouts = (argc >= 4) ? atoi(argv[3]) : 3000;
+        u32 seed = (argc >= 5) ? (u32)strtoul(argv[4], nullptr, 0) : 0xC0FFEEu;
+        std::string safe = test->name;
+        for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
+        Explore(test, rollouts, 80, seed, "oracle-demos/" + safe);
         return 0;
       }
 #endif
+      if (demoPath == "reverify") {
+        std::string safe = test->name;
+        for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
+        std::string dir = (argc >= 4) ? std::string{ argv[3] } : ("oracle-demos/" + safe);
+        Reverify(test, dir);
+        return 0;
+      }
       if (demoPath == "findpath") {
         // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Build the
         // reference engine (no /DUSE_LEVEL2) so the path is reference-legal. Swap the goal predicate for the scenario
         // being reproduced.
-        test->winOverride = &IsEscarpmentRotationDrop;
+        test->winOverride = &IsLogRollHatDivergence;
         bool ok = SolveLevel(test);
         printf(ok ? "Wrote solved.dem: shortest path to the alt win state.\n" : "No such state reachable.\n");
         return ok ? 0 : 5;
@@ -239,11 +343,6 @@ int main(int argc, char* argv[]) {
       if (!success) printf("Demo replay did not solve the level.\n");
       return success ? 0 : 2;
     } else {
-#ifdef USE_DIFF_ENGINES
-      DiffEngines(test, surveyAll);
-      if (!surveyAll) return 0;
-      continue;
-#endif
       printf("Solving level %s\n", test->name);
 
       bool success = SolveLevel(test);

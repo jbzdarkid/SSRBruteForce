@@ -15,7 +15,7 @@ class FrontierBuilder {
 public:
   FrontierBuilder(u32 depth, u32 numBuckets);
 
-  void AddStateUnchecked(const State2& state);
+  void AddStateUnchecked(const State& state);
   u64 ProcessStates();
 
 private:
@@ -23,7 +23,7 @@ private:
 
   u32 _numBuckets = 0;
   std::vector<LayerCache<u128>> _knownHashes;
-  std::vector<LayerCache<State2>> _currentLayer;
-  std::vector<LayerCache<State2>> _uncheckedStates;
+  std::vector<LayerCache<State>> _currentLayer;
+  std::vector<LayerCache<State>> _uncheckedStates;
   std::vector<LayerCache<u128>> _uncheckedStateHashes;
 };
