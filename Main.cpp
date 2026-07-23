@@ -93,7 +93,6 @@ bool IsLogRollHatDivergence(const LevelData* level) {
   return midOnLog;
 }
 
-#ifdef USE_LEVEL2
 static int PopCount(u32 v) { int c = 0; while (v) { v &= v - 1; c++; } return c; }
 
 // Novelty + complexity guided Monte-Carlo explorer (runs on Level2, the engine under test). From the level start it
@@ -325,7 +324,6 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
   printf("\n");
   printf("  wrote %d leaf demos (of %d landmarks) -> %s/\n", n, landmarks, outDir.c_str());
 }
-#endif
 
 // Replay every .dem in |dir| through THIS build's engine and compare the engine's end-of-simulation geometry to the
 // state recorded on the demo's trailing line (written by whichever engine generated it). Prints how many demos the
@@ -421,7 +419,6 @@ int main(int argc, char* argv[]) {
     if (!surveyAll && !std::strstr(test->name, filter.c_str())) continue; // Failed to match filter
 
     if (!demoPath.empty()) {
-#ifdef USE_LEVEL2
       if (demoPath == "explore") {
         int rollouts = (argc >= 4) ? atoi(argv[3]) : 3000;
         u32 seed = (argc >= 5) ? (u32)strtoul(argv[4], nullptr, 0) : 0xC0FFEEu;
@@ -440,7 +437,6 @@ int main(int argc, char* argv[]) {
         RRTExplore(test, iterations, rolloutLen, bin, 8, seed, "oracle-demos/" + safe);
         return 0;
       }
-#endif
       if (demoPath == "reverify") {
         std::string safe = test->name;
         for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
@@ -449,9 +445,8 @@ int main(int argc, char* argv[]) {
         return 0;
       }
       if (demoPath == "findpath") {
-        // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Build the
-        // reference engine (no /DUSE_LEVEL2) so the path is reference-legal. Swap the goal predicate for the scenario
-        // being reproduced.
+        // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Swap the
+        // goal predicate for the scenario being reproduced.
         test->winOverride = &IsLogRollHatDivergence;
         bool ok = SolveLevel(test);
         printf(ok ? "Wrote solved.dem: shortest path to the alt win state.\n" : "No such state reachable.\n");

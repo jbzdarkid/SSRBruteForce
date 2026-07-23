@@ -72,6 +72,192 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 0, Sausage::Cook1A});
   }
 
+  // Speared Stephen backs up, dragging the speared sausage; a hat rests on BOTH the speared sausage and Stephen's head,
+  // so both its supports move -- it must ride the full drag (3-4 Cold Trail m552).
+  MAKE_SYMMETRICAL_TEST(SpearedBackDragCarriesHeadSpanningHat) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " __^____  "
+      " _______  "
+      "          ",
+      {}, {}, { Sausage{3, 2, 3, 3, 0}, Sausage{3, 3, 3, 4, 1}, Sausage{9, 1, 9, 2, 0} }));
+    level.AssertPosition(3, 4, Up);
+    level.AssertSausage({3, 2, 3, 3, 0, Sausage::None}); // speared base, north of Stephen
+    level.AssertSausage({3, 3, 3, 4, 1, Sausage::None}); // hat: (3,3) on the base, (3,4) on Stephen's head
+    level.AssertMoveSucceeds(Down);                       // press backward -> drag the speared base south
+    level.AssertPosition(3, 5, Up);
+    level.AssertSausage({3, 3, 3, 4, 0, Sausage::None}); // base dragged one cell south
+    level.AssertSausage({3, 4, 3, 5, 1, Sausage::None}); // hat rode the full drag (both supports moved)
+  }
+
+  // Log roll while speared, with a hat bridging Stephen's head and the speared sausage. Stephen stands on a horizontal
+  // log and presses across it (facing along the press), so the log spins him and everything he carries one cell the
+  // OPPOSITE way. The hat's far end rests on the speared sausage, which rides the fork rigidly -- so the hat is NOT
+  // anchored and must ride the roll too, keeping its Rolled face (3-4 Cold Trail m552).
+  MAKE_SYMMETRICAL_TEST(LogRollCarriesHatBridgingHeadAndSpearedSausage) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      "          ",
+      Stephen{3, 4, 1, Up}, {},
+      { Sausage{3, 4, 4, 4, 0},          // the log Stephen stands on (horizontal), rolled south when he presses north
+        Sausage{3, 2, 3, 3, 1},          // speared base on the fork (vertical, north of Stephen)
+        Sausage{3, 3, 3, 4, 2, Sausage::Rolled} })); // hat: (3,3) on the base, (3,4) on Stephen's head; carried as one
+    level.AssertPosition(3, 4, Up);
+    level.AssertSausage({3, 4, 4, 4, 0, Sausage::None});          // the log underfoot
+    level.AssertSausage({3, 2, 3, 3, 1, Sausage::None});          // speared base
+    level.AssertSausage({3, 3, 3, 4, 2, Sausage::Rolled});        // the bridging hat
+    level.AssertMoveSucceeds(Up);                                  // press across the log -> it rolls everything south
+    level.AssertPosition(3, 5, Up);
+    level.AssertSausage({3, 5, 4, 5, 0, Sausage::Rolled});        // the log rolled one cell south
+    level.AssertSausage({3, 3, 3, 4, 1, Sausage::None});          // speared base dragged one cell south
+    level.AssertSausage({3, 4, 3, 5, 2, Sausage::Rolled});        // hat rode the roll rigidly, keeping its face
+  }
+
+  // 3-8 Cold Head (m415): a fork speared into a sausage LOCKS Stephen's rotation, so a press perpendicular to his facing
+  // can no longer turn him in place -- it rolls the log he stands on instead. Here he faces NORTH along a vertical log
+  // with his fork lodged in a base to the north; pressing WEST (across the log) rolls the whole speared load one cell
+  // EAST. Without the spear the same press would merely turn him to face west (see LogRoll), leaving the log unrolled --
+  // Level2 used to require Stephen to face along the press axis, so it wrongly refused this roll.
+  MAKE_SYMMETRICAL_TEST(SpearedLogRollFacingAlongLog) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      "          ",
+      Stephen{4, 4, 1, Up}, {},
+      { Sausage{4, 4, 4, 5, 0},          // vertical log Stephen stands on (north end)
+        Sausage{4, 2, 4, 3, 1},          // speared base on the fork (vertical, north of Stephen)
+        Sausage{9, 1, 9, 2, 0} }));      // parked filler
+    level.AssertPosition(4, 4, Up);
+    level.AssertSausage({4, 4, 4, 5, 0, Sausage::None});
+    level.AssertMoveSucceeds(Left);       // speared: a west press across the log rolls the load EAST rather than turning
+    level.AssertPosition(5, 4, Up);       // Stephen rode the log one cell east; still facing north (rotation locked)
+    level.AssertSausage({5, 4, 5, 5, 0, Sausage::Rolled}); // vertical log rolled one cell east
+    level.AssertSausage({5, 2, 5, 3, 1, Sausage::None});   // speared base dragged rigidly one cell east
+  }
+
+  // 3-8 Cold Head (m419): the speared sausage here is HORIZONTAL and RIDES the log's far end (the fork is lodged in it
+  // above the log's north cell), aligned with the roll direction. When the log rolls east the roll's push chain grabs
+  // the speared sausage as a rider and the double-move detector flags it. But a fork-borne sausage rides RIGIDLY --
+  // exactly one cell with Stephen -- and can never double-move. Level2 left that stale double-move flag set after
+  // rebuilding the speared sausage as a rigid single translate, so it tumbled an extra cell and landed one too far east;
+  // the fix clears the flag so it moves exactly +1.
+  MAKE_SYMMETRICAL_TEST(SpearedHatRidesRollWithoutDoubleMove) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      "          ",
+      Stephen{4, 5, 1, Up}, {},
+      { Sausage{4, 4, 4, 5, 0},          // vertical log: Stephen stands on its south end, the fork sits above its north end
+        Sausage{3, 4, 4, 4, 1},          // speared sausage riding the log's north end -- HORIZONTAL, aligned with the roll (east)
+        Sausage{9, 1, 9, 2, 0} }));      // parked filler
+    level.AssertPosition(4, 5, Up);
+    level.AssertSausage({4, 4, 4, 5, 0, Sausage::None});
+    level.AssertSausage({3, 4, 4, 4, 1, Sausage::None});
+    level.AssertMoveSucceeds(Left);       // speared: a west press across the log rolls the load one cell EAST
+    level.AssertPosition(5, 5, Up);       // Stephen rode the log one cell east
+    level.AssertSausage({5, 4, 5, 5, 0, Sausage::Rolled}); // vertical log rolled one cell east
+    level.AssertSausage({4, 4, 5, 4, 1, Sausage::None});   // speared sausage rode rigidly +1 (NOT +2) and kept its face
+  }
+
+  // 3-4 Cold Trail (m436): a NON-speared log roll where Stephen's fork rides the roll into a rider bridging a ground
+  // block and a sliding base. Stephen faces east on a vertical log (fork empty, hovering over the horizontal base H's
+  // west end). Pressing WEST rolls the log EAST: it shoves H east (H slides along its own axis -> no roll) and Stephen's
+  // fork rides east into the rider R's south end. R's NORTH end rests on a height-1 ground block, so the base-carry
+  // treats R as anchored and leaves it -- then the fork PUSHES R across its long axis. But R's south end rides H, a base
+  // co-moving east at the same speed, so R inherits that base's zero torsion (GameState.CalculateTorsion) and translates
+  // RIGIDLY, keeping its face. Level2 used to roll it because a cross-axis push always flipped the face regardless of a
+  // co-moving base beneath it.
+  MAKE_SYMMETRICAL_TEST(ForkShoveRiderOnCoMovingBaseNoRoll) {
+    TestSymmetryHelper level(symmetry, Level(10, 9, "arena",
+      "          "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ___1____ "                                 // height-1 block at (4,5): the rider's north end rests on it (anchored)
+      " ________ "
+      " ________ "
+      "          ",
+      Stephen{2, 6, 1, Right}, {},
+      { Sausage{2, 6, 2, 7, 0},                    // vertical log Stephen stands on (north end); fork empty above (3,6)
+        Sausage{3, 6, 4, 6, 0},                    // horizontal base H, its west end in the log's roll path
+        Sausage{4, 5, 4, 6, 1, Sausage::Rolled} })); // rider R: north end on the block, south end on H
+    level.AssertPosition(2, 6, Right);
+    level.AssertSausage({4, 5, 4, 6, 1, Sausage::Rolled});
+    level.AssertMoveSucceeds(Left);                 // press west across the log -> it rolls everything one cell EAST
+    level.AssertPosition(3, 6, Right);              // Stephen rode the log one cell east (still facing east)
+    level.AssertSausage({3, 6, 3, 7, 0, Sausage::Rolled}); // the log rolled east
+    level.AssertSausage({4, 6, 5, 6, 0, Sausage::None});   // base H slid east (no roll)
+    level.AssertSausage({5, 5, 5, 6, 1, Sausage::Rolled}); // rider rode rigidly on the co-moving base -> keeps its face
+  }
+
+  // 3-13 Cold Gate (m485): like the case above, but the rider's moving base ROLLS rather than slides, and its other end
+  // rests on a terrain block instead of a sausage. Stephen rides a log east; his body rams the rider R, whose west end
+  // sits on a vertical log Q that itself rolls east and whose east end rests on a height-1 terrain block. The game's
+  // CalculateTorsion carries R rigidly (torsion 0): the terrain-anchored end can't rotate, so R only translates east and
+  // keeps its face -- even though a raw cross-axis shove (and even a rolling base) would otherwise flip it.
+  MAKE_SYMMETRICAL_TEST(RiderOnRollingBaseAndTerrainAnchorNoRoll) {
+    TestSymmetryHelper level(symmetry, Level(10, 9, "arena",
+      "          "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      " _____1__ "                                 // height-1 block at (6,6): the rider's east end rests on it (anchored)
+      " ________ "
+      "          ",
+      Stephen{5, 5, 1, Left}, {},
+      { Sausage{5, 4, 5, 5, 0},                    // vertical log P Stephen stands on (south end); press west rolls it east
+        Sausage{6, 4, 6, 5, 0},                    // vertical log Q in the roll path -- it gets shoved east and rolls
+        Sausage{6, 5, 6, 6, 1, Sausage::Rolled} })); // rider R: west end on Q, east end on the terrain block
+    level.AssertPosition(5, 5, Left);
+    level.AssertSausage({6, 5, 6, 6, 1, Sausage::Rolled});
+    level.AssertMoveSucceeds(Left);                 // press west across log P -> the whole chain rolls one cell EAST
+    level.AssertPosition(6, 5, Left);               // Stephen rode P one cell east (still facing west)
+    level.AssertSausage({6, 4, 6, 5, 0, Sausage::Rolled}); // P rolled east into Q's old spot
+    level.AssertSausage({7, 4, 7, 5, 0, Sausage::Rolled}); // Q rolled east
+    level.AssertSausage({7, 5, 7, 6, 1, Sausage::Rolled}); // rider translated east on the rolling base + terrain -> no roll
+  }
+
+  // 3-14 Cold Frustration: a spear whose grill recoil would drive the speared log into terrain must not happen at all.
+  // Stephen faces west with his fork over a ground grill (#); a vertical log ('a') sits just past the fork, pinned to
+  // its west by a Wall1 (1) so a forward press can't roll it -- it SPEARS instead. Stepping onto the grill would recoil
+  // the fork, dragging the log one cell back (east) onto the grill -- but the log's south end would land inside a Wall2
+  // (2). The game blocks the whole recoil: the fork pulls free and Stephen bounces in place with nothing moved. Level2
+  // used to ignore the wall, shoving the log east onto the grill and cooking it (the dominant 3-14 posdiff class).
+  MAKE_SYMMETRICAL_TEST(SpearRecoilBlockedByWallNoDrag) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " ______b_ "                                 // filler log b, well clear of the action
+      " ______b_ "
+      " _1a#<___ "                                 // Wall1(2,3) | log a north(3,3) | grill(4,3) | Stephen(5,3) facing west
+      " __a2__c_ "                                 // log a south(3,4) | Wall2(4,4) -- the blocked drag cell | filler log c
+      " ______c_ "
+      "          "));
+    level.AssertPosition(5, 3, Left);
+    level.AssertSausage({3, 3, 3, 4, 0, Sausage::None});
+    level.AssertMoveSucceeds(Left);                // press forward: spear + grill bounce, but the recoil drag is wall-blocked
+    level.AssertPosition(5, 3, Left);              // Stephen bounced in place
+    level.AssertSausage({3, 3, 3, 4, 0, Sausage::None}); // the log never moved and never cooked
+  }
+
   MAKE_SYMMETRICAL_TEST(SpearedSausageBouncesOffGrill) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
@@ -199,6 +385,77 @@ TEST_CLASS(OneOffTests) {
     level.AssertPosition(3, 4, Up);
     level.AssertSausage({3, 2, 4, 2, 0, Sausage::Rolled});
     level.AssertSausage({4, 1, 4, 2, 1, Sausage::None});
+  }
+
+  // Same perpendicular double-move, but a rider is stacked on the vertical top. Pushing the base north rolls it and the
+  // top DOUBLE-MOVES north by two -- and the top drags its own rider the full two cells (the aligned vertical rider
+  // slides, no roll). Exercises DoubleMove's rider carry: a sausage riding a double-mover follows it two cells, not one
+  // (3-5 Cold Cliff m217: the top sausage riding the double-moving mid tumbles along with it instead of being stranded).
+  MAKE_SYMMETRICAL_TEST(DoubleMoveCarriesStackedRider) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " _______  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " __^____  "
+      "          ",
+      {}, {}, { Sausage{3, 3, 4, 3, 0}, Sausage{4, 3, 4, 4, 1}, Sausage{4, 3, 4, 4, 2} }));
+    level.AssertPosition(3, 5, Up);
+    level.AssertMoveSucceeds(Up);
+    level.AssertPosition(3, 4, Up);
+    level.AssertSausage({3, 2, 4, 2, 0, Sausage::Rolled}); // base rolled north one cell
+    level.AssertSausage({4, 1, 4, 2, 1, Sausage::None});   // top double-moved north two cells
+    level.AssertSausage({4, 1, 4, 2, 2, Sausage::None});   // rider dragged the full two cells (aligned slide, no roll)
+  }
+
+  // The double-move's extra tumble is a PUSH, not a phase-through: when it laps onto a same-level neighbour, that
+  // neighbour is shoved the same way (resolved BEFORE gravity). Here the double-mover rams a log wedged on a wall at the
+  // north edge, driving it clean off the grid; the following Settle drowns it, so the whole move is refused (3-4 Cold
+  // Trail m350: a slid log rams a wall-cornered upright off the west edge -> a loss the engine must not walk into).
+  MAKE_SYMMETRICAL_TEST(DoubleMovePushOffEdgeDrownsRefused) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " ___11__  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " __^____  "
+      "          ",
+      {}, {}, { Sausage{3, 3, 4, 3, 0}, Sausage{4, 3, 4, 4, 1}, Sausage{4, 1, 5, 1, 1} }));
+    level.AssertPosition(3, 5, Up);
+    level.AssertSausage({4, 1, 5, 1, 1, Sausage::None}); // the edge log, resting on the wall
+    // The top's second (double-move) cell would ram the edge log off the north edge -> it drowns -> the move is refused.
+    level.AssertMoveFails(Up);
+    // State is untouched: the edge log (and everything else) sits exactly where it started.
+    level.AssertPosition(3, 5, Up);
+    level.AssertSausage({3, 3, 4, 3, 0, Sausage::None});
+    level.AssertSausage({4, 3, 4, 4, 1, Sausage::None});
+    level.AssertSausage({4, 1, 5, 1, 1, Sausage::None});
+  }
+
+  // The same double-move push when the rammed neighbour has somewhere to go: it is shoved one cell onto the wall-top
+  // ahead (rolling, since the push crosses its long axis) and survives, so the move succeeds with the double-mover
+  // filling the vacated cell. Confirms the new push propagates without wrongly refusing when nothing drowns.
+  MAKE_SYMMETRICAL_TEST(DoubleMovePushesBlockerOntoWallSucceeds) {
+    TestSymmetryHelper level(symmetry, Level(10, 9, "arena",
+      "          "
+      " ___11__  "
+      " ___11__  "
+      " _______  "
+      " _______  "
+      " _______  "
+      " __^____  "
+      " _______  "
+      "          ",
+      {}, {}, { Sausage{3, 4, 4, 4, 0}, Sausage{4, 4, 4, 5, 1}, Sausage{4, 2, 5, 2, 1} }));
+    level.AssertPosition(3, 6, Up);
+    level.AssertSausage({4, 2, 5, 2, 1, Sausage::None}); // the blocker log on its wall
+    level.AssertMoveSucceeds(Up);
+    level.AssertPosition(3, 5, Up);
+    level.AssertSausage({3, 3, 4, 3, 0, Sausage::Rolled}); // base rolled north one cell
+    level.AssertSausage({4, 2, 4, 3, 1, Sausage::None});   // top double-moved north two cells (aligned slide, no roll)
+    level.AssertSausage({4, 1, 5, 1, 1, Sausage::Rolled}); // blocker shoved one cell onto the north wall, rolling
   }
 
   // 3b) Perpendicular stack, Stephen steps UNDER the south overhang as he pushes. His body holding one end cancels the
@@ -408,6 +665,30 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({5, 3, 5, 4, 1, Sausage::None});
   }
 
+  // A head+fork bridge carries a rider that rests on its HEAD (pivot) end, cantilevered off the far side. When Stephen
+  // turns, the bridge pivots about the head cell -- but the rider's only support IS that pivot cell, which stays put, so
+  // the rider does NOT spin with the bridge; it's left in place (3-5 Cold Cliff m330). Contrast SausageDoubleHat, where a
+  // squarely-stacked rider whose far end rides the bridge's swinging end pivots as a rigid unit.
+  MAKE_SYMMETRICAL_TEST(TurnLeavesRiderOnBridgePivotEnd) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      "          "
+      "          "
+      "  _       "
+      "          "
+      "          "
+      "          ",
+      Stephen{2, 3, 0, Left}, {},
+      { Sausage{1, 3, 2, 3, 1}, Sausage{2, 2, 2, 3, 2}, Sausage{9, 1, 9, 2, 0} }));
+    level.AssertPosition(2, 3, Left);
+    level.AssertSausage({1, 3, 2, 3, 1, Sausage::None}); // bridge: west end on the void-spanning fork, east end on head
+    level.AssertSausage({2, 2, 2, 3, 2, Sausage::None}); // rider: south end on the bridge's head/pivot end, north cantilevered
+    level.AssertMoveSucceeds(Down); // turn west->south: the bridge pivots south about the head cell
+    level.AssertPosition(2, 3, Down);
+    level.AssertSausage({2, 3, 2, 4, 1, Sausage::None}); // bridge swung to vertical about the head
+    level.AssertSausage({2, 2, 2, 3, 2, Sausage::None}); // rider stayed -- its pivot-cell support never moved
+  }
+
   // Spot test for 3-2 Cold Finger move 20 (a turn drops a fork-borne rider). A vertical rider spans a base sausage
   // (north end) and Stephen's fork (south end). Stephen turns east->north: the corner-sweep shoves the base out north
   // and the fork swings away, so the rider loses BOTH supports and drops straight down -- it is NOT carried north with
@@ -500,6 +781,137 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Left); // back away west; the fork leaves (4,3) from under the fork-hat
     level.AssertPosition(2, 3, Right);
     level.AssertSausage({4, 2, 4, 3, 1, Sausage::None}); // fork-hat STAYS, anchored on the Wall1 at (4,2)
+  }
+
+  // 3-2 Cold Finger (DiffEngines divergence #1, move 267): the fork is speared into a vertical base that is wall-pinned
+  // to its west, and a fork-tip hat rides one level up -- its NEAR end squarely over the fork cell (resting on the
+  // base), its FAR end cantilevered over open space. Backing away can't drag the pinned base, so the fork pulls free
+  // (an unspear). The hat's near end still rests on the base, which stays put, so the hat STAYS. Level2 judged the hat
+  // by its far end alone and, finding it cantilevered, wrongly rolled it off the retreating fork.
+  MAKE_SYMMETRICAL_TEST(UnspearLeavesForkTipHatOnSpearedBase) {
+    TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
+      "          "
+      " ________ "
+      " ________ "
+      " ________ "
+      " __1_____ "
+      " ________ "
+      "          ",
+      Stephen{3, 3, 0, Right}, {},
+      { Sausage{4, 3, 4, 4, 0}, Sausage{4, 2, 4, 3, 1}, Sausage{7, 1, 7, 2, 0} }));
+    level.AssertPosition(3, 3, Right);
+    level.AssertSausage({4, 3, 4, 4, 0, Sausage::None}); // vertical base, speared on the fork, Wall1-pinned to its west
+    level.AssertSausage({4, 2, 4, 3, 1, Sausage::None}); // fork-tip hat: near end on the base, far end cantilevered
+    level.AssertMoveSucceeds(Left);                      // back away west -> the fork unspears (the base can't be dragged)
+    level.AssertPosition(2, 3, Right);
+    level.AssertSausage({4, 3, 4, 4, 0, Sausage::None}); // base stays put (the fork pulled free)
+    level.AssertSausage({4, 2, 4, 3, 1, Sausage::None}); // hat STAYS on the base -- it does not roll off the retreating fork
+  }
+
+  // 3-2 Cold Finger (DiffEngines divergence #2, move 324): a turn whose corner-sweep and fork-dest push move two bases
+  // in DIFFERENT directions, with a rider bridging both. Stephen faces north; turning east shoves the horizontal base X
+  // east (corner-sweep) and the vertical base Z south (fork-dest), and the fork swings under the rider Y's south end.
+  // The rider can't follow both bases, so the fork catches it and it STAYS -- its north end merely cantilevers as X
+  // slides out east. Level2's rotation fork-hold refused to hold whenever the rider's OTHER end sat on any moving base,
+  // so it wrongly carried Y south with Z. The hold must ignore an other-end base that moves a DIFFERENT way than the carry.
+  MAKE_SYMMETRICAL_TEST(TurnForkCatchesRiderWhenOtherBaseMovesAside) {
+    TestSymmetryHelper level(symmetry, Level(10, 8, "arena",
+      "          "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      " ________ "
+      "          ",
+      Stephen{4, 3, 0, Up}, {},
+      { Sausage{5, 2, 6, 2, 0}, Sausage{5, 2, 5, 3, 1}, Sausage{5, 3, 5, 4, 0} }));
+    level.AssertPosition(4, 3, Up);
+    level.AssertSausage({5, 2, 6, 2, 0, Sausage::None}); // horizontal base X at the turn's corner
+    level.AssertSausage({5, 2, 5, 3, 1, Sausage::None}); // vertical rider Y: north end on X, south end on Z (the fork-dest)
+    level.AssertSausage({5, 3, 5, 4, 0, Sausage::None}); // vertical base Z at the fork's destination
+    level.AssertMoveSucceeds(Right);                     // turn north->east: X shoved east, Z shoved south, fork swings under Y
+    level.AssertPosition(4, 3, Right);
+    level.AssertSausage({6, 2, 7, 2, 0, Sausage::None}); // X shoved east by the corner-sweep
+    level.AssertSausage({5, 4, 5, 5, 0, Sausage::None}); // Z shoved south by the fork-dest push
+    level.AssertSausage({5, 2, 5, 3, 1, Sausage::None}); // Y STAYS -- caught by the fork; its north end cantilevers as X leaves
+  }
+
+  // 3-2 Cold Finger (DiffEngines divergence #3, move 291): a head hat bridges Stephen's head (its near end) and a
+  // neighbouring sausage Q (its far end). Backing away drags the speared base R west; R shoves Q (rolling it), and Q's
+  // push chain carries the hat. The hat rests on Stephen's head -- a rigid co-mover -- so it inherits his zero torsion
+  // and rides RIGIDLY, without rolling, even though its far end sits on the rolling Q. Level2's push-chain carry rolled
+  // it (it took Q's torsion).
+  MAKE_SYMMETRICAL_TEST(SpearDragHeadHatOverPushedSausageRidesRigid) {
+    TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
+      "         "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      "         ",
+      Stephen{4, 2, 0, Right}, {},
+      { Sausage{4, 2, 4, 3, 1}, Sausage{4, 3, 4, 4, 0}, Sausage{5, 2, 5, 3, 0} }));
+    level.AssertPosition(4, 2, Right);
+    level.AssertSausage({4, 2, 4, 3, 1, Sausage::None}); // head hat: north end on Stephen's head, south end on Q
+    level.AssertSausage({4, 3, 4, 4, 0, Sausage::None}); // Q, under the hat's south end
+    level.AssertSausage({5, 2, 5, 3, 0, Sausage::None}); // speared base R
+    level.AssertMoveSucceeds(Left);                      // back away west: R drags west and shoves Q, the hat rides Stephen
+    level.AssertPosition(3, 2, Right);
+    level.AssertSausage({4, 2, 4, 3, 0, Sausage::None});   // R dragged west (rigid)
+    level.AssertSausage({3, 3, 3, 4, 0, Sausage::Rolled}); // Q shoved west, rolled across its axis
+    level.AssertSausage({3, 2, 3, 3, 1, Sausage::None});   // head hat rode west RIGIDLY -- no roll (it rests on Stephen's head)
+  }
+
+  // 3-2 Cold Finger (DiffEngines divergence #4, move 324): a fork-bonked turn whose head-hat sweep shoves a wall-perched
+  // sausage clean off the playable edge onto VOID that still lies within the grid's bounds, where it drowns. The bonk
+  // keeps the hat home, but the swept sausage is an irreversible loss, so the move must be refused. Level2 only rejected
+  // sausages pushed FULLY out of bounds, missing this within-bounds void drown, and wrongly accepted the move.
+  MAKE_SYMMETRICAL_TEST(BonkedTurnSweepDrownsSausageOnVoid) {
+    TestSymmetryHelper level(symmetry, Level(10, 8, "arena",
+      "          "
+      " ________ "
+      " ________ "
+      " ____1    "
+      " _____    "
+      " ________ "
+      " ________ "
+      "          ",
+      Stephen{4, 3, 0, Down}, {},
+      { Sausage{4, 3, 4, 4, 1}, Sausage{5, 3, 5, 4, 1}, Sausage{2, 6, 3, 6, 0} }));
+    level.AssertPosition(4, 3, Down);
+    level.AssertSausage({4, 3, 4, 4, 1, Sausage::None}); // head+fork hat that will sweep on the bonk
+    level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // C: north end on the Wall1 at (5,3), south end cantilevered
+    level.AssertMoveFails(Right);                        // turn east bonks (fork-dest wall); the sweep would drown C -> refuse
+  }
+
+  // 3-4 Cold Trail (DiffEngines divergence, move 430): a log-roll carries a horizontal rider west, and the rider's
+  // LEADING end lands on a stationary sausage after one cell. That sausage is a "shelf" -- its top sits at the rider's
+  // level and catches the front -- so the rider moves a SINGLE cell, not two. Level2 only treated a WALL as a shelf, so
+  // it tumbled the rider an extra cell (a spurious double-move).
+  MAKE_SYMMETRICAL_TEST(DoubleMoveCaughtByStationarySausageShelf) {
+    TestSymmetryHelper level(symmetry, Level(9, 9, "arena",
+      "         "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      " _______ "
+      "         ",
+      Stephen{5, 6, 1, Right}, {},
+      { Sausage{3, 6, 3, 7, 0}, Sausage{4, 7, 5, 7, 1}, Sausage{5, 6, 5, 7, 0} }));
+    level.AssertPosition(5, 6, Right);
+    level.AssertSausage({3, 6, 3, 7, 0, Sausage::None}); // stationary sausage A -- the shelf the rider's lead end lands on
+    level.AssertSausage({4, 7, 5, 7, 1, Sausage::None}); // horizontal rider B, east end on the log
+    level.AssertSausage({5, 6, 5, 7, 0, Sausage::None}); // the vertical log C Stephen rides
+    level.AssertMoveSucceeds(Right);                     // press east across the log -> it rolls west, Stephen rides
+    level.AssertPosition(4, 6, Right);
+    level.AssertSausage({3, 6, 3, 7, 0, Sausage::None});   // A unchanged (the shelf)
+    level.AssertSausage({3, 7, 4, 7, 1, Sausage::None});   // B slid west ONE cell -- caught by A, no double-move
+    level.AssertSausage({4, 6, 4, 7, 0, Sausage::Rolled}); // C rolled west
   }
 
   // 3-14 Cold Frustration move 86, stripped to the critical geometry: a horizontal rider bridges a vertical base (its
@@ -756,12 +1168,12 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 2, Sausage::None}); // hat slid east and was deposited on the Wall2 top he left
   }
 
-  // 4-2 Toad's Folly (DiffEngines divergence #2): a horizontal "bridge" sausage rests across Stephen's head (east end)
-  // and his fork (west end) at head height, and a vertical sausage rides on the bridge's head end, cantilevered north
-  // over open space. Walking forward carries the bridge one cell (along its own axis, so it doesn't roll) and carries
-  // the rider along too -- but the rider is NOT part of the rigid hat (only one of its ends sits on the bridge), so it
-  // rolls across its long axis. Level2 used to treat the whole stack as a rigid head hat and left the rider unrolled.
-  MAKE_SYMMETRICAL_TEST(HatRiderRollsWhenCarriedAcrossAxis) {
+  // A horizontal "bridge" sausage rests across Stephen's head (east end) and his fork (west end) at head height, and a
+  // vertical sausage rides on the bridge's head end, cantilevered north over open space. Walking forward is a PURE
+  // TRANSLATION: the bridge slides one cell along its own axis (no roll) and its rider -- though cantilevered -- rides
+  // flat with zero torsion and does NOT roll either (3-5 Cold Cliff m348, measured against the game: a cantilevered
+  // rider on a head+fork bridge slides with it). The whole tower is one rigid co-moving unit.
+  MAKE_SYMMETRICAL_TEST(HatRiderRidesFlatOnRigidBridge) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
@@ -777,8 +1189,8 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({3, 2, 3, 3, 2, Sausage::None}); // rider: south end on the bridge, north end cantilevered
     level.AssertMoveSucceeds(Left); // walk forward; the bridge and its rider are carried one cell west
     level.AssertPosition(2, 3, Left);
-    level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});   // bridge slid west along its own axis -- no roll
-    level.AssertSausage({2, 2, 2, 3, 2, Sausage::Rolled}); // rider carried west across its axis -- it rolls
+    level.AssertSausage({1, 3, 2, 3, 1, Sausage::None}); // bridge slid west along its own axis -- no roll
+    level.AssertSausage({2, 2, 2, 3, 2, Sausage::None}); // rider rode flat on the rigid bridge -- no roll (pure translation)
   }
 
   // 4-3 Sludge Coast (DiffEngines divergence #1): Stephen's fork is speared into a vertical sausage; pressing sideways
@@ -1196,11 +1608,12 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({8, 1, 8, 2, 1, Sausage::None});   // speared rider rides rigidly west by ONE (not two, not rolled)
   }
 
-  // 3-8 Cold Head (leading divergence): Stephen is speared into a horizontal base sausage carrying a vertical rider on
-  // its cantilevered far end. He climbs a sideways ladder, stepping the whole speared stack up onto a Wall1. The base
-  // slides along its own axis (no roll), but the rider is carried across ITS axis and rolls. Level2 zeroed the entire
-  // roll set whenever a sausage was speared, so the rider climbed the step without ever flipping to its rolled face.
-  MAKE_SYMMETRICAL_TEST(SpearedClimbRollsRider) {
+  // 3-8 Cold Head (m143): Stephen is speared into a horizontal base sausage carrying a vertical rider on its cantilevered
+  // far end. He climbs a sideways ladder, stepping the whole speared stack up onto a Wall1. The base slides along its own
+  // axis (no roll). The rider is carried across its axis but rides RIGIDLY -- the fork locks the base flat and drags it
+  // at a fixed speed, so the rider (its other end hanging over the floor) moves at that same speed and keeps its face,
+  // matching the game's zero-torsion result. Level2 used to roll it, tumbling it to the wrong final position.
+  MAKE_SYMMETRICAL_TEST(SpearedClimbCarriesRiderRigid) {
     TestSymmetryHelper level(symmetry, Level(10, 8, "arena",
       "__________"
       "__________"
@@ -1216,7 +1629,7 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Right); // climb the ladder east, stepping the speared stack up onto the wall
     level.AssertPosition(4, 5, Up);
     level.AssertSausage({3, 4, 4, 4, 1, Sausage::None});   // speared base slid east along its axis onto the wall -- no roll
-    level.AssertSausage({3, 4, 3, 5, 2, Sausage::Rolled}); // rider carried east across its axis -- it rolls
+    level.AssertSausage({3, 4, 3, 5, 2, Sausage::None});   // rider carried east rigidly on the fork-locked base -- no roll
   }
 
   // Regression (3-8 Cold Head float bug): a ladder DESCENT must bring a rider DOWN with the speared base it rests on.
@@ -1237,7 +1650,7 @@ TEST_CLASS(OneOffTests) {
       { Sausage{2, 4, 3, 4, 0}, Sausage{2, 4, 2, 5, 1} }));
     level.AssertMoveSucceeds(Right); // climb east onto the wall: the speared base and its rider ride up, supported
     level.AssertSausage({3, 4, 4, 4, 1, Sausage::None});   // base on the wall at z=1
-    level.AssertSausage({3, 4, 3, 5, 2, Sausage::Rolled}); // rider one level up at z=2, resting on the base
+    level.AssertSausage({3, 4, 3, 5, 2, Sausage::None});   // rider one level up at z=2, riding the fork-locked base rigidly
     level.AssertMoveSucceeds(Left);  // descend the ladder: the base rolls back down AND the rider comes with it
     level.AssertPosition(3, 5, Up);
     level.AssertSausage({2, 4, 3, 4, 0, Sausage::None});   // base back on the ground

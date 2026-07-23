@@ -7,7 +7,7 @@
 [CmdletBinding()]
 param(
     [string] $TestName = "",
-    [string] $DemoDir = "..\SSRDecompile\App",
+    [string] $DemoOverride = "",
     [switch] $Solve
 )
 
@@ -55,7 +55,7 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "3-3 Cold Escarpment";   Dem = "3-3.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "3-14 Cold Frustration"; Dem = "3-4.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "3-4 Cold Trail";        Dem = "3-5.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "3-5 Cold Cliff";        Dem = "solved.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "3-5 Cold Cliff";        Dem = "3-6.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "3-6 Cold Pit";          Dem = "3-7.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "3-7 Cold Plateau";      Dem = "3-8.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "3-8 Cold Head";         Dem = "3-9.dem";  Sausages = 2 }
@@ -77,7 +77,8 @@ function Build-Variant {
     $macro = (0..($N-1) | ForEach-Object { "o($_)" }) -join " "
     $env:_CL_ = "/DSAUSAGES=`"$macro`""
     # Rebuild (not Build) avoids LNK1257 from stale PGO objects across SAUSAGES changes.
-    & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
+    # & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
+    & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for SAUSAGES=$N"
     }
@@ -108,10 +109,15 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
             }
         } else {
             echo "Testing $($lvl.Name)"
-            if ($TestName) {
-                & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem)
+            if (-not $DemoOverride) {
+                $path = "../SSRDecompile/App/" + $level.Dem
             } else {
-                & $exe $lvl.Name (Join-Path $DemoDir $lvl.Dem) *>> $null
+                $path = $DemoOverride
+            }
+            if ($TestName) {
+                & $exe $lvl.Name $path
+            } else {
+                & $exe $lvl.Name $path *>> $null
             }
         }
 

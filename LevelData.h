@@ -118,6 +118,13 @@ struct Sausage {
     if (x_ == x2 && y_ == y2) return true;
     return false;
   }
+  // Given one half's cell (seatX, seatY) -- typically the end resting on a support -- return the OTHER half's cell.
+  // If (seatX, seatY) is not (x1, y1) it is assumed to be (x2, y2); the caller guarantees the seat is one of the halves.
+  inline void OtherEnd(s8 seatX, s8 seatY, s8& farX, s8& farY) const {
+    bool firstIsSeat = (x1 == seatX && y1 == seatY);
+    farX = firstIsSeat ? x2 : x1;
+    farY = firstIsSeat ? y2 : y1;
+  }
   inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
   // Exchange the two halves' cook bits (Cook1*<->Cook2*). Used when a rotation puts the physical halves
   // into swapped slots: the cook state rides with each half so slot 1 always describes (x1,y1).

@@ -135,8 +135,22 @@ private:
   // record the whole tower into |carried| and |hatMask|. Returns false if any of them would rise into a wall.
   bool LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask);
 
-  // The mask of |base| plus every sausage stacked transitively on top of it -- a rigid tower the fork carries.
+  // The mask of |base| plus every sausage stacked transitively on top of it (growing through EITHER end) -- everything
+  // that rides along with |base|, rigid or not. Used both as "the rigid tower the fork carries" and as the rigid
+  // co-moving load (move-stages.md: "motion is one simultaneous event") so carries never ram members of the same load
+  // into each other. Returns 0 for |base| == -1.
   u16 CarriedMask(s8 base) const;
+
+  // How GrowRigidStack treats an end with no stack sausage directly beneath it (below == -1):
+  enum class Cantilever {
+    None, // never rigid -- the end must rest squarely on a stack member (a pure both-ends stack)
+    Air,  // an end cantilevered over genuine open space (below == -1 && !IsWall) still rides rigidly
+  };
+  // Grow a rigid (non-rolling) stack from |seed|: repeatedly add any sausage whose two ends are EACH either resting on
+  // a stack member or an allowed cantilever (see |cant|), with at least one end on a stack member. This is the shared
+  // "which carried sausages ride flat" primitive for steps and ladder climbs; a squarely-stacked rider joins, a
+  // cantilevered rider joins only under Cantilever::Air (a pure translation, or a fork-locked speared base).
+  u16 GrowRigidStack(u16 seed, Cantilever cant) const;
 
   // The mask of |base| plus every sausage SQUARELY stacked on it -- one whose BOTH ends rest on stack members
   // (transitively). This is the rigid unit that rides without rolling (a head hat and anything squarely stacked on it);
@@ -170,10 +184,6 @@ private:
   // sausages stacked on it. A carried sausage whose destination is a wall is left where it is (the parent move still
   // proceeds); the later Settle pass drops it if its support has gone. Motion only -- gravity and cooking come after.
   // Double-move is NOT decided here; the central MarkDoubleMoves detector resolves it post-hoc. A turn (plan.rotating) treats Stephen's body as a wall.
-  // The set of sausages that ride |seed| this move -- |seed| plus everything resting (transitively) on it. Used to build
-  // the rigid co-moving load (move-stages.md: "motion is one simultaneous event") so carries never ram members of the
-  // same load into each other.
-  u16 RidingLoad(s8 seed) const;
   bool PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, const Stephen* mover = nullptr, bool rigid = false, bool baseDragRolled = false) const;
 
   // Stage 5 (gravity). Drop any disturbed sausage in |plan|'s working tableau whose ends have lost their support,
@@ -198,6 +208,14 @@ private:
   // tumble here, after the primary move has fully settled and cooked, as its own little motion -> settle -> cook on
   // |plan|'s tableau. Returns false if it burns or falls out of the world.
   bool DoubleMove(MovePlan& plan);
+
+  // Shove sausage |sausageNo| (and whatever it rams, transitively) one cell by (dx,dy) on |plan|'s tableau, at its own
+  // level -- the horizontal push a double-move's extra tumble makes when it laps onto a same-z neighbour, resolved
+  // BEFORE gravity (3-4 Cold Trail m350: a slid log rams a wall-cornered upright off the west edge). |protect| pins
+  // sausages that must never be pushed (the double-move's own group); pushed sausages are OR'd into |pushed|. Returns
+  // false only when the chain wall-bottoms (the tumble is then stopped); a shove off the world is allowed here and left
+  // for the following Settle to drown (which refuses the move).
+  bool PushPlanned(MovePlan& plan, s8 sausageNo, s8 dx, s8 dy, u16 protect, u16& pushed) const;
 
   // Stage 6 (heat). Cook every sausage in |plan|'s tableau flagged in |movedMask| (those that moved or settled this
   // turn) at its resting cell, skipping any in |preCookedMask| (already browned inline -- a grill bounce or spear-drag).
