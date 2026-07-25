@@ -6,6 +6,14 @@
 #include <fstream>
 #include <string>
 
+#ifdef LAYERCACHE_ZSTD
+#include <zstd.h>
+#include <stdexcept>
+#ifndef LAYERCACHE_ZSTD_LEVEL
+#define LAYERCACHE_ZSTD_LEVEL 3
+#endif
+#endif
+
 #define MAX_BUFFER_SIZE 1'000'000
 
 template<typename T>
@@ -63,16 +71,37 @@ public:
     void ReadFromDisk() {
       if (!_in) return; // Dead iterator
 
+#ifdef LAYERCACHE_ZSTD
+      u64 header[2]; // { uncompressed bytes, compressed bytes }
+      _in->read(reinterpret_cast<char*>(header), sizeof(header));
+      if (_in->gcount() < static_cast<std::streamsize>(sizeof(header))) {
+        _readBuffer.clear();
+        _in = nullptr; // stream exhausted -> end
+        return;
+      }
+      const u64 rawBytes = header[0];
+      const u64 compBytes = header[1];
+      _compressBuffer.resize(compBytes);
+      _in->read(_compressBuffer.data(), compBytes);
+      _readBuffer.resize(rawBytes / sizeof(T));
+      size_t decompressed = ZSTD_decompress(_readBuffer.data(), rawBytes, _compressBuffer.data(), compBytes);
+      if (ZSTD_isError(decompressed)) throw std::runtime_error(ZSTD_getErrorName(decompressed));
+      _current = 0;
+#else
       _readBuffer.resize(MAX_BUFFER_SIZE);
       _in->read(reinterpret_cast<char*>(_readBuffer.data()), _readBuffer.size() * sizeof(T));
       _readBuffer.resize(static_cast<size_t>(_in->gcount()) / sizeof(T));
       _current = 0;
+#endif
       if (_readBuffer.empty()) _in = nullptr; // stream exhausted -> end
     }
 
     std::istream* _in = nullptr;
     std::vector<T> _readBuffer;
     u32 _current = 0;
+#ifdef LAYERCACHE_ZSTD
+    std::vector<char> _compressBuffer;
+#endif
   };
   iterator begin() { return iterator(&_in); }
   iterator end() { return iterator(); }
@@ -82,7 +111,19 @@ private:
     if (_writeBuffer.size() == 0) return; // Nothing to write
 
     if (!_out.is_open()) _out = std::ofstream(_name + ".tmp", std::ios::binary);
+#ifdef LAYERCACHE_ZSTD
+    const size_t rawBytes = _writeBuffer.size() * sizeof(T);
+    const size_t bound = ZSTD_compressBound(rawBytes);
+    _compressBuffer.resize(bound);
+    const size_t compBytes = ZSTD_compress(_compressBuffer.data(), bound, _writeBuffer.data(), rawBytes, LAYERCACHE_ZSTD_LEVEL);
+    if (ZSTD_isError(compBytes)) throw std::runtime_error(ZSTD_getErrorName(compBytes));
+
+    const u64 header[2] = { rawBytes, compBytes }; // { uncompressed bytes, compressed bytes }
+    _out.write(reinterpret_cast<const char*>(header), sizeof(header));
+    _out.write(_compressBuffer.data(), compBytes);
+#else
     _out.write(reinterpret_cast<const char*>(_writeBuffer.data()), _writeBuffer.size() * sizeof(T));
+#endif
     _writeBuffer.clear();
   }
 
@@ -90,4 +131,7 @@ private:
   std::ifstream _in;
   std::ofstream _out;
   std::vector<T> _writeBuffer;
+#ifdef LAYERCACHE_ZSTD
+  std::vector<char> _compressBuffer;
+#endif
 };

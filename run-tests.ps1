@@ -75,7 +75,7 @@ $levelDemos = @(
 function Build-Variant {
     param([int] $N)
     $macro = (0..($N-1) | ForEach-Object { "o($_)" }) -join " "
-    $env:_CL_ = "/DSAUSAGES=`"$macro`""
+    $env:_CL_ = "/DSAUSAGES=`"$macro`" /DLAYERCACHE_ZSTD /DLAYERCACHE_ZSTD_LEVEL=3"
     # Rebuild (not Build) avoids LNK1257 from stale PGO objects across SAUSAGES changes.
     # & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
     & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m
