@@ -93,109 +93,6 @@ bool IsLogRollHatDivergence(const LevelData* level) {
   return midOnLog;
 }
 
-static int PopCount(u32 v) { int c = 0; while (v) { v &= v - 1; c++; } return c; }
-
-// Novelty + complexity guided Monte-Carlo explorer (runs on Level2, the engine under test). From the level start it
-// does many random rollouts, at each step sampling the next input with weight proportional to how "distinctive" it is
-// (how many mechanics its feature mask fired, whether the state changed) plus a novelty bonus for feature masks and
-// consecutive-mask 2-grams not seen before. The path is archived whenever a move reaches a NOVEL Level2 state (so
-// every first-entry transition -- including pure-geometry ones with no special feature -- gets probed) or produces a
-// novel feature signature. Each archived path is a pure demo; the oracle replays it independently and an external
-// diff compares trajectories. Broad state coverage is what lets the geometry-only divergences surface.
-static void Explore(Level* level, int rollouts, int maxDepth, u32 seed, const std::string& outDir) {
-  std::mt19937 rng(seed);
-  State start = level->GetState();
-  std::unordered_set<u32> seenMask;
-  std::unordered_set<u64> seen2gram;
-  std::set<State> seenState;
-  seenState.insert(start);
-  struct Archived { std::vector<Direction> path; State end; u32 mask; }; // path + Level2 end-state + the move's feature mask
-  std::vector<Archived> archive;
-  std::unordered_map<u32, std::vector<int>> maskBuckets; // feature mask -> its archive slots, for mechanic-diverse eviction
-  Direction dirs[4] = { Up, Down, Left, Right };
-  const int kMaxArchive = 40000;
-
-  for (int r = 0; r < rollouts; r++) {
-    level->SetState(start);
-    std::vector<Direction> path;
-    u32 prevMask = 0;
-    for (int step = 0; step < maxDepth; step++) {
-      State cur = level->GetState();
-      double score[4]; u32 feat4[4]; bool acc4[4];
-      double total = 0;
-      for (int i = 0; i < 4; i++) {
-        level->SetState(cur);
-        level->_feat = 0;
-        bool ok = level->Move(dirs[i]);
-        feat4[i] = level->_feat; acc4[i] = ok;
-        State res = level->GetState();
-        bool changed = !(res == cur);
-        u32 m = feat4[i];
-        u64 gram = ((u64)prevMask << 32) | m;
-        double nov = 0;
-        if (m && seenMask.find(m) == seenMask.end()) nov += 6.0;
-        if (m && seen2gram.find(gram) == seen2gram.end()) nov += 3.0;
-        double s = 0.15 + PopCount(m) * 1.0 + nov + (changed ? 0.5 : 0.0);
-        if (!ok) s = 0.0; // reject: never sample a refused move -- reroll among the accepted ones instead
-        score[i] = s; total += s;
-      }
-      if (total <= 0.0) break; // no accepted move from here -- end the rollout rather than emit a rejected no-op
-      double pick = (rng() / (double)0xFFFFFFFFu) * total;
-      int d = 0; for (; d < 3; d++) { if (pick < score[d]) break; pick -= score[d]; }
-      level->SetState(cur);
-      level->_feat = 0;
-      level->Move(dirs[d]);
-      path.push_back(dirs[d]);
-      u32 mask = feat4[d];
-      u64 gram = ((u64)prevMask << 32) | mask;
-      bool novel = false;
-      if (seenState.insert(level->GetState()).second) novel = true;   // first time we reach this Level2 state
-      if (mask && seenMask.insert(mask).second) novel = true;
-      if (mask && seen2gram.insert(gram).second) novel = true;
-      if (novel) {
-        // Archive the demo. Below the (fixed) size cap we just append; once full we keep exploring and reservoir-evict,
-        // but bias the eviction to preserve MECHANIC diversity: drop a demo from whichever feature mask is currently the
-        // most over-represented (with a uniformly random pick *within* that dominant bucket). Rare/unique mechanics are
-        // thus never crowded out by common ones (e.g. plain-geometry mask==0 moves), and the retained sample stays an
-        // unbiased reservoir across the whole exploration instead of just the first-40000 prefix.
-        State end = level->GetState();
-        if ((int)archive.size() < kMaxArchive) {
-          maskBuckets[mask].push_back((int)archive.size());
-          archive.push_back({ path, end, mask });
-        } else {
-          u32 evMask = 0; size_t best = 0;
-          for (const auto& kv : maskBuckets) if (kv.second.size() > best) { best = kv.second.size(); evMask = kv.first; }
-          auto& bucket = maskBuckets[evMask];
-          int pos = (int)(rng() % bucket.size());
-          int slot = bucket[pos];
-          bucket[pos] = bucket.back(); bucket.pop_back(); // swap-pop the evicted slot out of its bucket
-          archive[slot] = { path, end, mask };
-          maskBuckets[mask].push_back(slot);
-        }
-      }
-      prevMask = mask;
-      if (level->Won()) break;
-    }
-  }
-
-  // Write each archived path as a standard .dem: the moves, then a "Stop" line, then Level2's end-of-simulation
-  // geometry as raw ints (Stephen's body+fork pose, then each sausage's two cells + z). GetState already sorted the
-  // sausages, so it's canonical. Move-replayers ignore the trailing non-move lines; the oracle replays the moves and
-  // compares its own end geometry to that final line for a position divergence (and reports a loss on death).
-  std::filesystem::create_directories(outDir);
-  for (const auto& e : std::filesystem::directory_iterator(outDir))
-    if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
-  int n = 0;
-  for (const auto& a : archive) {
-    char name[32]; snprintf(name, sizeof(name), "%05d.dem", n++);
-    std::ofstream out(outDir + "/" + name);
-    for (Direction d : a.path) out << DIR_NAMES[d] << '\n';
-    out << "Stop\n" << a.end << '\n'; // State operator<< = Stephen + oracle-sorted sausages (matches the oracle's line)
-  }
-  printf("Explored %s: wrote %zu demos -> %s/ (%zu masks, %zu 2-grams)\n",
-         level->name, archive.size(), outDir.c_str(), seenMask.size(), seen2gram.size());
-}
-
 // -------- RRT-style novelty explorer: grow a SPARSE tree of "landmark" states over the reachable graph. Memory is
 // O(distinct regions), NOT O(all states), so it never becomes a BFS closed set. Sparsification is an OCCUPANCY GRID:
 // each state's signature (positions quantized by |bin|, plus exact cook/facing) hashes to a u64 cell id, and a
@@ -419,14 +316,6 @@ int main(int argc, char* argv[]) {
     if (!surveyAll && !std::strstr(test->name, filter.c_str())) continue; // Failed to match filter
 
     if (!demoPath.empty()) {
-      if (demoPath == "explore") {
-        int rollouts = (argc >= 4) ? atoi(argv[3]) : 3000;
-        u32 seed = (argc >= 5) ? (u32)strtoul(argv[4], nullptr, 0) : 0xC0FFEEu;
-        std::string safe = test->name;
-        for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
-        Explore(test, rollouts, 80, seed, "oracle-demos/" + safe);
-        return 0;
-      }
       if (demoPath == "rrt") {
         int iterations = (argc >= 4) ? atoi(argv[3]) : 2000;
         int rolloutLen = (argc >= 5) ? atoi(argv[4]) : 40;

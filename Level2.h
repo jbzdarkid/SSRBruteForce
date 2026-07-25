@@ -22,30 +22,6 @@ struct Level : public LevelData {
   // ends up moving -- a grill bounces Stephen back, a fork bonks against a wall mid-turn.
   bool Move(Direction dir);
 
-  // Feature mask of which mechanics fired during the most recent Move -- used by the explorer's novelty search to
-  // recognize "distinctive" moves (and their interactions). Set in Move() and the reaction passes; mutable so the
-  // const planning helpers can OR into it.
-  enum Feat : u32 {
-    F_LOGROLL     = 1u << 0,
-    F_LADDER_UP   = 1u << 1,
-    F_LADDER_DOWN = 1u << 2,
-    F_SPEARMOVE   = 1u << 3,
-    F_STEP        = 1u << 4,
-    F_ROTATE      = 1u << 5,
-    F_BURNED      = 1u << 6,
-    F_SPEAR       = 1u << 7,
-    F_UNSPEAR     = 1u << 8,
-    F_DOUBLEMOVE  = 1u << 9,
-    F_DROP        = 1u << 10,
-    F_COOK        = 1u << 11,
-    F_ROTATE_BONK = 1u << 12,
-    F_SPEARDRAG   = 1u << 13,
-    F_HATCARRY    = 1u << 14,
-    F_HATROT      = 1u << 15,
-    F_PUSHCHAIN   = 1u << 16,
-  };
-  mutable u32 _feat = 0;
-
   // Level-specific heuristic which returns false from losing states to reduce the total state count.
   bool (*heuristic)(const Level*) = nullptr;
 
@@ -161,7 +137,7 @@ private:
   // Step Stephen one cell in |dir| while keeping his facing, as part of a ladder climb -- either OFF the top of a ladder
   // onto a ledge (|ladderMotion| false: the body needs footing), or OUT over a ladder at the start of a descent
   // (|ladderMotion| true: the body may hang). Unlike a rigid slide, the fork and body PUSH any sausage at their
-  // destination (the reference routes ladder motion through MoveStephenThroughSpace -- e.g. 3-8 Cold Head, the fork
+  // destination (the reference routes ladder motion through MoveStephenThroughSpace -- the fork
   // shoves a sausage as he steps onto/over the ledge), then gravity and heat resolve. |carried| is the sausage riding on
   // the fork (it translates rigidly with him, -1 if none). Returns false on a wall, a missing ledge, or an immovable push.
   bool StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 hatMask = 0, u16 rollMask = 0, s8 speared = -1);
@@ -211,7 +187,7 @@ private:
 
   // Shove sausage |sausageNo| (and whatever it rams, transitively) one cell by (dx,dy) on |plan|'s tableau, at its own
   // level -- the horizontal push a double-move's extra tumble makes when it laps onto a same-z neighbour, resolved
-  // BEFORE gravity (3-4 Cold Trail m350: a slid log rams a wall-cornered upright off the west edge). |protect| pins
+  // BEFORE gravity. |protect| pins
   // sausages that must never be pushed (the double-move's own group); pushed sausages are OR'd into |pushed|. Returns
   // false only when the chain wall-bottoms (the tumble is then stopped); a shove off the world is allowed here and left
   // for the following Settle to drown (which refuses the move).
