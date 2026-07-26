@@ -96,13 +96,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;LAYERCACHE_ZSTD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;LAYERCACHE_ZSTD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -113,12 +113,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DeltaEncodingTests.cpp" />
     <ClCompile Include="LogicTests.cpp" />
     <ClCompile Include="..\Level2.cpp" />
     <ClCompile Include="..\LevelData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestSymmetryHelper.h" />
+    <ClInclude Include="..\LayerCache.h" />
     <ClInclude Include="..\Level2.h" />
     <ClInclude Include="..\LevelData.h" />
     <ClInclude Include="..\State.h" />
