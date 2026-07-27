@@ -77,8 +77,7 @@ function Build-Variant {
     $macro = (0..($N-1) | ForEach-Object { "o($_)" }) -join " "
     $env:_CL_ = "/DSAUSAGES=`"$macro`" /DLAYERCACHE_ZSTD /DLAYERCACHE_ZSTD_LEVEL=3"
     # Rebuild (not Build) avoids LNK1257 from stale PGO objects across SAUSAGES changes.
-    # & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
-    & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m
+    & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for SAUSAGES=$N"
     }
@@ -110,7 +109,7 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
         } else {
             echo "Testing $($lvl.Name)"
             if (-not $DemoOverride) {
-                $path = "../SSRDecompile/App/" + $level.Dem
+                $path = "../SSRDecompile/App/" + $lvl.Dem
             } else {
                 $path = $DemoOverride
             }
