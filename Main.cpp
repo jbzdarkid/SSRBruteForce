@@ -93,110 +93,134 @@ bool IsLogRollHatDivergence(const LevelData* level) {
   return midOnLog;
 }
 
-#ifdef USE_LEVEL2
-static int PopCount(u32 v) { int c = 0; while (v) { v &= v - 1; c++; } return c; }
+// -------- RRT-style novelty explorer: grow a SPARSE tree of "landmark" states over the reachable graph. Memory is
+// O(distinct regions), NOT O(all states), so it never becomes a BFS closed set. Sparsification is an OCCUPANCY GRID:
+// each state's signature (positions quantized by |bin|, plus exact cook/facing) hashes to a u64 cell id, and a
+// landmark is kept only for the FIRST state to fall in each cell -- an O(1) hash check that replaces the old O(N) L1
+// nearest-neighbor scan, so a single tree can grow arbitrarily deep without slowing down. Growth is frontier-biased:
+// each iteration expands the least-fanned-out of a few random candidates (fewest children = the growing frontier),
+// then random-rollouts from it, planting a chain of new landmarks wherever the walk enters a fresh cell. Each
+// landmark's root-anchored path (segments up the parent chain) is a long demo -- ideal for the oracle, which validates
+// every intermediate move of a path in one replay. Not complete; it's a sampler. |bin| is the resolution dial (1 =
+// every distinct state; larger = coarser regions).
+static u64 BucketKey(const State& s, int bin) {
+  u64 h = 1469598103934665603ull; // FNV-1a offset basis
+  auto mix = [&](s64 v) { h = (h ^ (u64)v) * 1099511628211ull; };
+  mix(s.stephen.x / bin); mix(s.stephen.y / bin); mix(s.stephen.z / bin); mix((s64)s.stephen.dir);
+  mix(s.stephen.forkX / bin); mix(s.stephen.forkY / bin); mix(s.stephen.forkZ / bin); mix((s64)s.stephen.forkDir);
+  for (int i = 0; i < NUM_SAUSAGES; i++) {
+    const Sausage& sa = s.sausages[i];
+    mix(sa.x1 / bin); mix(sa.y1 / bin); mix(sa.x2 / bin); mix(sa.y2 / bin); mix(sa.z / bin); mix((s64)sa.flags);
+  }
+  return h;
+}
 
-// Novelty + complexity guided Monte-Carlo explorer (runs on Level2, the engine under test). From the level start it
-// does many random rollouts, at each step sampling the next input with weight proportional to how "distinctive" it is
-// (how many mechanics its feature mask fired, whether the state changed) plus a novelty bonus for feature masks and
-// consecutive-mask 2-grams not seen before. The path is archived whenever a move reaches a NOVEL Level2 state (so
-// every first-entry transition -- including pure-geometry ones with no special feature -- gets probed) or produces a
-// novel feature signature. Each archived path is a pure demo; the oracle replays it independently and an external
-// diff compares trajectories. Broad state coverage is what lets the geometry-only divergences surface.
-static void Explore(Level* level, int rollouts, int maxDepth, u32 seed, const std::string& outDir) {
+struct RRTNode {
+  State state;
+  int parent;
+  std::vector<Direction> segment; // moves from |parent|'s state to this state
+  int depth;                       // total moves from the root
+};
+
+static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, int frontierK, u32 seed, const std::string& outDir) {
+  const int INF = 1 << 30;
+  if (bin < 1) bin = 1;
   std::mt19937 rng(seed);
   State start = level->GetState();
-  std::unordered_set<u32> seenMask;
-  std::unordered_set<u64> seen2gram;
-  std::set<State> seenState;
-  seenState.insert(start);
-  struct Archived { std::vector<Direction> path; State end; u32 mask; }; // path + Level2 end-state + the move's feature mask
-  std::vector<Archived> archive;
-  std::unordered_map<u32, std::vector<int>> maskBuckets; // feature mask -> its archive slots, for mechanic-diverse eviction
+  std::vector<RRTNode> tree;
+  std::vector<int> childCount;            // per node -- frontier proxy + leaf detection
+  std::unordered_set<u64> occupied;       // O(1) sparsifier: one landmark per grid cell
+  tree.push_back({ start, -1, {}, 0 });
+  childCount.push_back(0);
+  occupied.insert(BucketKey(start, bin));
   Direction dirs[4] = { Up, Down, Left, Right };
-  const int kMaxArchive = 40000;
 
-  for (int r = 0; r < rollouts; r++) {
-    level->SetState(start);
-    std::vector<Direction> path;
-    u32 prevMask = 0;
-    for (int step = 0; step < maxDepth; step++) {
+  int maxDepth = 0, productiveRollouts = 0;
+  for (int it = 0; it < iterations; it++) {
+    // Frontier proxy: of |frontierK| random candidates, expand the one with the FEWEST children -- interior nodes have
+    // already fanned out, so the least-branched ones are the growing frontier. O(1) each (vs the old O(N) isolation scan).
+    int from = 0;
+    if (tree.size() > 1) {
+      int bestChildren = INF;
+      for (int k = 0; k < frontierK; k++) {
+        int cand = (int)(rng() % tree.size());
+        if (childCount[cand] < bestChildren) { bestChildren = childCount[cand]; from = cand; }
+      }
+    }
+
+    level->SetState(tree[from].state);
+    std::vector<Direction> segment;
+    bool grew = false;
+    for (int step = 0; step < rolloutLen; step++) {
+      State before = level->GetState();
+      int order[4] = { 0, 1, 2, 3 };
+      for (int i = 3; i > 0; i--) { int j = (int)(rng() % (i + 1)); std::swap(order[i], order[j]); }
+      bool moved = false;
+      for (int oi = 0; oi < 4; oi++) {
+        level->SetState(before);
+        if (level->Move(dirs[order[oi]])) { segment.push_back(dirs[order[oi]]); moved = true; break; }
+      }
+      if (!moved) { level->SetState(before); break; } // dead end -- every move refused
+
       State cur = level->GetState();
-      double score[4]; u32 feat4[4]; bool acc4[4];
-      double total = 0;
-      for (int i = 0; i < 4; i++) {
-        level->SetState(cur);
-        level->_feat = 0;
-        bool ok = level->Move(dirs[i]);
-        feat4[i] = level->_feat; acc4[i] = ok;
-        State res = level->GetState();
-        bool changed = !(res == cur);
-        u32 m = feat4[i];
-        u64 gram = ((u64)prevMask << 32) | m;
-        double nov = 0;
-        if (m && seenMask.find(m) == seenMask.end()) nov += 6.0;
-        if (m && seen2gram.find(gram) == seen2gram.end()) nov += 3.0;
-        double s = 0.15 + PopCount(m) * 1.0 + nov + (changed ? 0.5 : 0.0);
-        if (!ok) s = 0.0; // reject: never sample a refused move -- reroll among the accepted ones instead
-        score[i] = s; total += s;
+      if (occupied.insert(BucketKey(cur, bin)).second) { // first state in this grid cell -> a genuinely new region
+        int depth = tree[from].depth + (int)segment.size();
+        childCount[from]++;
+        tree.push_back({ cur, from, segment, depth });
+        childCount.push_back(0);
+        if (depth > maxDepth) maxDepth = depth;
+        grew = true;
+        from = (int)tree.size() - 1; // chain: further landmarks this rollout branch off the one just planted
+        segment.clear();
       }
-      if (total <= 0.0) break; // no accepted move from here -- end the rollout rather than emit a rejected no-op
-      double pick = (rng() / (double)0xFFFFFFFFu) * total;
-      int d = 0; for (; d < 3; d++) { if (pick < score[d]) break; pick -= score[d]; }
-      level->SetState(cur);
-      level->_feat = 0;
-      level->Move(dirs[d]);
-      path.push_back(dirs[d]);
-      u32 mask = feat4[d];
-      u64 gram = ((u64)prevMask << 32) | mask;
-      bool novel = false;
-      if (seenState.insert(level->GetState()).second) novel = true;   // first time we reach this Level2 state
-      if (mask && seenMask.insert(mask).second) novel = true;
-      if (mask && seen2gram.insert(gram).second) novel = true;
-      if (novel) {
-        // Archive the demo. Below the (fixed) size cap we just append; once full we keep exploring and reservoir-evict,
-        // but bias the eviction to preserve MECHANIC diversity: drop a demo from whichever feature mask is currently the
-        // most over-represented (with a uniformly random pick *within* that dominant bucket). Rare/unique mechanics are
-        // thus never crowded out by common ones (e.g. plain-geometry mask==0 moves), and the retained sample stays an
-        // unbiased reservoir across the whole exploration instead of just the first-40000 prefix.
-        State end = level->GetState();
-        if ((int)archive.size() < kMaxArchive) {
-          maskBuckets[mask].push_back((int)archive.size());
-          archive.push_back({ path, end, mask });
-        } else {
-          u32 evMask = 0; size_t best = 0;
-          for (const auto& kv : maskBuckets) if (kv.second.size() > best) { best = kv.second.size(); evMask = kv.first; }
-          auto& bucket = maskBuckets[evMask];
-          int pos = (int)(rng() % bucket.size());
-          int slot = bucket[pos];
-          bucket[pos] = bucket.back(); bucket.pop_back(); // swap-pop the evicted slot out of its bucket
-          archive[slot] = { path, end, mask };
-          maskBuckets[mask].push_back(slot);
-        }
-      }
-      prevMask = mask;
       if (level->Won()) break;
     }
+    if (grew) productiveRollouts++;
   }
 
-  // Write each archived path as a standard .dem: the moves, then a "Stop" line, then Level2's end-of-simulation
-  // geometry as raw ints (Stephen's body+fork pose, then each sausage's two cells + z). GetState already sorted the
-  // sausages, so it's canonical. Move-replayers ignore the trailing non-move lines; the oracle replays the moves and
-  // compares its own end geometry to that final line for a position divergence (and reports a loss on death).
+  // Root-anchored path for a landmark: walk up the parent chain, concatenating segments front-to-back.
+  auto rootPath = [&](int idx) {
+    std::vector<int> chain;
+    for (int i = idx; i != -1; i = tree[i].parent) chain.push_back(i);
+    std::vector<Direction> path;
+    for (int ci = (int)chain.size() - 1; ci >= 0; ci--) {
+      const auto& seg = tree[chain[ci]].segment;
+      path.insert(path.end(), seg.begin(), seg.end());
+    }
+    return path;
+  };
+
+  // Only LEAF landmarks (childCount 0) need a demo: a leaf's root-anchored path already traverses every one of its
+  // ancestors, so replaying leaves implicitly validates all interior landmark states (one long path checks every
+  // intermediate for free). Write them, tracking the longest leaf demo as we go.
   std::filesystem::create_directories(outDir);
   for (const auto& e : std::filesystem::directory_iterator(outDir))
     if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
-  int n = 0;
-  for (const auto& a : archive) {
+  int n = 0, longestDemo = 0;
+  for (int i = 1; i < (int)tree.size(); i++) {
+    if (childCount[i] != 0) continue; // interior landmark -- already on some leaf's root path
+    std::vector<Direction> path = rootPath(i);
+    if ((int)path.size() > longestDemo) longestDemo = (int)path.size();
     char name[32]; snprintf(name, sizeof(name), "%05d.dem", n++);
     std::ofstream out(outDir + "/" + name);
-    for (Direction d : a.path) out << DIR_NAMES[d] << '\n';
-    out << "Stop\n" << a.end << '\n'; // State operator<< = Stephen + oracle-sorted sausages (matches the oracle's line)
+    for (Direction d : path) out << DIR_NAMES[d] << '\n';
+    out << "Stop\n" << tree[i].state << '\n';
   }
-  printf("Explored %s: wrote %zu demos -> %s/ (%zu masks, %zu 2-grams)\n",
-         level->name, archive.size(), outDir.c_str(), seenMask.size(), seen2gram.size());
+
+  // --- Diagnostics (all O(N) -- no pairwise distance) ---
+  int landmarks = (int)tree.size() - 1;
+  int depthBuckets[8] = { 0 };
+  for (int i = 1; i < (int)tree.size(); i++) { int db = tree[i].depth / 10; if (db > 7) db = 7; depthBuckets[db]++; }
+
+  printf("RRT %s [iters=%d rollout=%d bin=%d frontierK=%d seed=0x%X]\n",
+         level->name, iterations, rolloutLen, bin, frontierK, seed);
+  printf("  landmarks=%d  leaves=%d  maxDepth=%d moves  longestLeafDemo=%d moves  productiveIters=%d/%d\n",
+         landmarks, n, maxDepth, longestDemo, productiveRollouts, iterations);
+  printf("  depth histogram (0-9,10-19,...,70+): ");
+  for (int b = 0; b < 8; b++) printf("%d%s ", depthBuckets[b], b == 7 ? "+" : "");
+  printf("\n");
+  printf("  wrote %d leaf demos (of %d landmarks) -> %s/\n", n, landmarks, outDir.c_str());
 }
-#endif
 
 // Replay every .dem in |dir| through THIS build's engine and compare the engine's end-of-simulation geometry to the
 // state recorded on the demo's trailing line (written by whichever engine generated it). Prints how many demos the
@@ -292,16 +316,16 @@ int main(int argc, char* argv[]) {
     if (!surveyAll && !std::strstr(test->name, filter.c_str())) continue; // Failed to match filter
 
     if (!demoPath.empty()) {
-#ifdef USE_LEVEL2
-      if (demoPath == "explore") {
-        int rollouts = (argc >= 4) ? atoi(argv[3]) : 3000;
-        u32 seed = (argc >= 5) ? (u32)strtoul(argv[4], nullptr, 0) : 0xC0FFEEu;
+      if (demoPath == "rrt") {
+        int iterations = (argc >= 4) ? atoi(argv[3]) : 2000;
+        int rolloutLen = (argc >= 5) ? atoi(argv[4]) : 40;
+        int bin        = (argc >= 6) ? atoi(argv[5]) : 3;
+        u32 seed       = (argc >= 7) ? (u32)strtoul(argv[6], nullptr, 0) : 0xC0FFEEu;
         std::string safe = test->name;
         for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
-        Explore(test, rollouts, 80, seed, "oracle-demos/" + safe);
+        RRTExplore(test, iterations, rolloutLen, bin, 8, seed, "oracle-demos/" + safe);
         return 0;
       }
-#endif
       if (demoPath == "reverify") {
         std::string safe = test->name;
         for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
@@ -310,9 +334,8 @@ int main(int argc, char* argv[]) {
         return 0;
       }
       if (demoPath == "findpath") {
-        // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Build the
-        // reference engine (no /DUSE_LEVEL2) so the path is reference-legal. Swap the goal predicate for the scenario
-        // being reproduced.
+        // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Swap the
+        // goal predicate for the scenario being reproduced.
         test->winOverride = &IsLogRollHatDivergence;
         bool ok = SolveLevel(test);
         printf(ok ? "Wrote solved.dem: shortest path to the alt win state.\n" : "No such state reachable.\n");
