@@ -75,15 +75,26 @@ public:
     int newWidth = swap ? _height : _width;
     int newHeight = swap ? _width : _height;
 
-    // Transform the grid
-    NArray<Tile> newGrid(newWidth, newHeight);
+    // Transform the grid and its derived per-cell masks in one remap.
+    NArray<u16> newWalls(newWidth, newHeight);
+    NArray<u16> newGrills(newWidth, newHeight);
+    NArray<u16> newLadders(newWidth, newHeight);
+    newLadders.Fill(0); // NArray does not default zero.
     for (int x = 0; x < _width; x++) {
       for (int y = 0; y < _height; y++) {
         auto [newX, newY] = Transform(x, y);
-        newGrid(newX, newY) = _level._grid(x, y);
+        newWalls(newX, newY) = _level._walls(x, y);
+        newGrills(newX, newY) = _level._grills(x, y);
+        u16 ladder = _level._ladders(x, y);
+        if (ladder) {
+          newLadders(newX, newY) = (sym((Direction)(ladder >> 8)) << 8);
+          newLadders(newX, newY) |= ladder & 0xFF;
+        }
       }
     }
-    _level._grid = std::move(newGrid);
+    _level._walls = std::move(newWalls);
+    _level._grills = std::move(newGrills);
+    _level._ladders = std::move(newLadders);
     _level._width = (u8)newWidth;
     _level._height = (u8)newHeight;
 
@@ -111,11 +122,8 @@ public:
       }
     }
 
-    // Transform all ladders
-    for (Ladder& ladder : _level._ladders) {
-      InlineTransform(ladder.x, ladder.y);
-      ladder.dir = sym(ladder.dir);
-    }
+    // Ladders were rotated above as part of _ladderMask (position via the remap, facing via sym), so there is no
+    // separate ladder list to transform here.
 
     // Initialize the engine's move scratch from the fully-transformed starting pose, exactly as the solver and
     // DiffEngines do. Notably this sets the reference's _sausageSpeared, so a level that STARTS with the fork embedded

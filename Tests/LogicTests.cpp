@@ -1023,7 +1023,7 @@ TEST_CLASS(OneOffTests) {
       "          ",
       {}, {},
       { Sausage{3, 1, 3, 2, 1} },
-      { Tile::Over2Grill }));
+      { SpecialTile::Over2Grill }));
     level.AssertPosition(3, 2, Right);
     level.AssertSausage({3, 1, 3, 2, 1, Sausage::None});
     level.AssertMoveSucceeds(Right);
@@ -3234,7 +3234,7 @@ TEST_CLASS(LogicTests) {
       " _______  "
       " _______  "
       "          ",
-      {}, {}, { Sausage{1, 3, 2, 3, 1} }, { Tile::Over2 }));
+      {}, {}, { Sausage{1, 3, 2, 3, 1} }, { SpecialTile::Over2 }));
     level.AssertPosition(1, 3, Right);
     level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});
     level.AssertMoveSucceeds(Right);
@@ -3295,7 +3295,7 @@ TEST_CLASS(LogicTests) {
       " _______  "
       " _______  "
       "          ",
-      {}, {}, { Sausage{1, 3, 2, 3, 1}, Sausage{1, 3, 2, 3, 2} }, { Tile::Over2 }));
+      {}, {}, { Sausage{1, 3, 2, 3, 1}, Sausage{1, 3, 2, 3, 2} }, { SpecialTile::Over2 }));
     level.AssertPosition(1, 3, Right);
     level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});
     level.AssertSausage({1, 3, 2, 3, 2, Sausage::None});

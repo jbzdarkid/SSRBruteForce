@@ -85,6 +85,12 @@ struct Ladder {
   Direction dir;
 };
 
+enum SpecialTile : u8 {
+  Over2,
+  Over3,
+  Over2Grill,
+};
+
 struct Sausage {
   // x1, y1 will always refer to the the left- or upper- half of the sausage.
   // This does cause some extra work while rotating, but makes comparison and referencing much easier.
@@ -151,37 +157,15 @@ struct Sausage {
   }
 };
 
-// Note the bit-masking here -- this allows us to natively represent overhangs
-enum Tile : u8 {
-  Empty  = 0,
-  Ground = 0b00000001,
-  Wall1  = 0b00000011,
-  Wall2  = 0b00000111,
-  Over2  = 0b00000101,
-  Wall3  = 0b00001111,
-  Over3  = 0b00001001,
-  Wall4  = 0b00011111,
-  Wall5  = 0b00111111,
-  Grill  = 0b01000000,
-  GroundGrill = Ground | Grill,
-  Wall1Grill  = Wall1  | Grill,
-  Wall2Grill  = Wall2  | Grill,
-  Over2Grill  = Over2  | Grill,
-  Special = 0b10000000,  // High bit: reserved for special tiles, with special handling
-  Wall6  = 0b10000001,
-  Wall7  = 0b10000010,
-  Wall8  = 0b10000011,
-};
-
 class LevelData {
 public:
   friend class TestSymmetryHelper;
 
   LevelData(u8 width, u8 height, const char* name, const char* asciiGrid,
     const Stephen& stephen = {},
-    std::initializer_list<Ladder> ladders = {},
-    std::initializer_list<Sausage> sausages = {},
-    std::initializer_list<Tile> tiles = {});
+    std::vector<Ladder> ladders = {},
+    std::vector<Sausage> sausages = {},
+    std::vector<SpecialTile> specialTiles = {});
   void Print() const;
   bool Won() const;
   // Analysis hook: when set, Won() returns this predicate instead of the normal win test, so the ordinary solver can
@@ -192,6 +176,7 @@ public:
   int NumSausages() const;
   const Vector<Sausage>& Sausages() const { return _sausages; } // read-only access for custom solver heuristics
   const Stephen& GetStephen() const { return _stephen; }        // read-only access for custom solver heuristics
+  const Stephen& Start() const { return _start; }               // the pose the win must return to (_stephen == _start)
   bool IsWithinGrid(s8 x, s8 y, s8 z) const;
   bool IsWall(s8 x, s8 y, s8 z) const;
   bool CanWalkOnto(s8 x, s8 y, s8 z) const;
@@ -207,7 +192,8 @@ protected:
 private:
   u8 _width;
   u8 _height;
-  NArray<Tile> _grid;
-  Vector<Ladder> _ladders;
+  NArray<u16> _walls;
+  NArray<u16> _grills;
+  NArray<u16> _ladders;
   Stephen _start;
 };

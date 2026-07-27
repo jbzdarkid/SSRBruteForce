@@ -257,7 +257,7 @@ Level ColdFinger = [] {
     {},
     {},
     {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
-    {Tile::Over3});
+    {SpecialTile::Over3});
 
   coldFinger.heuristic = [](const Level* level) {
     if (HasOffGridSausage(level)) return false; // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
@@ -312,12 +312,12 @@ Level ColdTrail = [] {
   {},
   {Sausage{1, 2, 2, 2, 1}, Sausage{1, 3, 1, 4, 1}, Sausage{2, 3, 2, 4, 1}});
   coldTrail.heuristic = [](const Level* level) {
+    // In the optimal solution, Stephen (and the sausages) never enter the lower half of the puzzle. Sausages are
+    // normalized so (x1,y1) is the upper/left half, hence y2 >= y1 -- testing the lower end's y2 alone bounds both.
+    const Stephen& stephen = level->GetStephen();
+    if (stephen.y > 5) return false;
     for (const Sausage& sausage : level->Sausages()) {
-      // There are 3 edges of this puzzle which a sausage overhanging is unrecoverable.
-      // Since the grills are all on the right, we also don't need to check for cooked flags.
-      if (sausage.x1 == -1) return false; // Left
-      if (sausage.y1 == -1) return false; // Top
-      if (sausage.y2 == 12) return false; // Bottom
+      if (sausage.y2 > 5) return false;
     }
     return true;
   };
@@ -459,7 +459,7 @@ Level ColdGate(18, 11, "3-13 Cold Gate",
   Sausage{14, 5, 14, 6, 4},  // tower sausage 4, z=4
   Sausage{14, 5, 14, 6, 5},  // tower sausage 5, z=5
   Sausage{14, 5, 14, 6, 6}}, // tower sausage 6, z=6
-  {Tile::Over2Grill, Tile::Over2Grill, Tile::Over2Grill});
+  {SpecialTile::Over2Grill, SpecialTile::Over2Grill, SpecialTile::Over2Grill});
 
 Level ColdFrustration = [] {
   Level coldFrustration(10, 9, "3-14 Cold Frustration",
@@ -537,7 +537,7 @@ Level SludgeCoast(10, 11, "4-3 Sludge Coast",
   Stephen{3, 5, 0, Right},
   {},
   {},
-  {Tile::Over2});
+  {SpecialTile::Over2});
 
 Level FoulFen(9, 9, "4-4 Foul Fen",
   "122211111"
@@ -585,7 +585,7 @@ Level GatorPaddock(12, 10, "4-6 Gator Paddock",
   Stephen{5, 7, 0, Down},
   {Ladder{6, 6, 1, Right}, Ladder{7, 8, 1, Up}},
   {},
-  {Tile::Over2Grill});
+  {SpecialTile::Over2Grill});
 
 Level SlopeView(18, 8, "5-1 Slope View",
   "        $$     1  "
