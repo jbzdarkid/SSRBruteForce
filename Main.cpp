@@ -279,7 +279,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
     State state = level->GetState();
     printf("\n=== move %d: %s %s ===\n", (i+1), DIR_NAMES[dir], (success ? "SUCCEEDED" : "FAILED"));
 
-    u32 moveUnits = solver.ComputeScore(previousState, dir, nextState);
+    u32 moveUnits = Solver(level).ComputeScore(previousState, dir, state);
     moveUnits = (moveUnits + 999) / 1000; // Compensating for any tie-breaks.
     totalUnits += moveUnits;
     previousState = state;
