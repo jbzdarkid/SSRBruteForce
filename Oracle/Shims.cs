@@ -40,7 +40,7 @@ public class MetaGameState {
 }
 
 // Game-shell statics referenced on save/sfx/overworld paths (no-ops headlessly).
-public static class Game {
+public static partial class Game {
   public static bool forktwang;
   public static string loadedLevelName = "";
 }
