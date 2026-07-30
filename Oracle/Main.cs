@@ -38,6 +38,7 @@ static class Oracle {
     string level = $"Oracle/levels/{levelName}.dat"; // Assuming we're running from repo root
     GameState gs = GameState.Load(File.ReadAllText(level), null, true);
 
+    long totalUnits = 0;
     string[] lines = File.ReadAllLines(demoPath);
     for (int i = 0; i < lines.Length; i++) {
       if (lines[i] == "Undo") i += 2; // Real demos have a second-move Undo, then immediately replay move 1 as move 3. Jump to move 4.
@@ -53,16 +54,13 @@ static class Oracle {
       };
 
       gs.ProcessInput(dir);
-      for (int j = 0; j < 100_000; j++) {
-        gs.ContinueAutomatic();
-        if (!gs.Moving()) break;
-      }
+      long moveUnits = Game.ResolveMove(gs);
 
       if (debug) {
         string success = (gs.Lost().Length == 0) ? "SUCCEEDED" : "FAILED";
         Console.WriteLine();
         Console.WriteLine($"=== move {i + 1}: {line} {success} ===");
-        Console.WriteLine(ToString(gs));
+        Console.WriteLine($"{ToString(gs)} {moveUnits} {totalUnits}");
       }
 
       if (gs.Won()) return ""; // Real demos have trailing moves to get to the next level, check early

@@ -14,7 +14,7 @@
 struct Level : public LevelData {
   using LevelData::LevelData; // Inherit the constructor
 
-  State GetState() const;
+  State GetState(bool sort = true) const;
   void SetState(const State& state);
 
   // Takes a player input (one of the 4 cardinal directions) and simulates the game's response. Returns false if the

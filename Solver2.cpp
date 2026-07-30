@@ -123,61 +123,102 @@ void Solver::FindFastestSolution(const State& state, std::vector<Direction>& sol
     auto search = _winningStates.find(newState);
     if (search == std::end(_winningStates) || search->second != solution.size() + 1) continue; // Not a winning move, or not an optimal winning move.
 
-    u32 scoreDelta = ComputeScore(state, dir, newState);
+    u32 scoreDelta = ComputeScore(state, dir, _level->GetState(false));
     solution.push_back(dir);
     FindFastestSolution(newState, solution, score + scoreDelta);
     solution.pop_back();
   }
 }
 
-u32 Solver::ComputeScore(const State& state, Direction dir, const State& newState) {
-  u32 score = 0;
+Direction DirectionBetween(s8 x1, s8 y1, s8 x2, s8 y2) {
+  if (x1 != x2) return x1 > x2 ? Right : Left;
+  if (y1 != y2) return y1 > y2 ? Down : Up;
+  return None;
+}
 
-  // Speared state is not saved, because it's recoverable. Memory > speed tradeoff.
-  bool sausageSpeared = false;
+u32 Solver::ComputeScore(const State& state, Direction dir, const State& newState) {
+  u32 score = 1000; // By default, every accepted move costs 1 unit of time
+
+  bool sidewaysPress = dir != state.stephen.dir && dir != (Direction)(7 - state.stephen.dir);
+
+  s8 speared = -1;
   if (state.stephen.HasFork()) {
-    for (const Sausage& sausage : state.sausages) {
-      if (sausage.IsAt(state.stephen.x, state.stephen.y, state.stephen.z)) {
-        sausageSpeared = true;
+    for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+      if (state.sausages[i].IsAt(state.stephen.forkX, state.stephen.forkY, state.stephen.z)) {
+        speared = i;
         break;
       }
     }
   }
-  if (!sausageSpeared) {
-    score += 160'000;
-
-#define o(x) if (state.sausages[x] != newState.sausages[x]) score += 38'000;
-    SAUSAGES
-#undef o
-  } else { // Movements are faster while spearing a sausage
-    score += 158'000;
-
-#define o(x) if (state.sausages[x] != newState.sausages[x]) score += 4'000;
-    SAUSAGES
-#undef o
-  }
 
   bool burnedStep = false;
-  if (dir == Up)         burnedStep = _level->IsGrill(state.stephen.x, state.stephen.y - 1, state.stephen.z);
-  else if (dir == Down)  burnedStep = _level->IsGrill(state.stephen.x, state.stephen.y + 1, state.stephen.z);
-  else if (dir == Left)  burnedStep = _level->IsGrill(state.stephen.x - 1, state.stephen.y, state.stephen.z);
-  else if (dir == Right) burnedStep = _level->IsGrill(state.stephen.x + 1, state.stephen.y, state.stephen.z);
-  if (burnedStep) score += 152'000; // TODO: Does this change while speared?
+  if (state.stephen == newState.stephen) {
+    // We can trigger a burned step by moving forwards or backwards onto a grill, *or* by strafing while speared.
+    if (!sidewaysPress || (sidewaysPress && speared != -1)) {
+      if      (dir == Up)    burnedStep = _level->IsGrill(state.stephen.x,     state.stephen.y - 1, state.stephen.z);
+      else if (dir == Down)  burnedStep = _level->IsGrill(state.stephen.x,     state.stephen.y + 1, state.stephen.z);
+      else if (dir == Left)  burnedStep = _level->IsGrill(state.stephen.x - 1, state.stephen.y,     state.stephen.z);
+      else if (dir == Right) burnedStep = _level->IsGrill(state.stephen.x + 1, state.stephen.y,     state.stephen.z);
+    }
+  }
 
-  // TODO: Does the sausage movement cost depend on your *current state* or the *next state*? I.e. if you unspear and roll a sausage behind you, do you pay for it?
-  // TODO: Time sausage pushes as fork pushes (same latency as rotations?)
-  // TODO: Time motion w/ sausage hat
+  if (burnedStep) {
+    score += 1000; // bounced off a grill for a full extra beat; the step's own sausage push is part of it (free)
+  }
+  
+  bool turnedInPlace = sidewaysPress && speared == -1
+    && state.stephen.x == newState.stephen.x
+    && state.stephen.y == newState.stephen.y
+    && state.stephen.z == newState.stephen.z;
+  if (turnedInPlace) {
+    // Stephen is turning in place (or bonking a turn); add 1/2 cost per unique direction a sausage rolled.
+    // A perpendicular press that instead climbs a ladder or strafes moves his body, so it isn't a turn and rolls nothing.
+
+    u32 sausageDirections = (1u << None);
+    for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+      const Sausage& before = state.sausages[i];
+      const Sausage& after = newState.sausages[i];
+      // Mostly, the x1/y1 coordinate will identify a sausage's movement direciton.
+      // However, when a sausage pivots, they will have different directions, so we skip computing the second direction in that case.
+      Direction rolled = DirectionBetween(before.x1, before.y1, after.x1, after.y1);
+      if (rolled == None) rolled = DirectionBetween(before.x2, before.y2, after.x2, after.y2);
+      sausageDirections |= 1u << rolled;
+    }
+    // -500 to account for the 'None' direction (from non-moving sausages)
+    score += 500 * __popcnt(sausageDirections) - 500;
+  }
+
+  // Double-moves are full cost for each sausage that moves.
+  for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+    const Sausage& before = state.sausages[i];
+    const Sausage& after = newState.sausages[i];
+    s8 distance = (after.x1 - before.x1) + (after.y1 - before.y1);
+    if (distance < 0) distance = -distance;
+    if (distance > 1) score += 1000 * (distance - 1);
+  }
+
+  // Ladder motion costs 1 beat per rung climbed
+  s8 ladderDelta = newState.stephen.z - state.stephen.z;
+  if (ladderDelta > 0) {
+    score += 1000 * ladderDelta;
+  }
+
+  // Descending a ladder moves simultaneously with dropped sausages, so compute them together
+  s8 maximumDrop = 0;
+  if (ladderDelta < maximumDrop) maximumDrop = ladderDelta;
+  for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+    s8 sausageDelta = newState.sausages[i].z - state.sausages[i].z;
+    if (sausageDelta < maximumDrop) maximumDrop = sausageDelta;
+  }
+  score += 1000 * -maximumDrop;
+
+  // TODO: This does not correctly handle logrolling
+  Direction stephenMoved = DirectionBetween(state.stephen.x, state.stephen.y, newState.stephen.x, newState.stephen.y);
+  if (dir == (Direction)(7 - stephenMoved)) score--; // Prefer backwards steps where possible as a tie break
+
   // TODO: Time motion w/ fork carry
   // TODO: Time motion as forkless -> rotations *and* lateral motion
   // TODO: Time motion when pushing a block
-  // TODO: Ladder climbs while speared / non-speared?
-
-  // TODO: This does not correctly handle logrolling
-  // Instead of counting backward steps separately, just lower the score (as a "reward").
-  if (state.stephen.dir == Up && dir == Down)         score--;
-  else if (state.stephen.dir == Down && dir == Up)    score--;
-  else if (state.stephen.dir == Left && dir == Right) score--;
-  else if (state.stephen.dir == Right && dir == Left) score--;
 
   return score;
 }

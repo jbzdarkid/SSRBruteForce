@@ -1,22 +1,24 @@
 #include "Level2.h"
 
 
-State Level::GetState() const {
+State Level::GetState(bool sort) const {
   State s{_stephen};
   assert(sizeof(s.sausages) / sizeof(Sausage) == _sausages.Size());
-#if 0 // Sorting is proven to work and also greatly reduces states in complex levels.
-  _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
-#else
-  _sausages.SortedCopyIntoArray(s.sausages, sizeof(s.sausages), [](const Sausage& a, const Sausage& b) -> s8 {
-    if (a.x1 != b.x1) return a.x1 - b.x1;
-    if (a.y1 != b.y1) return a.y1 - b.y1;
-    if (a.z != b.z) return a.z - b.z;
-    if (a.x2 != b.x2) return a.x2 - b.x2;
-    if (a.y2 != b.y2) return a.y2 - b.y2;
-    if (a.flags != b.flags) return a.flags - b.flags;
-    return 0;
-    });
-#endif
+  if (sort) {
+    // Sorting sausages reduces the number of redundant states (especially in large-sausage levels).
+    _sausages.SortedCopyIntoArray(s.sausages, sizeof(s.sausages), [](const Sausage& a, const Sausage& b) -> s8 {
+      if (a.x1 != b.x1) return a.x1 - b.x1;
+      if (a.y1 != b.y1) return a.y1 - b.y1;
+      if (a.z != b.z) return a.z - b.z;
+      if (a.x2 != b.x2) return a.x2 - b.x2;
+      if (a.y2 != b.y2) return a.y2 - b.y2;
+      if (a.flags != b.flags) return a.flags - b.flags;
+      return 0;
+      });
+  } else {
+    // Disabled for the 'cost' computation, which needs to compare sausage positions between consecutive states
+    _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
+  }
   return s;
 }
 
