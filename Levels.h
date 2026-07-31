@@ -351,7 +351,7 @@ Level ColdPit(10, 10, "3-6 Cold Pit",
   "1 $$111   "
   "11111     ",
   Stephen{4, 4, 1, Down},
-  {},
+  {Ladder{8, 0, 1, Up}}, // Extra ladder somehow included in the level, not actually useful
   {Sausage{8, 2, 9, 2, 1},
   Sausage{3, 3, 3, 4, 1}});
 

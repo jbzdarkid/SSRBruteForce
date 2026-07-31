@@ -5,7 +5,7 @@
 #   2. Level2 grows a single deep RRT-style tree from the start (frontier-biased expansion, novelty-gated by an
 #      occupancy grid) and writes death-free LEAF demos into oracle-demos\<safe>\. A leaf's move path traverses all
 #      its ancestors, so the leaves alone cover the whole tree -- few long demos instead of many short ones.
-#   3. The C# oracle (real game, loaded from the level's game-native dat) bulk-replays every one of those .dem files.
+#   3. The C# oracle (real game, loaded from the extracted merged_binary blob) bulk-replays every one of those .dem files.
 #      Level2 thought each was safe; any the game reports LOST -- or that ends in a different final state -- is a
 #      genuine divergence. The offending .dem is its repro.
 #

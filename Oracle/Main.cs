@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Linq;
 
 static class Oracle {
   static int Main(string[] args) {
@@ -11,6 +11,43 @@ static class Oracle {
     else Console.WriteLine($"Reason: {ReplayDemo(levelName, demos, debug: true)}"); // was actually a file
 
     return 0;
+  }
+
+  static Dictionary<string, string> loadedLevels = new();
+  static GameState LoadFromBlob(string levelName) {
+    if (loadedLevels.TryGetValue(levelName, out string levelData)) {
+      return GameState.Load(levelData, null, true);
+    }
+
+    using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+    MetaGameState metaGame = new();
+    metaGame.LoadBinary(reader);
+
+    // Strip the "1-1 " level prefix; the rest is the game's display name verbatim
+    string displayName = levelName[(levelName.IndexOf(' ') + 1)..];
+    GameState island = metaGame.islands.Values.FirstOrDefault(g => g.displayname == displayName);
+    if (island == null) throw new Exception($"No island with display name '{disp}' in merged_binary");
+
+    // Fresh copy so the cached island isn't mutated; strip decoration/markers off the working copy.
+    GameState work = GameState.Load(island.Save(false, false), _blob, false);
+    work.entities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
+    work.dynamicentities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
+
+    // Some source islands store a sausage pre-rolled; flatten rot to match how the C++ authors it (rot 0).
+    foreach (Entity e in work.entities) {
+      if (e.type == EntType.sausage) e.rot = 0;
+    }
+
+    // An isolated level is never the overworld (impacts some internal checks)
+    work.overworld = false;
+
+    int minx = work.entities.Min(e => e.pos.x);
+    int miny = work.entities.Min(e => e.pos.y);
+    int minz = work.entities.Min(e => e.pos.z);
+    string translated = GameState.Translate(work.Save(false, false), new Coord(-minx, -miny, -1 - minz));
+
+    loadedLevels[levelName] = translated;
+    return GameState.Load(translated, null, true);
   }
 
   static int Compare(Coord a, Coord b) {
@@ -34,9 +71,7 @@ static class Oracle {
   }
   
   static string ReplayDemo(string levelName, string demoPath, bool debug=false) {
-    levelName = levelName[(levelName.IndexOf(' ') + 1)..].Replace("'", "").Replace(" ", "_"); // drop the "3-7 " prefix
-    string level = $"Oracle/levels/{levelName}.dat"; // Assuming we're running from repo root
-    GameState gs = GameState.Load(File.ReadAllText(level), null, true);
+    GameState gs = LoadFromBlob(levelName);
 
     long totalUnits = 0;
     string[] lines = File.ReadAllLines(demoPath);

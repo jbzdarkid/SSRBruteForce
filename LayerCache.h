@@ -1,5 +1,5 @@
 #pragma once
-#include "WitnessRNG\StdLib.h"
+#include "Common.h"
 
 #include <filesystem>
 #include <format>
