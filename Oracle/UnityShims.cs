@@ -47,7 +47,7 @@ namespace UnityEngine {
   public class Transform { }
   public class Component { }
 
-  public class TextAsset { public string text = ""; }
+  public class TextAsset { public string text = ""; public byte[] bytes; }
 
   public struct Vector2 {
     public float x, y;

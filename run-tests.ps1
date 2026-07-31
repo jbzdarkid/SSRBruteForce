@@ -70,6 +70,7 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "4-4 Foul Fen";          Dem = "4-4.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Dem = "4-5.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "4-6 Gator Paddock";     Dem = "4-6.dem";  Sausages = 1 }
+    [pscustomobject]@{ Name = "5-1 Slope View";        Dem = "5-1.dem";  Sausages = 3 }
 )
 
 function Build-Variant {

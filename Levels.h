@@ -553,23 +553,20 @@ Level FoulFen(9, 9, "4-4 Foul Fen",
   {Ladder{2, 3, 1, Up}, Ladder{3, 3, 1, Up}},
   {Sausage{5, 3, 5, 4, 1}});
 
-Level CrunchyLeaves = [] {
-  Level crunchyLeaves(8, 10, "4-5 Crunchy Leaves",
-    "     111"
-    "     121"
-    " 222 111"
-    " 232##__"
-    " 222##  "
-    "_U__  R1"
-    "_bb_  _1"
-    "___v_a_U"
-    "_1___a__"
-    "______  ",
-    {},
-    {Ladder{2, 4, 2, Up}},
-    {Sausage{7, 1, 7, 2, 1}});
-  return crunchyLeaves;
-}();
+Level CrunchyLeaves(8, 10, "4-5 Crunchy Leaves",
+  "     111"
+  "     121"
+  " 222 111"
+  " 232##__"
+  " 222##  "
+  "_U__  R1"
+  "_bb_  _1"
+  "___v_a_U"
+  "_1___a__"
+  "______  ",
+  {},
+  {Ladder{2, 4, 2, Up}},
+  {Sausage{7, 1, 7, 2, 1}});
 
 Level GatorPaddock(12, 10, "4-6 Gator Paddock",
   "____11111211"
@@ -589,17 +586,16 @@ Level GatorPaddock(12, 10, "4-6 Gator Paddock",
 
 Level SlopeView(18, 8, "5-1 Slope View",
   "        $$     1  "
-  "        $$___bb_1 "
+  "        $$___aa_1 "
   "2222222211__R11_  "
   "2222322211______  "
-  "2222222211___cc_##"
+  "2222222211___bb_##"
   "2222222211L_____##"
   "           ##     "
   "           ##     ",
   Stephen{4, 5, 2, Left},
-  {Ladder{4, 3, 2, Down}, Ladder{7, 5, 2, Right}},
-  {Sausage{6, 3, 6, 4}});
-
+  {Ladder{4, 4, 3, Up}, Ladder{8, 5, 1, Left}},
+  {Sausage{6, 3, 6, 4, 2}});
 
 Level LandsEnd(13, 7, "5-5 Land's End",
   "      _1     "
@@ -929,4 +925,5 @@ std::vector<Level*> tests = {
   &FoulFen,
   &CrunchyLeaves,
   &GatorPaddock,
+  &SlopeView,
 };
