@@ -239,7 +239,9 @@ bool LevelData::IsWall(s8 x, s8 y, s8 z) const {
 bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   if (_walls(x, y) & (1 << z)) return true; // Stepping onto standable terrain at our current level
-  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z) return true; // Stepping onto a fork
+  // A thrown (detached) fork is a solid object one cell tall: standing on it means it sits directly below us, exactly
+  // mirroring the sausage footing rule just below (the reference's HasFooting: an entity in the cell beneath you).
+  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z - 1) return true;
   if (GetSausage(x, y, z-1) != -1) return true; // Stepping onto a sausage
   return false;
 }

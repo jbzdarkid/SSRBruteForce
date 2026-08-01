@@ -70,7 +70,18 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "4-4 Foul Fen";          Dem = "4-4.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Dem = "4-5.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "4-6 Gator Paddock";     Dem = "4-6.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "5-1 Slope View";        Dem = "5-1.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-1 The Gorge";         Dem = "5-1.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-2 Widow's Finger";    Dem = "5-2.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-3 Skeleton";          Dem = "5-3.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-4 Slope View";        Dem = "5-4.dem";  Sausages = 1 }
+    [pscustomobject]@{ Name = "5-5 Land's End";        Dem = "5-5.dem";  Sausages = 1 }
+    [pscustomobject]@{ Name = "5-6 Crater";            Dem = "5-6.dem";  Sausages = 2 }
+    [pscustomobject]@{ Name = "5-7 Pressure Points";   Dem = "5-7.dem";  Sausages = 2 }
+    [pscustomobject]@{ Name = "5-8 Open Baths";        Dem = "5-8.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-9 Drumlin";           Dem = "5-9.dem";  Sausages = 3 }
+    [pscustomobject]@{ Name = "5-10 Tarry Ridge";      Dem = "5-10.dem"; Sausages = 2 }
+    [pscustomobject]@{ Name = "5-11 Rough View";       Dem = "5-11.dem"; Sausages = 2 }
+    [pscustomobject]@{ Name = "5-12 Baby Rock";        Dem = "5-12.dem"; Sausages = 2 }
 )
 
 function Build-Variant {
