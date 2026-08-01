@@ -5,7 +5,7 @@
 #   2. Level2 grows a single deep RRT-style tree from the start (frontier-biased expansion, novelty-gated by an
 #      occupancy grid) and writes death-free LEAF demos into oracle-demos\<safe>\. A leaf's move path traverses all
 #      its ancestors, so the leaves alone cover the whole tree -- few long demos instead of many short ones.
-#   3. The C# oracle (real game, loaded from the level's game-native dat) bulk-replays every one of those .dem files.
+#   3. The C# oracle (real game, loaded from the extracted merged_binary blob) bulk-replays every one of those .dem files.
 #      Level2 thought each was safe; any the game reports LOST -- or that ends in a different final state -- is a
 #      genuine divergence. The offending .dem is its repro.
 #
@@ -85,12 +85,12 @@ $levels = @(
     [pscustomobject]@{ Name = "3-12 Cold Horizon";     Sausages = 2 }
     [pscustomobject]@{ Name = "3-13 Cold Gate";        Sausages = 7 }
     [pscustomobject]@{ Name = "3-14 Cold Frustration"; Sausages = 3 }
-#    [pscustomobject]@{ Name = "4-1 Wretch's Retreat";  Sausages = 2 }
-#    [pscustomobject]@{ Name = "4-2 Toad's Folly";      Sausages = 3 }
-#    [pscustomobject]@{ Name = "4-3 Sludge Coast";      Sausages = 2 }
-#    [pscustomobject]@{ Name = "4-4 Foul Fen";          Sausages = 1 }
-#    [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Sausages = 3 }
-#    [pscustomobject]@{ Name = "4-6 Gator Paddock";     Sausages = 1 }
+    [pscustomobject]@{ Name = "4-1 Wretch's Retreat";  Sausages = 2 }
+    [pscustomobject]@{ Name = "4-2 Toad's Folly";      Sausages = 3 }
+    [pscustomobject]@{ Name = "4-3 Sludge Coast";      Sausages = 2 }
+    [pscustomobject]@{ Name = "4-4 Foul Fen";          Sausages = 1 }
+    [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Sausages = 3 }
+    [pscustomobject]@{ Name = "4-6 Gator Paddock";     Sausages = 1 }
 )
 
 function Build-Variant {

@@ -15,84 +15,6 @@
 
 const char* DIR_NAMES[] = {"None", "North", "West", "Jump", "Crouch", "East", "South"};
 
-// A "goal" predicate for winOverride: the state holds a sausage FLOATING in mid-air -- a level or more up, with every
-// end unsupported (no wall-top, no other sausage, and not resting on / impaled by Stephen). This is the reference's
-// ladder-descent quirk: it lowers the speared/fork/head sausage but never re-checks gravity on a rider merely resting
-// on it. Pointed at winOverride, the ordinary solver finds the shortest move sequence that produces such a state.
-bool IsFloatingState(const LevelData* level) {
-  const Stephen& man = level->GetStephen();
-  const Vector<Sausage>& sausages = level->Sausages();
-  for (int i = 0; i < (int)sausages.Size(); i++) {
-    const Sausage& s = sausages[i];
-    if (s.z < 1) continue;                                                        // on the ground floor
-    if (man.HasFork() && s.IsAt(man.forkX, man.forkY, man.forkZ)) continue;       // impaled on the fork -> held
-    auto endSupported = [&](s8 x, s8 y) -> bool {
-      if (level->IsWall(x, y, s.z - 1)) return true;                              // wall-top
-      if (man.x == x && man.y == y && man.z == s.z - 1) return true;             // Stephen's head
-      if (man.HasFork() && man.forkX == x && man.forkY == y && man.forkZ == s.z - 1) return true; // his fork
-      for (int j = 0; j < (int)sausages.Size(); j++) {
-        if (j == i) continue;
-        const Sausage& o = sausages[j];
-        if (o.z == s.z - 1 && o.IsAt(x, y, o.z)) return true;                     // another sausage below
-      }
-      return false;
-    };
-    if (!endSupported(s.x1, s.y1) && !endSupported(s.x2, s.y2)) return true;
-  }
-  return false;
-}
-
-// Alt winOverride goal for the 3-3 Cold Escarpment rotation-drop divergence: Stephen faces West at (11,12) with his
-// fork at (10,12), a horizontal "hat" sausage straddles (10,11)-(11,11) z=1 resting on a vertical base at
-// (10,10)-(10,11) z=0. Pressing North here turns him North; the reference tips the hat one cell East off the fork and
-// drops it, while Level2 leaves it on the fork. Point winOverride here and run |findpath| for the shortest demo to
-// this pose -- then press North to reproduce the divergence.
-bool IsEscarpmentRotationDrop(const LevelData* level) {
-  const Stephen& man = level->GetStephen();
-  if (!(man.x == 11 && man.y == 12 && man.z == 0 && man.dir == Left)) return false;
-  if (!(man.HasFork() && man.forkX == 10 && man.forkY == 12 && man.forkZ == 0)) return false;
-  const Vector<Sausage>& sausages = level->Sausages();
-  bool hat = false, base = false;
-  for (int i = 0; i < (int)sausages.Size(); i++) {
-    const Sausage& s = sausages[i];
-    if (s.IsAt(10, 11, 1) && s.IsAt(11, 11, 1)) hat = true;   // horizontal hat on the fork-swing cell
-    if (s.IsAt(10, 10, 0) && s.IsAt(10, 11, 0)) base = true;  // vertical base under its west end
-  }
-  return hat && base;
-}
-
-// winOverride goal for the "gap 2" log-roll head-hat divergence. Detects the pre-roll pose: Stephen stands ON a sausage
-// (the log), carries a head-hat, and that hat's FAR half (the end not over his head) rests on a THIRD sausage which is
-// itself riding the log. When he then presses ACROSS the log (a log-roll), the log rolls and carries that third sausage
-// out from under the hat's far end -- and the reference flings the head-hat off Stephen onto the moving sausage while
-// Level2 keeps it on his head. Point winOverride here, |findpath| to this pose, then press across the log to reproduce.
-bool IsLogRollHatDivergence(const LevelData* level) {
-  const Stephen& man = level->GetStephen();
-  const Vector<Sausage>& sausages = level->Sausages();
-  s8 logNo = level->GetSausage(man.x, man.y, man.z - 1);   // Stephen must be standing on a sausage
-  if (logNo == -1) return false;
-  s8 hatNo = level->GetSausage(man.x, man.y, man.z + 1);   // ...with a head-hat above him
-  if (hatNo == -1) return false;
-  const Sausage& log = sausages[logNo];
-  const Sausage& hat = sausages[hatNo];
-  // A log-roll only fires when Stephen faces ALONG the log's long axis and presses across it.
-  bool canRoll = (log.IsHorizontal() && (man.dir == Up || man.dir == Down))
-              || (log.IsVertical()   && (man.dir == Left || man.dir == Right));
-  if (!canRoll) return false;
-  // The hat's far half is the end that isn't over Stephen's head; it must actually bridge off that cell.
-  bool firstOnHead = (hat.x1 == man.x && hat.y1 == man.y);
-  s8 farX = firstOnHead ? hat.x2 : hat.x1;
-  s8 farY = firstOnHead ? hat.y2 : hat.y1;
-  if (farX == man.x && farY == man.y) return false;        // hat sits squarely on the head (no cantilever) -> no divergence
-  s8 midNo = level->GetSausage(farX, farY, man.z);         // the sausage under the hat's far end (hat.z-1 == man.z)
-  if (midNo == -1 || midNo == logNo || midNo == hatNo) return false;
-  // The "mid" must ride the LOG (rest on one of the log's ends) so that the roll carries it away this turn.
-  const Sausage& mid = sausages[midNo];
-  bool midOnLog = level->GetSausage(mid.x1, mid.y1, mid.z - 1) == logNo
-               || level->GetSausage(mid.x2, mid.y2, mid.z - 1) == logNo;
-  return midOnLog;
-}
-
 // -------- RRT-style novelty explorer: grow a SPARSE tree of "landmark" states over the reachable graph. Memory is
 // O(distinct regions), NOT O(all states), so it never becomes a BFS closed set. Sparsification is an OCCUPANCY GRID:
 // each state's signature (positions quantized by |bin|, plus exact cook/facing) hashes to a u64 cell id, and a
@@ -270,13 +192,21 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
   printf("=== initial state ===\n");
   level->Print();
 
+  State previousState = level->GetState();
+  u32 totalUnits = 0;
   for (int i = 0; i < (int)moves.size(); i++) {
     Direction dir = moves[i];
     bool success = level->Move(dir);
 
     State state = level->GetState();
     printf("\n=== move %d: %s %s ===\n", (i+1), DIR_NAMES[dir], (success ? "SUCCEEDED" : "FAILED"));
-    std::cout << state << std::endl;
+
+    u32 moveUnits = Solver(level).ComputeScore(previousState, dir, state);
+    moveUnits = (moveUnits + 999) / 1000; // Compensating for any tie-breaks.
+    totalUnits += moveUnits;
+    previousState = state;
+
+    std::cout << state << ' ' << moveUnits << ' ' << totalUnits << std::endl;
     level->Print();
 
     if (level->Won()) break; // Demos have trailing moves
@@ -332,14 +262,6 @@ int main(int argc, char* argv[]) {
         std::string dir = (argc >= 4) ? std::string{ argv[3] } : ("oracle-demos/" + safe);
         Reverify(test, dir);
         return 0;
-      }
-      if (demoPath == "findpath") {
-        // Let the ordinary solver find the shortest path to an alternate win state, written to solved.dem. Swap the
-        // goal predicate for the scenario being reproduced.
-        test->winOverride = &IsLogRollHatDivergence;
-        bool ok = SolveLevel(test);
-        printf(ok ? "Wrote solved.dem: shortest path to the alt win state.\n" : "No such state reachable.\n");
-        return ok ? 0 : 5;
       }
       std::ifstream file(demoPath);
       if (!file.is_open()) {

@@ -1,6 +1,6 @@
 #pragma once
 #include "LevelData.h"
-#include "WitnessRNG/StdLib.h"
+#include "Common.h"
 
 #include <cstring>
 #include <random>

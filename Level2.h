@@ -14,7 +14,7 @@
 struct Level : public LevelData {
   using LevelData::LevelData; // Inherit the constructor
 
-  State GetState() const;
+  State GetState(bool sort = true) const;
   void SetState(const State& state);
 
   // Takes a player input (one of the 4 cardinal directions) and simulates the game's response. Returns false if the
@@ -216,7 +216,7 @@ private:
   bool SausageBlocked(s8 sausageNo, Direction dir) const;
 
   // The (dx, dy) unit step for a cardinal direction.
-  void Delta(Direction dir, s8& dx, s8& dy) const;
+  std::pair<s8, s8> Delta(Direction dir) const;
 
   inline Direction Inverse(Direction dir) const {
     assert(dir > 0 && dir < 7);

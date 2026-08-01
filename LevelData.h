@@ -1,7 +1,7 @@
 #pragma once
 #include <initializer_list>
 #include <ostream>
-#include "WitnessRNG/StdLib.h"
+#include "Common.h"
 
 #define OVERWORLD_HACK 0
 #ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.

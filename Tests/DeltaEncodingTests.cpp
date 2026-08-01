@@ -1,5 +1,5 @@
 #include "CppUnitTest.h"
-#include "LayerCache.h" // pulls in u128 (absl::uint128) via WitnessRNG/StdLib.h
+#include "LayerCache.h" // pulls in u128 (absl::uint128) via Common.h
 #include "State.h"     // State (the record we sort + delta-encode)
 #include "Levels.h"    // ColdTrail (to benchmark real Move expansion on cached states)
 

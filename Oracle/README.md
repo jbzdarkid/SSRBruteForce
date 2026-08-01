@@ -11,6 +11,7 @@ Direct copies:
 - `Fraction.cs`
 - `GameState.cs`
 - `IslandMask.cs`
+- `MetaGameState.cs`
 - `Movement.cs`
 - `Occupancy.cs`
 - `Pair.cs`

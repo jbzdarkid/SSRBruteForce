@@ -11,6 +11,8 @@ public:
 
   std::vector<Direction> Solve();
 
+  u32 ComputeScore(const State& state, Direction dir, const State& newState);
+
 private:
   Level* _level = nullptr;
   u32 _numBuckets = 0;
@@ -26,7 +28,6 @@ private:
   void FindWinningStates(u32 depth);
 
   void FindFastestSolution(const State& state, std::vector<Direction>& solution, u32 score);
-  u32 ComputeScore(const State& state, Direction dir, const State& newState);
 
   // Stage 3
   u32 _bestScore = 0xFFFF'FFFF;

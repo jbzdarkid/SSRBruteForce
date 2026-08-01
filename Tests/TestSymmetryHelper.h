@@ -233,7 +233,7 @@ public:
     _level.Print();
     printf("Build-test mode. Keys: u/d/l/r = move, z = undo, q = finish & emit.\n");
 
-    Vector<State> undoHistory({ _level.GetState() });
+    std::vector<State> undoHistory{ _level.GetState() };
     Vector<Sausage> prevSausages = _level._sausages.Copy();
     int tracked = -1; // sausage index AssertSausageMoved's single _expected currently follows (-1 = none)
 
@@ -258,9 +258,9 @@ public:
       if (ch == 'q' || ch == 'Q') break;
       if (ch == '\n') continue;
       if (ch == 'z' || ch == 'Z') {
-        if (undoHistory.Size() > 1) {
-          undoHistory.Pop();
-          _level.SetState(undoHistory[undoHistory.Size() - 1]);
+        if (undoHistory.size() > 1) {
+          undoHistory.pop_back();
+          _level.SetState(undoHistory[undoHistory.size() - 1]);
           prevSausages = _level._sausages.Copy();
           if (!moves.empty()) {
             moves.pop_back();
@@ -319,14 +319,14 @@ public:
           tracked = i;
         }
         prevSausages = _level._sausages.Copy();
-        undoHistory.Push(_level.GetState());
+        undoHistory.push_back(_level.GetState());
       } else {
         chunk += emit("    level.AssertMoveFails(", DIRS[dir], ");\n");
-        _level.SetState(undoHistory[undoHistory.Size() - 1]); // undo the rejected move's side-effects
+        _level.SetState(undoHistory[undoHistory.size() - 1]); // undo the rejected move's side-effects
         // Keep undoHistory in lockstep with |moves| (one entry per attempt) so a later 'z' rewinds
         // exactly one move. Without this, undoing a rejected move over-pops undoHistory and silently
         // rewinds _level an extra real step, corrupting every later assert.
-        undoHistory.Push(_level.GetState());
+        undoHistory.push_back(_level.GetState());
       }
       moves.push_back({ chunk, tracked });
       _level.Print();

@@ -1,14 +1,16 @@
-﻿# Replay every level's .dem under the build matching its sausage count, confirming it reaches Won().
+# Timing check: replay each level's .dem through BOTH engines (the C++ solver and the C# oracle) and report only REAL
+# timing mismatches -- |delta| > 1 with both engines timing the move -- i.e. genuine timing-model errors, not the
+# sub-beat backpedal tiebreaker or post-win trailing moves. Builds each sausage count once, then checks every level
+# under it. World 1 and World 2 are timing-validated (all green); World 3 is being explored. 2-4 Great Tower has no
+# oracle .dat, so it is omitted.
 # Usage:
-#   .\run-tests.ps1                            # build + replay all levels (logs to run-tests.log)
-#   .\run-tests.ps1 -Solve "3-14"              # build + solve named level
-#   .\run-tests.ps1 -TestName "3-13 Cold Gate" # only levels whose name contains this substring
-#   .\run-tests.ps1 -DemoDir "C:\path\to\dems" # Custom path to a demo directory (default ..\SSRDecompile\App)
+#   .\check.ps1                                  # build + check all levels (Results table of per-level mismatch counts)
+#   .\check.ps1 -TestName "2-7 Barrow Set"       # only levels whose name contains this substring (shows full per-move detail)
+#   .\check.ps1 -DemoOverride "C:\path\to\a.dem" # custom demo path (use with -TestName for a single level)
 [CmdletBinding()]
 param(
     [string] $TestName = "",
-    [string] $DemoOverride = "",
-    [switch] $Solve
+    [string] $DemoOverride = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,8 +24,11 @@ $msbuild = Join-Path $vsPath "MSBuild\Current\Bin\MSBuild.exe"
 if (-not (Test-Path $msbuild)) { throw "Latest installation $vsPath does not have MSBuild.exe" }
 
 $Configuration = "Release"
-$exe = ".\x64\$Configuration\SSRBruteForce.exe"
+$exe    = ".\x64\$Configuration\SSRBruteForce.exe"
+$oracle = ".\Oracle\bin\Release\net8.0\Oracle.exe"
 
+# name -> (demo file, sausage count). Demo numbering diverges from display order for 2-7/2-8/2-10 (game-encounter order,
+# verified by replaying each demo to a win). 2-4 Great Tower has no oracle .dat, so it is omitted.
 $levelDemos = @(
     [pscustomobject]@{ Name = "1-1 Lachrymose Head";   Dem = "1-1.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "1-2 Southjaunt";        Dem = "1-2.dem";  Sausages = 2 }
@@ -46,10 +51,10 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "2-3 Cove";              Dem = "2-3.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "2-5 The Paddock";       Dem = "2-5.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "2-6 Beautiful Horizon"; Dem = "2-6.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "2-8 Rough Field";       Dem = "2-7.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "2-10 Twisty Farm";      Dem = "2-8.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "2-9 Fallow Earth";      Dem = "2-9.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "2-7 Barrow Set";        Dem = "2-10.dem"; Sausages = 2 }
+    [pscustomobject]@{ Name = "2-8 Rough Field";       Dem = "2-7.dem";  Sausages = 2 }
+    [pscustomobject]@{ Name = "2-9 Fallow Earth";      Dem = "2-9.dem";  Sausages = 1 }
+    [pscustomobject]@{ Name = "2-10 Twisty Farm";      Dem = "2-8.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "3-1 Cold Jag";          Dem = "3-1.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "3-2 Cold Finger";       Dem = "3-2.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "3-3 Cold Escarpment";   Dem = "3-3.dem";  Sausages = 2 }
@@ -64,24 +69,6 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "3-11 Cold Terrace";     Dem = "3-12.dem"; Sausages = 3 }
     [pscustomobject]@{ Name = "3-12 Cold Horizon";     Dem = "3-13.dem"; Sausages = 2 }
     [pscustomobject]@{ Name = "3-13 Cold Gate";        Dem = "3-14.dem"; Sausages = 7 }
-    [pscustomobject]@{ Name = "4-1 Wretch's Retreat";  Dem = "4-1.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "4-2 Toad's Folly";      Dem = "4-2.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "4-3 Sludge Coast";      Dem = "4-3.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "4-4 Foul Fen";          Dem = "4-4.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Dem = "4-5.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "4-6 Gator Paddock";     Dem = "4-6.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "5-1 The Gorge";         Dem = "5-1.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-2 Widow's Finger";    Dem = "5-2.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-3 Skeleton";          Dem = "5-3.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-4 Slope View";        Dem = "5-4.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "5-5 Land's End";        Dem = "5-5.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "5-6 Crater";            Dem = "5-6.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "5-7 Pressure Points";   Dem = "5-7.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "5-8 Open Baths";        Dem = "5-8.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-9 Drumlin";           Dem = "5-9.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-10 Tarry Ridge";      Dem = "5-10.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "5-11 Rough View";       Dem = "5-11.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "5-12 Baby Rock";        Dem = "5-12.dem"; Sausages = 2 }
 )
 
 function Build-Variant {
@@ -95,46 +82,77 @@ function Build-Variant {
     }
 }
 
+function Get-MoveUnits {
+    param([string[]] $lines)
+    # Each timed move prints a state row ending in "@t=<move> @T=<cumulative>"; pull the per-move value. The C++ side
+    # formats integers with a locale thousands separator (160,000), so strip commas before parsing.
+    $units = New-Object System.Collections.Generic.List[long]
+    foreach ($line in $lines) {
+        $match = [regex]::Match($line, '@t=([\d,]+)')
+        if ($match.Success) { $units.Add([long]($match.Groups[1].Value -replace ',', '')) }
+    }
+    return ,$units
+}
+
+# Replay one level+demo through both engines and return the count of REAL timing mismatches -- moves both engines timed
+# that differ by more than the sub-beat tiebreaker (|delta| > 1). A one-off delta is the intentional backpedal reward;
+# a missing oracle value is a post-win trailing move -- neither is a model error. With -Detail, also print the per-move
+# table and the summary line (used when narrowed to specific levels).
+function Compare-Timing {
+    param([string] $Name, [string] $Demo, [switch] $Detail)
+    $cppUnits    = Get-MoveUnits (& $exe    $Name $Demo timing 2>&1)
+    $oracleUnits = Get-MoveUnits (& $oracle $Name $Demo timing 2>&1)
+
+    $moveCount   = [Math]::Max($cppUnits.Count, $oracleUnits.Count)
+    $mismatches  = 0
+    $cppTotal    = 0L
+    $oracleTotal = 0L
+    if ($Detail) { Write-Host ("{0,4}  {1,10}  {2,10}  {3,10}" -f "mv", "oracle", "cpp", "delta") }
+    for ($i = 0; $i -lt $moveCount; $i++) {
+        $oracleMove = if ($i -lt $oracleUnits.Count) { $oracleUnits[$i] } else { $null }
+        $cppMove    = if ($i -lt $cppUnits.Count)    { $cppUnits[$i] }    else { $null }
+        if ($null -ne $oracleMove) { $oracleTotal += $oracleMove }
+        if ($null -ne $cppMove)    { $cppTotal    += $cppMove }
+        $isMismatch = ($null -ne $oracleMove -and $null -ne $cppMove -and [Math]::Abs($cppMove - $oracleMove) -gt 1)
+        if ($isMismatch) { $mismatches++ }
+        if ($Detail) {
+            $delta = if ($null -ne $oracleMove -and $null -ne $cppMove) { $cppMove - $oracleMove } else { $null }
+            $flag  = if ($isMismatch) { "  <-- DIFF" } else { "" }
+            Write-Host ("{0,4}  {1,10}  {2,10}  {3,10}{4}" -f ($i + 1), $oracleMove, $cppMove, $delta, $flag)
+        }
+    }
+    if ($Detail) {
+        Write-Host ""
+        Write-Host "moves: oracle=$($oracleUnits.Count) cpp=$($cppUnits.Count)   totals: oracle=$oracleTotal cpp=$cppTotal   REAL mismatches (|delta|>1, both timed): $mismatches"
+    }
+    return $mismatches
+}
+
 # Candidate levels, optionally narrowed by -TestName (substring match on the display name).
 $candidates = $levelDemos
 if ($TestName) { $candidates = $candidates | Where-Object { $_.Name -like "*$TestName*" } }
 if (@($candidates).Count -eq 0) { throw "No level name contains $TestName." }
 
-# Build each distinct sausage count once (rebuilds are expensive), then replay every candidate under it.
+# Build each distinct sausage count once (rebuilds are expensive), then check every candidate under it.
 $unified = [ordered]@{}
 foreach ($lvl in $candidates) { $unified[$lvl.Name] = "SKIP" }
 
 foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
     echo "Building with $n sausages"
     Build-Variant -N $n
-    echo "Running with $n sausages"
+    echo "Checking with $n sausages"
     foreach ($lvl in $candidates) {
         if ($lvl.Sausages -ne $n) { continue }
 
-        if ($Solve) {
-            echo "Solving $($lvl.Name)"
-            if ($TestName) {
-                & $exe $lvl.Name
-            } else {
-                & $exe $lvl.Name *>> $null
-            }
+        echo "Checking $($lvl.Name)"
+        if (-not $DemoOverride) {
+            $path = "../SSRDecompile/App/" + $lvl.Dem
         } else {
-            echo "Testing $($lvl.Name)"
-            if (-not $DemoOverride) {
-                $path = "../SSRDecompile/App/" + $lvl.Dem
-            } else {
-                $path = $DemoOverride
-            }
-            if ($TestName) {
-                & $exe $lvl.Name $path
-            } else {
-                & $exe $lvl.Name $path *>> $null
-            }
+            $path = $DemoOverride
         }
 
-        if ($LASTEXITCODE -eq 4) { continue } # Wrong number of sausages, value will be set in another iteration
-        if ($LASTEXITCODE -eq 0) { $unified[$lvl.Name] = "PASS" }
-        else                     { $unified[$lvl.Name] = "FAIL" }
+        # Show the full per-move table when narrowed to specific levels, like run-tests shows exe output.
+        $unified[$lvl.Name] = Compare-Timing -Name $lvl.Name -Demo $path -Detail:([bool]$TestName)
     }
 }
 
@@ -142,7 +160,8 @@ echo "=== Results ==="
 $failCount = 0
 foreach ($level in $candidates) {
     $status = $unified[$level.Name]
-    echo "[$status] $($level.Name)"
-    if ($status -ne "PASS") { $failCount++ }
+    echo "[$status] $($level.Name)" # REAL-mismatch count per level; 0 is a pass.
+    if ($status -ne 0) { $failCount++ }
 }
 if ($failCount -gt 0) { exit 1 }
+
