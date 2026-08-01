@@ -1,17 +1,6 @@
 #pragma once
 #include "Level2.h"
 
-// A sausage whose BOTH ends lie outside the playfield has rolled entirely off the map -- an unwinnable, lost state. It
-// also drives a class of engine divergences: the reference keeps such a sausage floating over the void (its gravity
-// only re-checks sausages a move actually disturbed, so an unmoved off-grid stack is never dropped), whereas Level2
-// correctly finds it unsupported and refuses. Rejecting these lost states from a level's heuristic prunes that whole
-// degenerate subtree so the survey/solver ignore it (the sanctioned "reject genuine reference quirks" path).
-static inline bool HasOffGridSausage(const LevelData* level) {
-  for (const Sausage& s : level->Sausages())
-    if (!level->IsWithinGrid(s.x1, s.y1, s.z) && !level->IsWithinGrid(s.x2, s.y2, s.z)) return true;
-  return false;
-}
-
 Level LachrymoseHead(5, 4, "1-1 Lachrymose Head",
   "_###_"
   "aab__"
@@ -164,9 +153,9 @@ Level GreatTowerImanex(14, 11, "2-4 Great Tower (after imanex's start) (with no 
   "  1_______U___"
   "  1___________"
   "##1___________"
-  " # _______cd__"
-  " 11_____bbcd__"
-  "##1___>__aa___"
+  " # _______ab__"
+  " 11_____ccab__"
+  "##1___>__dd___"
   " # ___________"
   " 11L__________");
 
@@ -259,9 +248,8 @@ Level ColdFinger = [] {
     {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
     {SpecialTile::Over3});
 
-  coldFinger.heuristic = [](const Level* level, u32) {
-    if (HasOffGridSausage(level)) return false; // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
-    for (const Sausage& sausage : level->Sausages()) {
+  coldFinger.heuristic = [](const Level* level, u32 depth) {
+    for (const Sausage& sausage : level->GetSausages()) {
       // ColdFinger requires all sausages to be vertical to win, and we can't rotate sausages once they drop to the ground.
       // If any sausage reaches the ground and is facing horizontal, the level is lost.
       if (sausage.z == 0 && sausage.IsHorizontal()) return false;
@@ -272,8 +260,7 @@ Level ColdFinger = [] {
   return coldFinger;
 }();
 
-Level ColdEscarpment = [] {
-  Level coldEscarpment(14, 16, "3-3 Cold Escarpment",
+Level ColdEscarpment(14, 16, "3-3 Cold Escarpment",
   "________      "
   "________      "
   "_______D      "
@@ -290,11 +277,6 @@ Level ColdEscarpment = [] {
   "___R1####_____"
   "     ####     "
   "      11      ");
-  coldEscarpment.heuristic = [](const Level* level, u32) {
-    return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
-  };
-  return coldEscarpment;
-}();
 
 Level ColdTrail = [] {
   Level coldTrail(19, 10, "3-4 Cold Trail",
@@ -316,7 +298,7 @@ Level ColdTrail = [] {
     // normalized so (x1,y1) is the upper/left half, hence y2 >= y1 -- testing the lower end's y2 alone bounds both.
     const Stephen& stephen = level->GetStephen();
     if (stephen.y > 5) return false;
-    for (const Sausage& sausage : level->Sausages()) {
+    for (const Sausage& sausage : level->GetSausages()) {
       if (sausage.y2 > 5) return false;
     }
     return true;
@@ -468,7 +450,7 @@ Level ColdGate = [] {
     // so we can eliminate unwinnable states where many sausages are uncooked in the right side.
     if (depth < 66) return true;
     u8 uncooked = 0;
-    for (const Sausage& sausage : level->Sausages()) {
+    for (const Sausage& sausage : level->GetSausages()) {
       if (sausage.x2 >= 12 && !sausage.IsFullyCooked()) uncooked++;
     }
     return uncooked < 3;
@@ -476,8 +458,7 @@ Level ColdGate = [] {
   return coldGate;
 }();
 
-Level ColdFrustration = [] {
-  Level coldFrustration(10, 9, "3-14 Cold Frustration",
+Level ColdFrustration(10, 9, "3-14 Cold Frustration",
   "2  _____  "
   "111L_D__  "
   "1    222  "
@@ -490,11 +471,6 @@ Level ColdFrustration = [] {
   {},
   {},
   {Sausage{4, 8, 5, 8, 2}});
-  coldFrustration.heuristic = [](const Level* level, u32) {
-    return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
-  };
-  return coldFrustration;
-}();
 
 Level OverworldSausage3(13, 14, "3-final Overworld sausage",
   "__1_1_1_1    "
@@ -575,9 +551,9 @@ Level CrunchyLeaves(8, 10, "4-5 Crunchy Leaves",
   " 232##__"
   " 222##  "
   "_U__  R1"
-  "_bb_  _1"
-  "___v_a_U"
-  "_1___a__"
+  "_aa_  _1"
+  "___v_b_U"
+  "_1___b__"
   "______  ",
   {},
   {Ladder{2, 4, 2, Up}},
@@ -692,12 +668,12 @@ Level Crater(13, 7, "5-6 Crater",
 Level PressurePoints(18, 13, "5-7 Pressure Points",
   "     _____        "
   "  222_____1       "
-  "  232_____1b____  "
-  "  222__1__1b____##"
+  "  232_____1a____  "
+  "  222__1__1a____##"
   "  _U___U____1_1_##"
   "  __________ ___  "
-  "  ________a_ 1 _  "
-  "##___?2___a_ _ _  "
+  "  ________b_ 1 _  "
+  "##___?2___b_ _ _  "
   "##______^___ ___  "
   "  __________1_1   "
   "  ____________    "
@@ -736,9 +712,9 @@ Level OpenBaths(17, 19, "5-8 Open Baths",
 Level Drumlin(13, 7, "5-9 Drumlin",
   "  111        "
   "  1111111    "
-  "22211a_c1    "
-  "232_1abc1    "
-  "222_U_b_1    "
+  "22211a_b1    "
+  "232_1acb1    "
+  "222_U_c_1    "
   "_U_______##__"
   "____>____##  ",
   {},
@@ -853,6 +829,7 @@ Level CuriousDragons2(11, 9, "6-11 Curious Dragons (Part 2/2)",
   "    __##___"
   "    _______");
 
+/*
 
 // ABC: Lachrymose Head
 // DE: Southjaunt
@@ -880,10 +857,10 @@ Level Overworld1(29, 27, "Overworld1",
   "____ZZ_______________        "
   "    __   ________ _ _>_PP__  "
   "    __ __a_______N__<_O__ _  "
-  "   >_____a__c_   N__  O__ _  "
-  "    ______^_c_ _QQ______L___ "
-  "    ___   _b____   _JJ_KLMM__"
-  "___XYY_   _b___  _ ____K_<_  "
+  "   >_____a__b_   N__  O__ _  "
+  "    ______^_b_ _QQ______L___ "
+  "    ___   _c____   _JJ_KLMM__"
+  "___XYY_   _c___  _ ____K_<_  "
   "___X_______R___ _  __>_____  "
   "___  __UV__R__v   __ ___ __  "
   "   W^^_UV_ _^________<_      "
@@ -1056,6 +1033,7 @@ Level Overworld4(38, 32, "Overworld4",
   Stephen{37,14,1,Left},
   {},
   {Sausage{2,19,2,20,4}});
+*/
 
 std::vector<Level*> tests = {
   &LachrymoseHead,

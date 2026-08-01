@@ -1946,8 +1946,8 @@ TEST_CLASS(LogicTests) {
       "          "
       " _____   A"
       " _____   A"
-      " >_cc_   B"
-      " _____   B"
+      " >_bb_   C"
+      " _____   C"
       " _____    "
       "          "));
 
@@ -2148,8 +2148,8 @@ TEST_CLASS(LogicTests) {
       "          "
       " _____   A"
       " ___1_   A"
-      " >_cc_   B"
-      " _____   B"
+      " >_bb_   C"
+      " _____   C"
       " _____    "
       "          "));
     // Walks a single sausage all the way around the arena -- testing slides, rolls, every edge, and
@@ -2388,9 +2388,9 @@ TEST_CLASS(LogicTests) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _____   A"
-      " __cc_   A"
-      " >_#__   B"
-      " _____   B"
+      " __bb_   A"
+      " >_#__   C"
+      " _____   C"
       " _____    "
       "          "));
     level.AssertPosition(1, 3, Right);
@@ -2740,8 +2740,8 @@ TEST_CLASS(LogicTests) {
       "          "
       " _______ A"
       " _______ A"
-      " >_cb_1_  "
-      " __cb___  "
+      " >_bc_1_  "
+      " __bc___  "
       " _______  "
       "          "));
 
@@ -3030,9 +3030,9 @@ TEST_CLASS(LogicTests) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
       "          "
       " _D___   A"
-      " 11cc_   A"
-      " >____   B"
-      " ____1   B"
+      " 11bb_   A"
+      " >____   C"
+      " ____1   C"
       " ___R1    "
       "          "));
     level.AssertPosition(1, 3, Right);
@@ -3116,10 +3116,10 @@ TEST_CLASS(LogicTests) {
   MAKE_SYMMETRICAL_TEST(CarrySausageUpLadder) {
     TestSymmetryHelper level(symmetry, Level(10, 7, "arena",
     "          "
-    " __c____ A"
-    " __c111_ A"
-    " >__121_ B"
-    " ___111_ B"
+    " __a____ B"
+    " __a111_ B"
+    " >__121_ C"
+    " ___111_ C"
     " ____U__  "
     "          "));
     level.AssertPosition(1, 3, Right);

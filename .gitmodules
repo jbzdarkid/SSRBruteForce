@@ -1,0 +1,3 @@
+[submodule "WitnessRNG"]
+	path = WitnessRNG
+	url = https://github.com/jbzdarkid/WitnessRNG

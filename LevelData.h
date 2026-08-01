@@ -1,7 +1,6 @@
 #pragma once
-#include <initializer_list>
 #include <ostream>
-#include "Common.h"
+#include "WitnessRNG/StdLib.h"
 
 #define OVERWORLD_HACK 0
 #ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.
@@ -22,6 +21,8 @@ enum Direction : u8 {
   Crouch = 4,
   Right = 5,
   Down = 6,
+
+  NUM_ENTRIES,
 };
 
 extern const char* DIR_NAMES[]; // defined in Main.cpp; indexed by Direction
@@ -54,15 +55,6 @@ struct Stephen {
   // If it has any other value, then it is elsewhere in the world.
   inline bool HasFork() const { return forkDir == None; }
   bool operator==(const Stephen& other) const {
-#if _DEBUG
-    // Run some sanity checks
-    if (HasFork()) {
-      assert(forkZ == z);
-    }
-    if (other.HasFork()) {
-      assert(other.forkZ == other.z);
-    }
-#endif
     static_assert(sizeof(Stephen) == sizeof(u64));
     u64 a = *(u64*)this;
     u64 b = *(u64*)&other;
@@ -70,8 +62,6 @@ struct Stephen {
   }
   bool operator!=(const Stephen& other) const { return !(*this == other); }
 
-  // Raw-int dump for the oracle to diff against: body pose + facing, then fork pose + fork facing. Directions go out as
-  // names (via DIR_NAMES), which the game's Direction enum matches ("North"/"South"/"West"/"East"/"None").
   friend std::ostream& operator<<(std::ostream& o, const Stephen& s) {
     return o << (int)s.x << ' ' << (int)s.y << ' ' << (int)s.z << ' ' << DIR_NAMES[s.dir] << ' '
              << (int)s.forkX << ' ' << (int)s.forkY << ' ' << (int)s.forkZ << ' ' << DIR_NAMES[s.forkDir];
@@ -124,17 +114,16 @@ struct Sausage {
     if (x_ == x2 && y_ == y2) return true;
     return false;
   }
-  // Given one half's cell (seatX, seatY) -- typically the end resting on a support -- return the OTHER half's cell as
-  // (x, y). If (seatX, seatY) is not (x1, y1) it is assumed to be (x2, y2); the caller guarantees the seat is one half.
-  inline std::pair<s8, s8> OtherEnd(s8 seatX, s8 seatY) const {
-    if (x1 == seatX && y1 == seatY) return {x2, y2};
+  inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
+  // The compiler optimizes the std::pair reasonably well here.
+  inline std::pair<s8, s8> OtherEnd(s8 x, s8 y) const {
+    if (x1 == x && y1 == y) return {x2, y2};
     return {x1, y1};
   }
-  inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
-  // Exchange the two halves' cook bits (Cook1*<->Cook2*). Used when a rotation puts the physical halves
-  // into swapped slots: the cook state rides with each half so slot 1 always describes (x1,y1).
+  // Used during a hat rotation along with swapping the ends.
   inline void SwapCookBits() {
-    u8 cook1 = flags & Cook1, cook2 = flags & Cook2;
+    u8 cook1 = flags & Cook1;
+    u8 cook2 = flags & Cook2;
     flags = (flags & ~(u8)FullyCooked) | (u8)(cook1 << 2) | (u8)(cook2 >> 2);
   }
   bool operator==(const Sausage& other) const {
@@ -168,24 +157,32 @@ public:
     std::vector<SpecialTile> specialTiles = {});
   void Print() const;
   bool Won() const;
-  // Analysis hook: when set, Won() returns this predicate instead of the normal win test, so the ordinary solver can
-  // search for the shortest path to some OTHER condition (e.g. a state that reproduces an engine quirk). Null = normal.
-  bool (*winOverride)(const LevelData*) = nullptr;
 
-  s8 GetSausage(s8 x, s8 y, s8 z) const;
-  int NumSausages() const;
-  const Vector<Sausage>& Sausages() const { return _sausages; } // read-only access for custom solver heuristics
-  const Stephen& GetStephen() const { return _stephen; }        // read-only access for custom solver heuristics
-  const Stephen& Start() const { return _start; }               // the pose the win must return to (_stephen == _start)
-  bool IsWithinGrid(s8 x, s8 y, s8 z) const;
-  bool IsWall(s8 x, s8 y, s8 z) const;
-  bool CanWalkOnto(s8 x, s8 y, s8 z) const;
+  // Frequently used for level heuristics.
+  const Vector<Sausage>& GetSausages() const { return _sausages; }
+  const Stephen& GetStephen() const { return _stephen; }
+
+  // Used by Solver2 to compute traversal costs
   bool IsGrill(s8 x, s8 y, s8 z) const;
-  bool IsLadder(s8 x, s8 y, s8 z, Direction dir) const;
 
   const char* name;
 
-protected:
+protected: // Used in the Level engine
+  inline std::pair<s8, s8> Delta(Direction dir) const {
+    if (dir == Up)    return { 0, -1 };
+    if (dir == Down)  return { 0, +1 };
+    if (dir == Left)  return { -1, 0 };
+    if (dir == Right) return { +1, 0 };
+    return { 0, 0 };
+  }
+  inline Direction Inverse(Direction dir) const { return (Direction)(7 - dir); }
+
+  s8 GetSausage(s8 x, s8 y, s8 z) const;
+  bool IsWithinGrid(s8 x, s8 y, s8 z) const;
+  bool CanWalkOnto(s8 x, s8 y, s8 z) const;
+  bool IsWall(s8 x, s8 y, s8 z) const;
+  bool IsLadder(s8 x, s8 y, s8 z, Direction dir) const;
+
   Stephen _stephen;
   Vector<Sausage> _sausages;
 
@@ -194,6 +191,6 @@ private:
   u8 _height;
   NArray<u16> _walls;
   NArray<u16> _grills;
-  NArray<u16> _ladders;
+  NArray<u8> _ladders;
   Stephen _start;
 };

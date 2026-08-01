@@ -1,5 +1,4 @@
 #include "LevelData.h"
-#include <bit>
 #include <cstdio>
 #include <vector>
 
@@ -12,7 +11,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     _height(height),
     _walls(NArray<u16>(_width, _height)),
     _grills(NArray<u16>(_width, _height)),
-    _ladders(NArray<u16>(_width, _height)),
+    _ladders(NArray<u8>(_width, _height, Direction::NUM_ENTRIES)),
     name(name)
 {
   _walls.Fill(0);
@@ -78,6 +77,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 
       // We need to do this here because, even if we don't *solve* levels
       // with less than the expected count, we still construct them.
+      assert(num <= _sausages.Size()); // There shouldn't be any gaps in level data or sausages out of order.
       while (_sausages.Size() < num + 1) _sausages.Push({-127, -127, -127, -127, Sausage::Flags::None});
       if (_sausages[num].x1 == x-1 && _sausages[num].y1 == y) {
         _sausages[num].x2 = x;
@@ -92,19 +92,6 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     } else {
       printf("Couldn't parse character '%c' for puzzle '%s', giving up\n", c, name);
       return;
-    }
-
-    if (name[0] == 'O' && name[1] == 'v' && name[2] == 'e') { // Overworlds
-      const char* dirs[] = {
-        nullptr,
-        "North",
-        "West",
-        nullptr,
-        nullptr,
-        "East",
-        "South",
-      };
-      //printf("[%s] if (_stephen.x == %d && _stephen.y == %d && _stephen.dir == %s) sausagesToRemove = {};\n", name, _stephen.x, _stephen.y, dirs[_stephen.dir]);
     }
   }
   if (stephen.x > -1) {
@@ -121,12 +108,11 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 
   // Ladders from the grid, as 2D, may need height extensions.
   for (const Ladder& ladder : ladders) {
-    assert(_ladders(ladder.x, ladder.y) == 0);
-    _ladders(ladder.x, ladder.y) |= ladder.dir << 8;
+    assert(_ladders(ladder.x, ladder.y, ladder.dir) == 0);
 
     for (s8 z = ladder.z; z < 9; z++) {
       assert(z < 8); // Maximum bitmask size
-      _ladders(ladder.x, ladder.y) |= 1 << z;
+      _ladders(ladder.x, ladder.y, ladder.dir) |= 1 << z;
 
       if (ladder.dir == Up) {
         if (!IsWall(ladder.x, ladder.y - 1, z + 1)) break;
@@ -142,8 +128,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 
   // Ladders from the initializer list do not get the same treatment.
   for (const Ladder& ladder : extraLadders) {
-    assert(_ladders(ladder.x, ladder.y) == 0 || ((_ladders(ladder.x, ladder.y) >> 8) == ladder.dir));
-    _ladders(ladder.x, ladder.y) |= (1 << ladder.z) | (ladder.dir << 8);
+    _ladders(ladder.x, ladder.y, ladder.dir) |= (1 << ladder.z);
   }
 
   assert(specialTiles.empty()); // Assert that all excess tiles were consumed
@@ -172,18 +157,18 @@ void LevelData::Print() const {
           if (_walls(x, y) == 0) putchar('A' + sausageNo);
           if (_walls(x, y) != 0) putchar('a' + sausageNo);
 #endif
-        } else if ((_ladders(x, y) & 0xFF) >> z) {
-          putchar(" UL  RD"[_ladders(x, y) >> 8]);
-        } else if (_grills(x, y) >> z) {
-          putchar(" #$ %"[_grills(x, y)]);
-        } else if (_walls(x, y) >> z) {
-          putchar("_12345678"[z]);
-        } else if (z == 0) {
-          putchar(' ');
-        } else {
-          continue;
         }
-        break;
+        else if (IsLadder(x, y, z, Up))     putchar('U');
+        else if (IsLadder(x, y, z, Left))   putchar('L');
+        else if (IsLadder(x, y, z, Right))  putchar('R');
+        else if (IsLadder(x, y, z, Down))   putchar('D');
+        else if (IsGrill(x, y, z))          putchar(" #$ %"[_grills(x, y)]);
+        else if (IsWall(x, y, z))           putchar("_12345678"[z]);
+        else {
+          if (z > 0) continue; // Not yet handled, keep looking for something at a lower Z
+          if (z == 0) putchar(' '); // Bottom of the world, put an empty cell
+        }
+        break; // Handled because we didn't enter the 'else' above
       }
     }
     putchar('|');
@@ -197,10 +182,6 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  if (winOverride) return winOverride(this);
-//  return (_stephen.x == 7 && _stephen.y == 13 && _stephen.dir == Up
-//      && ((_sausages[0].x1 == 7 && _sausages[0].y1 == 9 && _sausages[1].x1 == 7 && _sausages[1].y1 == 11)
-//          || (_sausages[1].x1 == 7 && _sausages[1].y1 == 9 && _sausages[0].x1 == 7 && _sausages[0].y1 == 11)));
 #if !OVERWORLD_HACK
   if (_stephen != _start) return false;
 #endif
@@ -220,30 +201,25 @@ s8 LevelData::GetSausage(s8 x, s8 y, s8 z) const {
   return -1;
 }
 
-int LevelData::NumSausages() const {
-    return _sausages.Size();
-}
-
 bool LevelData::IsWithinGrid(s8 x, s8 y, s8 z) const {
   // return x >= 0 && x <= _width - 1 && y >= 0 && y <= _height - 1 && z >= 0;
   // This is an optimized version of the above; it uses signed->unsigned cast to avoid two branches
   return (u8)x < _width && (u8)y < _height && z >= 0;
 }
 
+bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
+  if (!IsWithinGrid(x, y, z)) return false;
+  if (_walls(x, y) & (1 << z)) return true; // Stepping onto standable terrain at our current level
+  // Stephen can also stand on a dropped fork or a sausage.
+  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z-1) return true;
+  if (GetSausage(x, y, z-1) != -1) return true;
+  return false;
+}
+
 bool LevelData::IsWall(s8 x, s8 y, s8 z) const {
   if (!IsWithinGrid(x, y, z)) return false;
   // A wall blocks level z iff the column is solid at z+1 (the block occupies z, you stand on top at z+1).
   return _walls(x, y) & (2 << z);
-}
-
-bool LevelData::CanWalkOnto(s8 x, s8 y, s8 z) const {
-  if (!IsWithinGrid(x, y, z)) return false;
-  if (_walls(x, y) & (1 << z)) return true; // Stepping onto standable terrain at our current level
-  // A thrown (detached) fork is a solid object one cell tall: standing on it means it sits directly below us, exactly
-  // mirroring the sausage footing rule just below (the reference's HasFooting: an entity in the cell beneath you).
-  if (!_stephen.HasFork() && _stephen.forkX == x && _stephen.forkY == y && _stephen.forkZ == z - 1) return true;
-  if (GetSausage(x, y, z-1) != -1) return true; // Stepping onto a sausage
-  return false;
 }
 
 bool LevelData::IsGrill(s8 x, s8 y, s8 z) const {
@@ -253,7 +229,6 @@ bool LevelData::IsGrill(s8 x, s8 y, s8 z) const {
 
 bool LevelData::IsLadder(s8 x, s8 y, s8 z, Direction dir) const {
   if (!IsWithinGrid(x, y, z)) return false;
-  u16 ladder = _ladders(x, y);
-  if ((ladder >> 8) != dir) return false; // Ladder must be facing in the right direction
-  return ladder & 0xFF & (1 << z); // There must be a ladder at this Z index (ignoring direction bits)
+  u16 ladder = _ladders(x, y, dir);
+  return ladder & (1 << z); // There must be a ladder at this Z index
 }

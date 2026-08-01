@@ -214,12 +214,4 @@ private:
   // a void one rides out. For an ordinary push, PlanSausagePush already refuses exactly on a wall, so no separate check
   // is needed.
   bool SausageBlocked(s8 sausageNo, Direction dir) const;
-
-  // The (dx, dy) unit step for a cardinal direction.
-  std::pair<s8, s8> Delta(Direction dir) const;
-
-  inline Direction Inverse(Direction dir) const {
-    assert(dir > 0 && dir < 7);
-    return (Direction)(7 - dir);
-  }
 };

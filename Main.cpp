@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
 
   bool surveyAll = (filter == "ALL");
   for (Level* test : tests) {
-    if (test->NumSausages() != NUM_SAUSAGES) continue;
+    if (test->GetSausages().Size() != NUM_SAUSAGES) continue;
     if (!surveyAll && !std::strstr(test->name, filter.c_str())) continue; // Failed to match filter
 
     if (!demoPath.empty()) {
