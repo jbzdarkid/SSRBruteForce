@@ -127,7 +127,8 @@ TEST_CLASS(OneOffTests) {
       "________"
       "________"
       "________",
-      Stephen{4, 3, 1, Left}));           // perched on the (4,3) end of the vertical log, facing Left
+      Stephen{4, 3, 1, Left}, {},
+      { Sausage{0, 0, 1, 0, 0}, Sausage{6, 7, 7, 7, 0} })); // perched on the (4,3) end of the vertical log; fillers parked
     level.SetDetachedFork(1, 1, 0, Right); // fork lies loose across the arena; it must not move
     level.AssertBodyAt(4, 3, 1, Left);
     level.AssertMoveSucceeds(Left);                          // press Left -> log rolls Right, Stephen rides Right with it
@@ -149,13 +150,147 @@ TEST_CLASS(OneOffTests) {
       "________"
       "________"
       "________"
-      "________"));
+      "________",
+      {}, {}, { Sausage{0, 0, 1, 0, 0}, Sausage{6, 7, 7, 7, 0} })); // fillers parked to reach the 3-sausage build count
     level.SetDetachedFork(2, 3, 1, Right); // fork perched on top of the sausage the step would push
     level.AssertBodyAt(1, 3, 0, Right);
     level.AssertMoveFails(Right);          // pushing the sausage would fling the fork -> refuse the whole step
     level.AssertBodyAt(1, 3, 0, Right);    // nothing moved
     level.AssertSausage({2, 3, 3, 3, 0, Sausage::None});
     level.AssertForkAt(2, 3, 1, Right);
+  }
+
+  // A FORKLESS Stephen stands on a vertical log at a ladder cell and presses toward the ladder (along his own facing).
+  // The reference tests the ladder (TryClimbUp) BEFORE the sausage-underfoot roll inside TryMovePlayer, so the log must
+  // NOT roll -- he climbs the ladder and steps off on top instead (5-6 Crater m205).
+  MAKE_SYMMETRICAL_TEST(ForklessLadderClimbBeatsLogRoll) {
+    TestSymmetryHelper level(symmetry, Level(8, 8, "arena",
+      "________"
+      "________"
+      "___2____"
+      "___2a___"                            // (3,3) wall to climb onto; (4,3) is the log's north end
+      "____a___"
+      "________"
+      "________"
+      "________",
+      Stephen{4, 3, 1, Left}, {Ladder{4, 3, 1, Left}}, // ladder on the (4,3) cell facing west, at the log's height
+      { Sausage{0, 0, 1, 0, 0}, Sausage{6, 0, 7, 0, 0} })); // parked fillers
+    level.SetDetachedFork(0, 7, 0, Right);  // forkless; the loose fork sits out of the way and must not reattach
+    level.AssertBodyAt(4, 3, 1, Left);
+    level.AssertMoveSucceeds(Left);          // press toward the ladder -> climb, do NOT roll the log
+    level.AssertBodyAt(3, 3, 2, Left);       // climbed up and stepped off onto the wall top
+    level.AssertSausage({4, 3, 4, 4, 0, Sausage::None}); // the log stayed put (it did not roll)
+    level.AssertForkAt(0, 7, 0, Right);      // the loose fork never moved
+  }
+
+  // A forkless step shoves the thrown fork one cell ahead, but that cell is open void -- the game drops the fork off the
+  // map (Fork Lost). The engine must REFUSE rather than rest it on the floor of an empty column (5-6 Crater m190).
+  MAKE_SYMMETRICAL_TEST(ForklessStepRefusedWhenShovedForkWouldDrown) {
+    TestSymmetryHelper level(symmetry, Level(7, 6, "arena",
+      "_______"
+      "_______"
+      "__>_   "                             // (3,2) is solid; (4,2) onward is void
+      "_______"
+      "_______"
+      "_______",
+      {}, {},
+      { Sausage{0, 0, 1, 0, 0}, Sausage{5, 0, 6, 0, 0}, Sausage{0, 5, 1, 5, 0} })); // parked fillers
+    level.SetDetachedFork(3, 2, 0, Right);   // fork sits one cell ahead, so the forward step shoves it over the void
+    level.AssertBodyAt(2, 2, 0, Right);
+    level.AssertMoveFails(Right);            // shoving the fork into the void would lose it -> refuse
+    level.AssertBodyAt(2, 2, 0, Right);      // nothing moved
+    level.AssertForkAt(3, 2, 0, Right);
+  }
+
+  // A thrown fork ends one cell ahead of Stephen but faces CROSSWISE to him. The game only takes it back when
+  // fork.direction == his facing (TryReattachFork), so a turn that swings a crosswise fork into front does NOT
+  // reattach it (5-6 Crater m521).
+  MAKE_SYMMETRICAL_TEST(ForkNotReattachedWhenFacingCrosswise) {
+    TestSymmetryHelper level(symmetry, Level(7, 7, "arena",
+      "_______"
+      "_______"
+      "_______"
+      "___>___"                             // Stephen at (3,3) facing east
+      "_______"
+      "_______"
+      "_______",
+      Stephen{3, 3, 0, Right}, {},
+      { Sausage{0, 0, 1, 0, 0}, Sausage{5, 0, 6, 0, 0}, Sausage{0, 6, 1, 6, 0} })); // parked fillers
+    level.SetDetachedFork(3, 4, 0, Left);    // fork one cell south, facing west (crosswise to a south-facer)
+    level.AssertBodyAt(3, 3, 0, Right);
+    level.AssertMoveSucceeds(Down);          // turn to face south -> the fork is now directly ahead...
+    level.AssertBodyAt(3, 3, 0, Down);       // ...turned in place
+    level.AssertForkAt(3, 4, 0, Left);       // ...but NOT taken back (crosswise facing) -- still detached
+  }
+
+  // A SPEARED log roll drops Stephen off a ledge: he falls two levels riding the log, but the speared sausage's far end
+  // catches a wall one level down. The reference detaches the fork mid-fall (TryDetatchFork) -- leaving it lodged in the
+  // sausage at the wall height -- while Stephen's body falls on past it. Level2 used to drag the speared sausage rigidly
+  // down to the body's level, burying it in the wall (5-6 Crater m40).
+  MAKE_SYMMETRICAL_TEST(SpearedLogRollFallDetachesForkOnCaughtSausage) {
+    TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
+      "_________"
+      "_________"
+      "_________"
+      "_____22__"                            // (5,3),(6,3) height-2: the speared sausage's far end catches (6,3)
+      "_____2___"                            // (5,4) height-2 platform; (6,4) is low ground
+      "_________"
+      "_________",
+      Stephen{5, 5, 3, Up}, {},
+      { Sausage{5, 4, 5, 5, 2},              // the log B: Stephen stands on its (5,5) end at z=3
+        Sausage{5, 3, 5, 4, 3},              // the speared sausage A: the fork is lodged in its (5,4) end
+        Sausage{0, 0, 1, 0, 0} }));          // parked filler
+    level.AssertBodyAt(5, 5, 3, Up);          // the (speared) fork is held at (5,4,3)
+    level.AssertMoveSucceeds(Left);            // press across the log (rotation locked by the spear) -> it rolls east
+    level.AssertBodyAt(6, 5, 1, Up);           // Stephen fell two levels riding the log down to the low ground
+    level.AssertForkAt(6, 4, 2, Up);           // the fork detached, lodged in A at the wall height a level above him
+    level.AssertSausage({6, 3, 6, 4, 2, Sausage::None}); // A caught the (6,3) wall and stayed one level up
+  }
+
+  // A detached fork is lodged in a sausage whose far end rests on a wall, one level above Stephen. He walks forward to
+  // stand directly UNDER it: the wall-borne sausage (and the fork stuck in it) stay put -- he does not lift them like a
+  // head hat, because they hang from the wall, not from him (5-6 Crater m225, the follow-up to the m40 detach).
+  MAKE_SYMMETRICAL_TEST(WalkUnderWallBorneSausageLeavesItAndDetachedFork) {
+    TestSymmetryHelper level(symmetry, Level(7, 7, "arena",
+      "_______"
+      "_______"
+      "_______"
+      "__2____"                              // (2,3) height-2 wall: sausage A's north end rests on it
+      "_______"
+      "_______"
+      "_______",
+      Stephen{2, 5, 1, Up}, {},
+      { Sausage{2, 3, 2, 4, 2},              // A: (2,3) end on the wall, (2,4) end cantilevered over the low ground
+        Sausage{2, 4, 2, 5, 0},              // B: Stephen stands on its (2,5) end
+        Sausage{6, 6, 6, 6, 0} }));          // parked filler (single cell is fine as a placeholder)
+    level.SetDetachedFork(2, 4, 2, Up);       // fork lodged in A's (2,4) end, one level above Stephen's path
+    level.AssertBodyAt(2, 5, 1, Up);
+    level.AssertMoveSucceeds(Up);              // walk forward to stand directly under A
+    level.AssertBodyAt(2, 4, 1, Up);
+    level.AssertForkAt(2, 4, 2, Up);           // the detached fork stayed put (it hangs from the wall, not from Stephen)
+    level.AssertSausage({2, 3, 2, 4, 2, Sausage::None}); // A stayed on the wall
+  }
+
+  // A forkless climb-up would step off onto a cell that a wall-borne sausage occupies (the thrown fork is lodged in it).
+  // The game shoves that sausage along; we don't model the push during a forkless climb, so the climb is refused rather
+  // than left overlapping the sausage (5-6 Crater m195, a follow-up to the m40 detach).
+  MAKE_SYMMETRICAL_TEST(ForklessClimbOntoWallBorneSausageRefused) {
+    TestSymmetryHelper level(symmetry, Level(7, 6, "arena",
+      "_______"
+      "_______"
+      "__2____"                              // (2,2) wall: sausage A's north end
+      "__2____"                              // (2,3) wall: A's south end -- and the step-off cell
+      "__U____"                              // (2,4) Up ladder (z=0,1) Stephen climbs
+      "_______",
+      Stephen{2, 4, 1, Up}, {},
+      { Sausage{2, 2, 2, 3, 2},              // A: rests across the (2,2)/(2,3) wall tops
+        Sausage{2, 4, 2, 5, 0},              // B: Stephen stands on its (2,4) end
+        Sausage{6, 6, 6, 6, 0} }));          // parked filler
+    level.SetDetachedFork(2, 3, 2, Up);       // fork lodged in A's (2,3) end -- the cell Stephen would climb off onto
+    level.AssertBodyAt(2, 4, 1, Up);
+    level.AssertMoveFails(Up);                 // stepping off onto A would need to push it -> refuse (unmodelled)
+    level.AssertBodyAt(2, 4, 1, Up);           // nothing moved
+    level.AssertSausage({2, 2, 2, 3, 2, Sausage::None});
   }
 
   // Speared Stephen backs up, dragging the speared sausage; a hat rests on BOTH the speared sausage and Stephen's head,
@@ -1109,7 +1244,7 @@ TEST_CLASS(OneOffTests) {
       "          ",
       {}, {},
       { Sausage{3, 1, 3, 2, 1} },
-      { SpecialTile::Over2Grill }));
+      { SpecialTile({0, 2}, {0}) }));
     level.AssertPosition(3, 2, Right);
     level.AssertSausage({3, 1, 3, 2, 1, Sausage::None});
     level.AssertMoveSucceeds(Right);
@@ -3320,7 +3455,7 @@ TEST_CLASS(LogicTests) {
       " _______  "
       " _______  "
       "          ",
-      {}, {}, { Sausage{1, 3, 2, 3, 1} }, { SpecialTile::Over2 }));
+      {}, {}, { Sausage{1, 3, 2, 3, 1} }, { SpecialTile({0, 2}) }));
     level.AssertPosition(1, 3, Right);
     level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});
     level.AssertMoveSucceeds(Right);
@@ -3381,7 +3516,7 @@ TEST_CLASS(LogicTests) {
       " _______  "
       " _______  "
       "          ",
-      {}, {}, { Sausage{1, 3, 2, 3, 1}, Sausage{1, 3, 2, 3, 2} }, { SpecialTile::Over2 }));
+      {}, {}, { Sausage{1, 3, 2, 3, 1}, Sausage{1, 3, 2, 3, 2} }, { SpecialTile({0, 2}) }));
     level.AssertPosition(1, 3, Right);
     level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});
     level.AssertSausage({1, 3, 2, 3, 2, Sausage::None});

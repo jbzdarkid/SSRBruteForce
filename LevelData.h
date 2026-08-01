@@ -84,10 +84,10 @@ enum SpecialTile : u8 {
 struct Sausage {
   // x1, y1 will always refer to the the left- or upper- half of the sausage.
   // This does cause some extra work while rotating, but makes comparison and referencing much easier.
-  s8 x1;
-  s8 y1;
-  s8 x2;
-  s8 y2;
+  s8 x1 = 0;
+  s8 y1 = 0;
+  s8 x2 = 0;
+  s8 y2 = 0;
   s8 z = 0;
 
   enum Flags : u8 {

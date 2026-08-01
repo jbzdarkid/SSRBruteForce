@@ -78,17 +78,15 @@ public:
     // Transform the grid and its derived per-cell masks in one remap.
     NArray<u16> newWalls(newWidth, newHeight);
     NArray<u16> newGrills(newWidth, newHeight);
-    NArray<u16> newLadders(newWidth, newHeight);
+    NArray<u16> newLadders(newWidth, newHeight, Direction::NUM_ENTRIES);
     newLadders.Fill(0); // NArray does not default zero.
     for (int x = 0; x < _width; x++) {
       for (int y = 0; y < _height; y++) {
         auto [newX, newY] = Transform(x, y);
         newWalls(newX, newY) = _level._walls(x, y);
         newGrills(newX, newY) = _level._grills(x, y);
-        u16 ladder = _level._ladders(x, y);
-        if (ladder) {
-          newLadders(newX, newY) = (sym((Direction)(ladder >> 8)) << 8);
-          newLadders(newX, newY) |= ladder & 0xFF;
+        for (Direction dir : { Up, Down, Left, Right }) {
+          newLadders(newX, newY, sym(dir)) = _level._ladders(x, y, dir);
         }
       }
     }

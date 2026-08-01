@@ -11,7 +11,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     _height(height),
     _walls(NArray<u16>(_width, _height)),
     _grills(NArray<u16>(_width, _height)),
-    _ladders(NArray<u8>(_width, _height, Direction::NUM_ENTRIES)),
+    _ladders(NArray<u16>(_width, _height, Direction::NUM_ENTRIES)),
     name(name)
 {
   _walls.Fill(0);
@@ -40,9 +40,8 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c == '8') { _walls(x, y) = 0b1'1111'1111; }
     else if (c == '?') {
         SpecialTile tile = specialTiles.back();
-        if      (tile == Over2)      { _walls(x, y) = 0b0000'0101; }
-        else if (tile == Over3)      { _walls(x, y) = 0b0000'1001; }
-        else if (tile == Over2Grill) { _walls(x, y) = 0b0000'0101; _grills(x, y) = 0b0000'0001; }
+        _walls(x, y) = tile.walls;
+        _grills(x, y) = tile.grills;
         specialTiles.pop_back();
     }
 #if (OVERWORLD_HACK == 0 || OVERWORLD_HACK >= 2) // need to use these capital letters for sausages I mean not really but whatever
@@ -110,9 +109,9 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
   for (const Ladder& ladder : ladders) {
     assert(_ladders(ladder.x, ladder.y, ladder.dir) == 0);
 
-    for (s8 z = ladder.z; z < 9; z++) {
-      assert(z < 8); // Maximum bitmask size
-      _ladders(ladder.x, ladder.y, ladder.dir) |= 1 << z;
+    for (s8 z = ladder.z; z < 17; z++) {
+      assert(z < 16); // Maximum bitmask size
+      _ladders(ladder.x, ladder.y, ladder.dir) |= (1 << z);
 
       if (ladder.dir == Up) {
         if (!IsWall(ladder.x, ladder.y - 1, z + 1)) break;

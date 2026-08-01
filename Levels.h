@@ -159,6 +159,30 @@ Level GreatTowerImanex(14, 11, "2-4 Great Tower (after imanex's start) (with no 
   " # ___________"
   " 11L__________");
 
+Level TheGreatTower(19, 19, "2-4 The Great Tower",
+  "         $  $      "
+  "        $$ $$      "
+  "         #  #      "
+  "       1##1##      "
+  "    1111 11 1      "
+  "    1_______U______"
+  "    1______________"
+  "$$##1______________"
+  " $ # ______________"
+  "   11______________"
+  "$$##1______ab______"
+  " $ # ______ab______"
+  "   11L______>______"
+  "     ______________"
+  "     ______________"
+  "     ______________"
+  "     ______________"
+  "     ______________"
+  "     ______________",
+  {},
+  {},
+  {Sausage{11, 10, 12, 10, 1}, Sausage{11, 10, 11, 11, 2}, Sausage{11, 10, 12, 10, 3}, Sausage{12, 10, 12, 11, 2}, Sausage{11, 11, 12, 11, 1}, Sausage{11, 11, 12, 11, 3}});
+
 Level ThePaddock(10, 6, "2-5 The Paddock",
   " 11____111"
   "1_#_aa_# 1"
@@ -246,7 +270,7 @@ Level ColdFinger = [] {
     {},
     {},
     {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
-    {SpecialTile::Over3});
+    {SpecialTile({0, 3})});
 
   coldFinger.heuristic = [](const Level* level, u32 depth) {
     for (const Sausage& sausage : level->GetSausages()) {
@@ -442,7 +466,7 @@ Level ColdGate = [] {
   Sausage{14, 5, 14, 6, 4},  // tower sausage 4, z=4
   Sausage{14, 5, 14, 6, 5},  // tower sausage 5, z=5
   Sausage{14, 5, 14, 6, 6}}, // tower sausage 6, z=6
-  {SpecialTile::Over2Grill, SpecialTile::Over2Grill, SpecialTile::Over2Grill});
+  {SpecialTile({0, 2}, {0}), SpecialTile({0, 2}, {0}), SpecialTile({0, 2}, {0})});
   coldGate.heuristic = [](const Level* level, u32 depth) {
     // This level has 7 sausages, which means there's a fairly massive state explosion around depth 70.
     // Mostly, these states are exploring the right side -- which has a limited number of grills.
@@ -528,7 +552,7 @@ Level SludgeCoast(10, 11, "4-3 Sludge Coast",
   Stephen{3, 5, 0, Right},
   {},
   {},
-  {SpecialTile::Over2});
+  {SpecialTile({0, 2})});
 
 Level FoulFen(9, 9, "4-4 Foul Fen",
   "122211111"
@@ -573,7 +597,7 @@ Level GatorPaddock(12, 10, "4-6 Gator Paddock",
   Stephen{5, 7, 0, Down},
   {Ladder{6, 6, 1, Right}, Ladder{7, 8, 1, Up}},
   {},
-  {SpecialTile::Over2Grill});
+  {SpecialTile({0, 2}, {0})});
 
 Level TheGorge(20, 11, "5-1 The Gorge",
   "            ________"
@@ -590,7 +614,7 @@ Level TheGorge(20, 11, "5-1 The Gorge",
   Stephen{3, 6, 3, Up},
   {},
   {Sausage{1, 6, 2, 6, 3}, Sausage{11, 4, 11, 5, 2}, Sausage{13, 4, 13, 5, 1}},
-  {SpecialTile::Over3});
+  {SpecialTile({0, 3})});
 
 Level WidowsFinger(16, 11, "5-2 Widow's Finger",
   "             223"
@@ -607,7 +631,7 @@ Level WidowsFinger(16, 11, "5-2 Widow's Finger",
   {},
   {Ladder{10, 5, 2, Up}, Ladder{13, 6, 1, Up}},
   {Sausage{13, 1, 13, 2, 2}},
-  {SpecialTile::Over2});
+  {SpecialTile({0, 2})});
 
 Level Skeleton(25, 11, "5-3 Skeleton",
   "          _______________"
@@ -624,7 +648,7 @@ Level Skeleton(25, 11, "5-3 Skeleton",
   {},
   {},
   {},
-  {SpecialTile::Over2, SpecialTile::Over2});
+  {SpecialTile({0, 2}), SpecialTile({0, 2})});
 
 Level SlopeView(18, 8, "5-4 Slope View",
   "        $$     1  "
@@ -638,7 +662,7 @@ Level SlopeView(18, 8, "5-4 Slope View",
   Stephen{4, 5, 2, Left},
   {Ladder{4, 4, 2, Up}, Ladder{8, 5, 1, Left}},
   {Sausage{6, 3, 6, 4, 2}},
-  {SpecialTile::Over2, SpecialTile::Over2});
+  {SpecialTile({0, 2}), SpecialTile({0, 2})});
 
 Level LandsEnd(13, 7, "5-5 Land's End",
   "      R1     "
@@ -658,7 +682,7 @@ Level Crater(13, 7, "5-6 Crater",
   "2     2____#_"
   "2     2L_1_1#"
   "2    22____1_"
-  "232%%2__a____"
+  "232%%2U_a____"
   "   %% __a___^"
   "         _   ",
   {},
@@ -682,7 +706,7 @@ Level PressurePoints(18, 13, "5-7 Pressure Points",
   {},
   {Ladder{3, 3, 2, Up}},
   {},
-  {SpecialTile::Over2});
+  {SpecialTile({0, 2})});
 
 Level OpenBaths(17, 19, "5-8 Open Baths",
   "         2       "
@@ -707,7 +731,7 @@ Level OpenBaths(17, 19, "5-8 Open Baths",
   Stephen{2, 13, 3, Right},
   {},
   {Sausage{3, 13, 3, 14, 2}, Sausage{5, 13, 6, 13, 1}},
-  {SpecialTile::Over2, SpecialTile::Over2});
+  {SpecialTile({0, 2}), SpecialTile({0, 2})});
 
 Level Drumlin(13, 7, "5-9 Drumlin",
   "  111        "
@@ -1055,7 +1079,7 @@ std::vector<Level*> tests = {
   &EmersonJetty,
   &SadFarm,
   &Cove,
-  // &GreatTower,
+  &TheGreatTower,
   &ThePaddock,
   &BeautifulHorizon,
   &RoughField,

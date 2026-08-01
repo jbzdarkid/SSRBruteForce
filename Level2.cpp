@@ -47,10 +47,12 @@ bool Level::Move(Direction dir) {
   if (!HandleBurnedStep(dir, handled)) return false;
 
   // Reconnect a thrown fork: the instant Stephen's body ends a move directly behind it -- the fork lying one cell ahead
-  // in his facing at his own level -- he takes it back into his hand (the reference keeps a held fork at pos + facing).
+  // in his facing at his own level AND pointing the way he faces -- he takes it back into his hand (TryReattachFork:
+  // fork.pos == pos + dir && fork.direction == dir). A fork facing crosswise is not picked up.
   if (!_stephen.HasFork()) {
     auto [dx, dy] = Delta(_stephen.dir);
-    if (_stephen.forkX == _stephen.x + dx && _stephen.forkY == _stephen.y + dy && _stephen.forkZ == _stephen.z)
+    if (_stephen.forkX == _stephen.x + dx && _stephen.forkY == _stephen.y + dy && _stephen.forkZ == _stephen.z
+        && _stephen.forkDir == _stephen.dir)
       _stephen.forkDir = None;
   }
 
@@ -68,6 +70,9 @@ bool Level::HandleBurnedStep(Direction dir, bool& handled) {
 bool Level::HandleSpearedMotion(Direction dir, bool& handled) {
   // If the fork is lodged in a sausage, Stephen drags it rigidly; otherwise leave |handled| false for the step/turn
   // classification. The speared sausage is whatever the fork currently occupies.
+  // A DETACHED fork merely lying inside a sausage (thrown, then the sausage settled around it) is inert -- only a HELD
+  // fork spears. Without this guard a forkless Stephen would drag the sausage his loose fork happens to sit in.
+  if (!_stephen.HasFork()) return true;
   s8 sausageNo = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ);
   if (sausageNo == -1) return true;
   handled = true;
@@ -211,6 +216,18 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   s8 onSausage = GetSausage(_stephen.x, _stephen.y, _stephen.z - 1);
   if (onSausage == -1) return true;
 
+  // A forkless press toward a ladder climbs it: the reference tests the ladder (TryClimbUp/Down) BEFORE the
+  // sausage-underfoot roll inside TryMovePlayer, so a ladder in the press direction preempts the log roll. Defer to
+  // HandleLadderMotion (leave |handled| false) rather than rolling the sausage he stands on.
+  if (!_stephen.HasFork()) {
+    auto [adx, ady] = Delta(dir);
+    s8 ax = _stephen.x + adx, ay = _stephen.y + ady;
+    bool climbUp   = (dir == _stephen.dir)          && IsLadder(_stephen.x, _stephen.y, _stephen.z, dir);
+    bool climbDown = (dir == Inverse(_stephen.dir)) && !CanWalkOnto(ax, ay, _stephen.z)
+                  && IsLadder(ax, ay, _stephen.z - 1, Inverse(dir));
+    if (climbUp || climbDown) return true;
+  }
+
   // It fires when he presses ACROSS the sausage's long axis. Normally he must also be FACING along that press axis --
   // a press perpendicular to his facing is otherwise a free turn in place, which leaves the log unrolled (LogRoll test:
   // facing Right on a horizontal log, a press Up just turns him to face Up). But a fork speared into a sausage locks
@@ -300,6 +317,16 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   if (hasFork) { plan.stephen.forkX += dx; plan.stephen.forkY += dy; } // a detached fork stays where it was thrown
   while (!SausageSupported(plan, plan.stephen.x, plan.stephen.y, plan.stephen.z)) {
     if (plan.stephen.z <= 0) return false;
+    // A speared sausage rides the fork down with the body -- but only while it, too, is still falling. The instant its
+    // own far end catches a wall or sausage, Stephen falls PAST it: the reference detaches the fork mid-fall
+    // (TryDetatchFork), leaving it lodged in the now-independent sausage at that height while the body drops on alone.
+    if (speared != -1) {
+      const Sausage& sp = plan.sausages[speared];
+      if (SausageSupported(plan, sp.x1, sp.y1, sp.z) || SausageSupported(plan, sp.x2, sp.y2, sp.z)) {
+        plan.stephen.forkDir = _stephen.dir; // detach: the fork stays lodged in the caught sausage
+        speared = -1;
+      }
+    }
     plan.stephen.z--;
     if (speared != -1) { plan.stephen.forkZ--; plan.sausages[speared].z--; } // speared: fork + its sausage ride down with the body
   }
@@ -418,6 +445,10 @@ bool Level::HandleLadderMotion(Direction dir, bool& handled) {
         nz++;
       }
       if (IsWall(ax, ay, nz) || !CanWalkOnto(ax, ay, nz)) return false;
+      // A sausage occupying the step-off cell itself (not merely under it) would be shoved along by the body arriving --
+      // the game pushes it; we don't model that push during a forkless climb, so refuse rather than overlap it
+      // (a refusal never causes a false divergence). Covers the fork-lodged-in-a-wall-borne-sausage case (5-6 Crater m195).
+      if (GetSausage(ax, ay, nz) != -1) return false;
       MovePlan plan = NewPlan();
       plan.stephen.x = ax; plan.stephen.y = ay; plan.stephen.z = nz;
       // If the thrown fork lies on the cell we step off onto, the body shoves it one cell further along |dir| (a wall
@@ -754,6 +785,9 @@ bool Level::HandleStepMotion(Direction dir, bool& handled) {
       while (plan.stephen.forkZ > 0 && !IsWall(pfx, pfy, plan.stephen.forkZ - 1)
              && GetSausage(pfx, pfy, plan.stephen.forkZ - 1) == -1)
         plan.stephen.forkZ--;
+      // Shoved over a column with no footing at all, the fork falls off the map (Fork Lost) -- refuse rather than
+      // resting it on the void floor.
+      if (!CanWalkOnto(pfx, pfy, plan.stephen.forkZ)) return false;
     }
     s8 bumped = GetSausage(nbx, nby, nz);
     Stephen mover = _stephen; mover.x = nbx; mover.y = nby;
