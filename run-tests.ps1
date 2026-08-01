@@ -73,7 +73,7 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "5-1 The Gorge";         Dem = "5-1.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "5-2 Widow's Finger";    Dem = "5-2.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "5-3 Skeleton";          Dem = "5-3.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "5-4 Slope View";        Dem = "5-4.dem";  Sausages = 1 }
+    [pscustomobject]@{ Name = "5-4 Slope View";        Dem = "5-4.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "5-5 Land's End";        Dem = "5-5.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "5-6 Crater";            Dem = "5-6.dem";  Sausages = 2 }
     [pscustomobject]@{ Name = "5-7 Pressure Points";   Dem = "5-7.dem";  Sausages = 2 }
