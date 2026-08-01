@@ -91,6 +91,18 @@ $levels = @(
     [pscustomobject]@{ Name = "4-4 Foul Fen";          Sausages = 1 }
     [pscustomobject]@{ Name = "4-5 Crunchy Leaves";    Sausages = 3 }
     [pscustomobject]@{ Name = "4-6 Gator Paddock";     Sausages = 1 }
+    [pscustomobject]@{ Name = "5-1 The Gorge";         Sausages = 3 }
+    [pscustomobject]@{ Name = "5-2 Widow's Finger";    Sausages = 3 }
+    [pscustomobject]@{ Name = "5-3 Skeleton";          Sausages = 3 }
+    [pscustomobject]@{ Name = "5-4 Slope View";        Sausages = 3 }
+    [pscustomobject]@{ Name = "5-5 Land's End";        Sausages = 1 }
+    [pscustomobject]@{ Name = "5-6 Crater";            Sausages = 2 }
+    [pscustomobject]@{ Name = "5-7 Pressure Points";   Sausages = 2 }
+    [pscustomobject]@{ Name = "5-8 Open Baths";        Sausages = 3 }
+    [pscustomobject]@{ Name = "5-9 Drumlin";           Sausages = 3 }
+    [pscustomobject]@{ Name = "5-10 Tarry Ridge";      Sausages = 2 }
+    [pscustomobject]@{ Name = "5-11 Rough View";       Sausages = 2 }
+    [pscustomobject]@{ Name = "5-12 Baby Rock";        Sausages = 2 }
 )
 
 function Build-Variant {
