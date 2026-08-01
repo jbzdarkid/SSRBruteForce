@@ -259,7 +259,7 @@ Level ColdFinger = [] {
     {Sausage{3, 2, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}},
     {SpecialTile::Over3});
 
-  coldFinger.heuristic = [](const Level* level) {
+  coldFinger.heuristic = [](const Level* level, u32) {
     if (HasOffGridSausage(level)) return false; // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
     for (const Sausage& sausage : level->Sausages()) {
       // ColdFinger requires all sausages to be vertical to win, and we can't rotate sausages once they drop to the ground.
@@ -290,7 +290,7 @@ Level ColdEscarpment = [] {
   "___R1####_____"
   "     ####     "
   "      11      ");
-  coldEscarpment.heuristic = [](const Level* level) {
+  coldEscarpment.heuristic = [](const Level* level, u32) {
     return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
   };
   return coldEscarpment;
@@ -311,7 +311,7 @@ Level ColdTrail = [] {
   {},
   {},
   {Sausage{1, 2, 2, 2, 1}, Sausage{1, 3, 1, 4, 1}, Sausage{2, 3, 2, 4, 1}});
-  coldTrail.heuristic = [](const Level* level) {
+  coldTrail.heuristic = [](const Level* level, u32) {
     // In the optimal solution, Stephen (and the sausages) never enter the lower half of the puzzle. Sausages are
     // normalized so (x1,y1) is the upper/left half, hence y2 >= y1 -- testing the lower end's y2 alone bounds both.
     const Stephen& stephen = level->GetStephen();
@@ -438,7 +438,8 @@ Level ColdHorizon(15, 5, "3-12 Cold Horizon",
   {Sausage{4, 0, 5, 0, 2}, Sausage{4, 1, 4, 2, 2}});
 
 
-Level ColdGate(18, 11, "3-13 Cold Gate",
+Level ColdGate = [] {
+  Level coldGate(18, 11, "3-13 Cold Gate",
   "####              "
   "####?22277        "
   "####?21$$1        "
@@ -460,6 +461,20 @@ Level ColdGate(18, 11, "3-13 Cold Gate",
   Sausage{14, 5, 14, 6, 5},  // tower sausage 5, z=5
   Sausage{14, 5, 14, 6, 6}}, // tower sausage 6, z=6
   {SpecialTile::Over2Grill, SpecialTile::Over2Grill, SpecialTile::Over2Grill});
+  coldGate.heuristic = [](const Level* level, u32 depth) {
+    // This level has 7 sausages, which means there's a fairly massive state explosion around depth 70.
+    // Mostly, these states are exploring the right side -- which has a limited number of grills.
+    // We can get out ahead of this because we know that the optimal solution is 84 moves,
+    // so we can eliminate unwinnable states where many sausages are uncooked in the right side.
+    if (depth < 66) return true;
+    u8 uncooked = 0;
+    for (const Sausage& sausage : level->Sausages()) {
+      if (sausage.x2 >= 12 && !sausage.IsFullyCooked()) uncooked++;
+    }
+    return uncooked < 3;
+  };
+  return coldGate;
+}();
 
 Level ColdFrustration = [] {
   Level coldFrustration(10, 9, "3-14 Cold Frustration",
@@ -475,7 +490,7 @@ Level ColdFrustration = [] {
   {},
   {},
   {Sausage{4, 8, 5, 8, 2}});
-  coldFrustration.heuristic = [](const Level* level) {
+  coldFrustration.heuristic = [](const Level* level, u32) {
     return !HasOffGridSausage(level); // a sausage rolled fully off the map -- lost, and a reference-quirk divergence source
   };
   return coldFrustration;

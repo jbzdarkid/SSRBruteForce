@@ -62,7 +62,7 @@ void Solver::ProcessOneLayer(u32 depth) {
         }
 
         if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
-        if (_level->heuristic && !_level->heuristic(_level)) continue; // Discard heuristically-pruned moves
+        if (_level->heuristic && !_level->heuristic(_level, depth)) continue; // Discard heuristically-pruned moves
 
         cache.AddStateUnchecked(_level->GetState());
       }
@@ -89,7 +89,7 @@ void Solver::FindWinningStates(u32 depth) {
         }
 
         if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
-        if (_level->heuristic && !_level->heuristic(_level)) continue;
+        if (_level->heuristic && !_level->heuristic(_level, depth + 1)) continue;
 
         State newState = _level->GetState();
         auto search = _winningStates.find(newState);

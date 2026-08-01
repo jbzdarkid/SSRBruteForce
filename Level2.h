@@ -23,7 +23,7 @@ struct Level : public LevelData {
   bool Move(Direction dir);
 
   // Level-specific heuristic which returns false from losing states to reduce the total state count.
-  bool (*heuristic)(const Level*) = nullptr;
+  bool (*heuristic)(const Level*, u32 depth) = nullptr;
 
 private:
   // A move's entire planning scratch AND its working tableau -- created fresh on the stack by each leaf handler (see
