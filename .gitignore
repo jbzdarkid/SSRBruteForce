@@ -10,3 +10,4 @@ vcpkg_installed
 *.pdb
 cache/
 Extracted/
+/Oracle/obj

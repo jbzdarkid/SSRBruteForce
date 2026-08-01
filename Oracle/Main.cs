@@ -5,6 +5,31 @@ using System.Linq;
 
 static class Oracle {
   static int Main(string[] args) {
+    // THROWAWAY converter mode: emit a C++ Level(...) def for one level (arg[1] = "5-1 The Gorge").
+    if (args.Length >= 1 && args[0] == "--tolevelh") {
+      GameState g = LoadFromBlob(args[1]);
+      Console.WriteLine(ConvertToLevelH(args[1], g));
+      return 0;
+    }
+
+    // THROWAWAY: emit C++ Level(...) defs for the whole-world overworld islands. arg1 = shrine key + arg2 = display
+    // name for one world, or arg1 = "all" to emit all five (worlds 1-5). Each world = its temple shrine + prereq level
+    // islands merged at their overworld offsets, per-level sausages dropped, only the world sausage kept active.
+    if (args.Length >= 2 && args[0] == "--world-tolevelh") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      if (args[1] == "all") {
+        Console.WriteLine("#pragma once");
+        Console.WriteLine("#include \"Level2.h\"");
+        var worlds = new[] { (1, "temple2j1"), (2, "temple1d1"), (3, "temple1x1"), (4, "temple1h1"), (5, "temple2c1") };
+        foreach (var (w, key) in worlds) { Console.WriteLine(); Console.WriteLine(EmitWorldLevel(mg, key, $"{w}-final Overworld sausage")); }
+      } else {
+        Console.WriteLine(EmitWorldLevel(mg, args[1], args[2]));
+      }
+      return 0;
+    }
+
     string levelName = args[0];
     string demos = args[1];
     if (Directory.Exists(args[1])) BulkReplay(levelName, demos);
@@ -25,11 +50,42 @@ static class Oracle {
 
     // Strip the "1-1 " level prefix; the rest is the game's display name verbatim
     string displayName = levelName[(levelName.IndexOf(' ') + 1)..];
-    GameState island = metaGame.islands.Values.FirstOrDefault(g => g.displayname == displayName);
-    if (island == null) throw new Exception($"No island with display name '{displayName}' in merged_binary");
+
+    // World 6 levels are composite: the island matching the display name is a "hub" whose entities are all
+    // `island` references, and the real terrain lives in sibling islands keyed "<hubkey>__islandN". Detect the
+    // hub and pool its children (each already authored in a shared frame, shifted by its offset delta) into one
+    // entity list; every other world is a single island whose own entities ARE the level.
+    string dat;
+    var hub = metaGame.islands.FirstOrDefault(kv => kv.Value.displayname == displayName
+                                                  && kv.Value.entities.Count > 0
+                                                  && kv.Value.entities.All(e => e.type == EntType.island));
+    if (hub.Key != null) {
+      Coord hubOff = metaGame.offsets[hub.Key];
+      var children = metaGame.islands.Where(kv => kv.Key.StartsWith(hub.Key + "__")).ToList();
+      if (children.Count == 0) throw new Exception($"Composite hub '{hub.Key}' for '{displayName}' has no child islands");
+      // Concatenating full child saves would drop all but the first island's terrain (Save appends '*'-delimited
+      // metadata and LoadDat only reads the entity run before the first '*'), so splice just the entity segment
+      // from each child and give the children disjoint id ranges.
+      var sb = new System.Text.StringBuilder();
+      int idBase = 0;
+      foreach (var kv in children) {
+        Coord delta = (metaGame.offsets.ContainsKey(kv.Key) ? metaGame.offsets[kv.Key] : hubOff) - hubOff;
+        GameState child = GameState.Load(kv.Value.Save(false, false), null, false);
+        foreach (Entity e in child.entities) { e.pos += delta; e.id += idBase; }
+        idBase = child.entities.Count > 0 ? child.entities.Max(e => e.id) + 1 : idBase;
+        string save = child.Save(false, false);
+        int star = save.IndexOf('*');
+        sb.Append(star < 0 ? save : save[..star]);
+      }
+      dat = sb.ToString() + "*";
+    } else {
+      GameState island = metaGame.islands.Values.FirstOrDefault(g => g.displayname == displayName);
+      if (island == null) throw new Exception($"No island with display name '{displayName}' in merged_binary");
+      dat = island.Save(false, false);
+    }
 
     // Fresh copy so the cached island isn't mutated; strip decoration/markers off the working copy.
-    GameState work = GameState.Load(island.Save(false, false), null, false);
+    GameState work = GameState.Load(dat, null, false);
     work.entities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
     work.dynamicentities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
 
@@ -54,6 +110,39 @@ static class Oracle {
     if (a.x != b.x) return a.x - b.x;
     if (a.y != b.y) return a.y - b.y;
     return a.z - b.z;
+  }
+
+  // THROWAWAY: build one world's overworld island (temple shrine + prereq level islands, merged at offsets; per-level
+  // sausages dropped, world sausage kept) and emit its C++ Level(...) def with a proper OverworldSausageN var name.
+  static string EmitWorldLevel(MetaGameState mg, string shrine, string name) {
+    var worldKeys = new List<string> { shrine };
+    if (mg.templedat.TryGetValue(shrine, out var prereqs)) worldKeys.AddRange(prereqs);
+    GameState world = GameState.Load("*", null, false);
+    int id = 0;
+    Entity player = null;
+    foreach (string key in worldKeys) {
+      if (!mg.offsets.TryGetValue(key, out Coord io) || !mg.islands.ContainsKey(key)) continue;
+      GameState isl = GameState.Load(mg.islands[key].Save(false, false), null, false);
+      foreach (Entity e in isl.entities) {
+        if (e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage || e.type == EntType.sausage) continue;
+        if (e.type == EntType.player) { if (key == shrine && player == null) { e.pos += io; player = e; } continue; }
+        e.pos += io; e.id = id++;
+        world.entities.Add(e);
+        if (e.type.Dynamic()) world.dynamicentities.Add(e);
+      }
+    }
+    foreach (var p in mg.sausagepositions[shrine]) {
+      Entity s = new Entity(world) { type = EntType.sausage, pos = p.Key + mg.offsets[shrine], direction = p.Value, rot = 0, cookdata = 0, id = id++ };
+      world.entities.Add(s); world.dynamicentities.Add(s);
+    }
+    if (player == null) player = new Entity(world) { type = EntType.player, direction = Direction.North, pos = mg.sausagepositions[shrine][0].Key + mg.offsets[shrine] };
+    player.id = id++;
+    world.entities.Add(player); world.dynamicentities.Add(player);
+    world.player = player;
+    int minx = world.entities.Min(e => e.pos.x), miny = world.entities.Min(e => e.pos.y), minz = world.entities.Min(e => e.pos.z);
+    string translated = GameState.Translate(world.Save(false, false), new Coord(-minx, -miny, -1 - minz));
+    string def = ConvertToLevelH(name, GameState.Load(translated, null, true));
+    return def.Replace("Level Overworldsausage(", $"Level OverworldSausage{name.Split('-')[0]}(");
   }
 
   static void BulkReplay(string levelName, string folderPath) {
@@ -141,4 +230,193 @@ static class Oracle {
     foreach (var s in sausages) line += $" | {s.a.x} {s.a.y} {s.b.x} {s.b.y} {s.a.z}{s.flags}";
     return line;
   }
+
+  // ===== THROWAWAY: game GameState -> C++ Level(...) def (see Levels.h). Delete after generating worlds 5 & 6. =====
+  static string CppDir(Direction d) => d switch {
+    Direction.North => "Up", Direction.South => "Down", Direction.West => "Left", Direction.East => "Right", _ => "None"
+  };
+  static (int dx, int dy) Step(Direction d) => d switch {
+    Direction.North => (0, -1), Direction.South => (0, 1), Direction.East => (1, 0), Direction.West => (-1, 0), _ => (0, 0)
+  };
+  static Direction Opposite(Direction d) => d switch {
+    Direction.North => Direction.South, Direction.South => Direction.North,
+    Direction.East => Direction.West, Direction.West => Direction.East, _ => d
+  };
+
+  static string ConvertToLevelH(string name, GameState gs) {
+    var terrain = gs.entities.Where(e => e.type == EntType.ground || e.type == EntType.barrier
+                                      || e.type == EntType.bbq    || e.type == EntType.ladder).ToList();
+    int W = terrain.Max(e => e.pos.x) + 1;
+    int H = terrain.Max(e => e.pos.y) + 1;
+
+    var solid = new HashSet<int>[H, W];   // C++ wall-bit indices present (bit = game_z + 1)
+    var grill = new HashSet<int>[H, W];   // grill bits (from bbq)
+    for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) { solid[y, x] = new(); grill[y, x] = new(); }
+
+    var ladders = new List<(int x, int y, int z, Direction dir)>(); // raw game (x,y,game_z,dir); transformed at emit
+    foreach (Entity e in terrain) {
+      int x = e.pos.x, y = e.pos.y, b = e.pos.z + 1;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (e.type == EntType.ground || e.type == EntType.barrier) solid[y, x].Add(b);
+      else if (e.type == EntType.bbq) { solid[y, x].Add(b); grill[y, x].Add(b); }
+      else if (e.type == EntType.ladder) { solid[y, x].Add(b); ladders.Add((x, y, e.pos.z, e.direction)); }
+    }
+
+    var warnings = new List<string>();
+    var specials = new List<string>(); // SpecialTile tokens, in grid order (matches '?' consumption... see note)
+    var grid = new char[H, W];
+    var effWalls = new HashSet<int>[H, W]; // wall bit indices the emitted char actually produces (for IsWall sim)
+    var cellGrill = new bool[H, W];
+    for (int y = 0; y < H; y++) {
+      for (int x = 0; x < W; x++) {
+        var S = solid[y, x]; var G = grill[y, x];
+        char c; HashSet<int> eff;
+        if (S.Count == 0) { c = ' '; eff = new(); }
+        else {
+          int top = S.Max();
+          bool grillTop = G.Contains(top) && top <= 2; // grill occupies the standable top surface
+          // A plain char is exact only for a run contiguous from the lowest block (implicitly-solid interior) whose
+          // grill, if any, sits on a standable (<=2) top; anything else -> an explicit z-level SpecialTile.
+          bool contigFromMin = Enumerable.Range(S.Min(), top - S.Min() + 1).All(S.Contains);
+          bool grillOk = G.Count == 0 || (grillTop && G.Count == 1);
+          if (contigFromMin && grillOk) {
+            c = grillTop ? "#$%"[top] : "_12345678"[Math.Clamp(top, 0, 8)];
+            eff = new(Enumerable.Range(0, Math.Clamp(top, 0, 8) + 1));
+          } else {
+            c = '?';
+            var wallBits = Enumerable.Range(0, S.Min()).Concat(S).OrderBy(v => v).ToList(); // implied-solid below the lowest block
+            eff = new(wallBits);
+            specials.Add(G.Count == 0
+              ? $"SpecialTile({{{string.Join(", ", wallBits)}}})"
+              : $"SpecialTile({{{string.Join(", ", wallBits)}}}, {{{string.Join(", ", G.OrderBy(v => v))}}})");
+          }
+        }
+        grid[y, x] = c; effWalls[y, x] = eff; cellGrill[y, x] = G.Count > 0;
+      }
+    }
+
+    // Stephen
+    Entity p = gs.player;
+    string stephen = $"Stephen{{{p.pos.x}, {p.pos.y}, {p.pos.z}, {CppDir(p.direction)}}}";
+    bool forkPlaced = gs.fork != null;
+
+    // Sausages (reuse the validated ToString decode, but emit C++ initializers)
+    bool Cooked(int q) => q == 1 || q == 2;
+    var saus = new List<(Coord a, Coord b, string flags, int z)>();
+    foreach (Entity e in gs.dynamicentities) {
+      if (e.type != EntType.sausage) continue;
+      int cd = e.cookdata;
+      var pos = (cell: e.pos, r0: Cooked((cd >> 6) & 3), r1: Cooked((cd >> 4) & 3));
+      var coord = (cell: e.pos + e.direction, r0: Cooked(cd & 3), r1: Cooked((cd >> 2) & 3));
+      var (lo, hi) = Compare(pos.cell, coord.cell) <= 0 ? (pos, coord) : (coord, pos);
+      var fl = new List<string>();
+      if (lo.r0) fl.Add("Sausage::Cook1A");
+      if (lo.r1) fl.Add("Sausage::Cook1B");
+      if (hi.r0) fl.Add("Sausage::Cook2A");
+      if (hi.r1) fl.Add("Sausage::Cook2B");
+      if (e.rot != 0) fl.Add("Sausage::Rolled");
+      saus.Add((lo.cell, hi.cell, fl.Count == 0 ? "Sausage::None" : string.Join(" | ", fl), lo.cell.z));
+    }
+    // Row-major by the upper-left half, so inline letters (a,b,c…) land in the C++ grid's parse order (top-to-bottom, left-to-right).
+    saus.Sort((s1, s2) => s1.a.y != s2.a.y ? s1.a.y - s2.a.y : (s1.a.x != s2.a.x ? s1.a.x - s2.a.x : s1.a.z - s2.a.z));
+
+    // Transform each game ladder to its C++ anchor cell + opposite facing. The C++ _ladders array is indexed by
+    // (x,y,dir), so a cell CAN carry ladders on several faces: the inline pass below promotes at most one face per
+    // cell to a U/D/L/R grid char and leaves any other faces in the explicit Ladder{...} list.
+    var xl = ladders.Select(l => { var st = Step(l.dir); return (x: l.x + st.dx, y: l.y + st.dy, z: l.z, dir: CppDir(Opposite(l.dir))); }).ToList();
+    // A ladder whose anchor cell is off the grid (a boundary face) or below the floor can't be indexed by the C++
+    // _ladders array -- in the frozen island snapshot it backs onto void anyway, so drop it and flag for review.
+    foreach (var l in xl.Where(l => l.x < 0 || l.y < 0 || l.x >= W || l.y >= H || l.z < 0))
+      warnings.Add($"dropped off-grid ladder anchor ({l.x},{l.y},{l.z}) {l.dir}");
+    var kept = xl.Where(l => l.x >= 0 && l.y >= 0 && l.x < W && l.y < H && l.z >= 0)
+                 .Select(l => (l.x, l.y, l.z, l.dir)).Distinct()
+                 .OrderBy(l => l.y).ThenBy(l => l.x).ThenBy(l => l.z).ToList();
+
+    // Inline ladders into the grid where the hand-authored style allows it: a ladder can become a U/D/L/R char iff its
+    // anchor cell is a plain '_', its rungs start at z=0, and the parser's auto-extension (climb while a wall backs each
+    // level) reproduces exactly its z-set. Anything else stays in the {Ladder{...}} list.
+    bool IsWallEff(int x, int y, int z) => x >= 0 && y >= 0 && x < W && y < H && z >= 0 && effWalls[y, x].Contains(z + 1);
+    (int dx, int dy) DirStep(string d) => d switch { "Up" => (0, -1), "Down" => (0, 1), "Left" => (-1, 0), "Right" => (1, 0), _ => (0, 0) };
+    char DirChar(string d) => d switch { "Up" => 'U', "Down" => 'D', "Left" => 'L', "Right" => 'R', _ => '?' };
+    var stillList = new List<(int x, int y, int z, string dir)>();
+    foreach (var g in kept.GroupBy(l => (l.x, l.y, l.dir))) {
+      int ax = g.Key.x, ay = g.Key.y; string dir = g.Key.dir;
+      var zset = g.Select(l => l.z).ToHashSet();
+      bool inlinable = ax >= 0 && ay >= 0 && ax < W && ay < H && grid[ay, ax] == '_' && !cellGrill[ay, ax];
+      if (inlinable) {
+        var (sx, sy) = DirStep(dir);
+        var produced = new HashSet<int>();
+        for (int z = 0; z < 9; z++) { produced.Add(z); if (!IsWallEff(ax + sx, ay + sy, z + 1)) break; }
+        inlinable = produced.SetEquals(zset);
+      }
+      if (inlinable) grid[ay, ax] = DirChar(dir);
+      else stillList.AddRange(g);
+    }
+    kept = stillList.OrderBy(l => l.y).ThenBy(l => l.x).ThenBy(l => l.z).ToList();
+
+    // Inline sausages into the grid using the hand-authored letter convention: each sausage's two halves share a
+    // letter = its 0-based index, lowercase over ground ('_'), uppercase over void (' '). The parser fixes inline
+    // sausages at z=0, uncooked and unrolled, so only such a sausage whose BOTH halves sit on a plain '_'/' ' cell (not
+    // a raised/grill/special/ladder tile) can be inlined; anything else stays in the {Sausage{...}} list. Halves are
+    // adjacent and |saus| keeps the upper-left half in |a|, matching the parser's left-to-right/top-to-bottom pairing.
+    bool InlineCell(Coord c) => c.x >= 0 && c.y >= 0 && c.x < W && c.y < H && (grid[c.y, c.x] == '_' || grid[c.y, c.x] == ' ');
+    var sausList = new List<(Coord a, Coord b, string flags, int z)>();
+    int inlined = 0;
+    foreach (var s in saus) {
+      bool adjacent = Math.Abs(s.a.x - s.b.x) + Math.Abs(s.a.y - s.b.y) == 1;
+      if (s.z == 0 && s.flags == "Sausage::None" && adjacent && inlined < 26 && InlineCell(s.a) && InlineCell(s.b)) {
+        foreach (Coord c in new[] { s.a, s.b })
+          grid[c.y, c.x] = (char)((grid[c.y, c.x] == ' ' ? 'A' : 'a') + inlined); // uppercase over void, lowercase over ground
+        inlined++;
+      } else {
+        sausList.Add(s);
+      }
+    }
+
+    // Inline Stephen with a facing arrow (^ v < >) when he starts at z=0 on a plain ground cell -- the only start the
+    // grid char can express (it fixes z=0 and sets the cell to '_'); otherwise keep the explicit Stephen{...}. (A
+    // detached start fork can't be expressed either way; the fork warning above still flags it.)
+    char StephenChar(Direction d) => d switch {
+      Direction.North => '^', Direction.South => 'v', Direction.West => '<', Direction.East => '>', _ => '?'
+    };
+    bool stephenInline = p.pos.z == 0 && p.pos.x >= 0 && p.pos.y >= 0 && p.pos.x < W && p.pos.y < H
+                      && grid[p.pos.y, p.pos.x] == '_';
+    if (stephenInline) grid[p.pos.y, p.pos.x] = StephenChar(p.direction);
+
+    var rows = new List<string>();
+    for (int y = 0; y < H; y++) {
+      var sb = new System.Text.StringBuilder();
+      for (int x = 0; x < W; x++) sb.Append(grid[y, x]);
+      rows.Add(sb.ToString());
+    }
+
+    // The grid parser pops specialTiles from the BACK per '?' in row-major order, so emit them reversed.
+    specials.Reverse();
+
+    // Positional args after the grid: an inline Stephen becomes a default "{}" placeholder (the grid arrow supplies
+    // him); trailing "{}" are dropped so an all-inline level emits just the grid, matching the hand-authored style.
+    var parts = new List<string>();
+    parts.Add(stephenInline ? "{}" : stephen);
+    parts.Add(kept.Count == 0 ? "{}" : "{" + string.Join(", ", kept.Select(l => $"Ladder{{{l.x}, {l.y}, {l.z}, {l.dir}}}")) + "}");
+    parts.Add(sausList.Count == 0 ? "{}" : "{" + string.Join(", ", sausList.Select(s =>
+      s.flags == "Sausage::None"
+        ? $"Sausage{{{s.a.x}, {s.a.y}, {s.b.x}, {s.b.y}, {s.z}}}"
+        : $"Sausage{{{s.a.x}, {s.a.y}, {s.b.x}, {s.b.y}, {s.z}, {s.flags}}}")) + "}");
+    if (specials.Count > 0) parts.Add("{" + string.Join(", ", specials) + "}");
+    while (parts.Count > 0 && parts[^1] == "{}") parts.RemoveAt(parts.Count - 1);
+
+    // Assemble
+    var o = new System.Text.StringBuilder();
+    string disp = name.Substring(name.IndexOf(' ') + 1);
+    string varName = new string(disp.Where(char.IsLetterOrDigit).ToArray()); // C++ ident: no numeric prefix
+    if (warnings.Count > 0) o.AppendLine($"// WARNING: {string.Join("; ", warnings)}");
+    if (forkPlaced) o.AppendLine($"// WARNING fork placed at start ({gs.fork.pos.x},{gs.fork.pos.y},{gs.fork.pos.z}) dir {gs.fork.direction} -- Stephen ctor can't express this");
+    o.AppendLine($"Level {varName}({W}, {H}, \"{name}\",");
+    for (int y = 0; y < H; y++) o.AppendLine($"  \"{rows[y]}\"{(y == H - 1 && parts.Count > 0 ? "," : "")}");
+    if (parts.Count > 0) o.Append("  " + string.Join(",\n  ", parts));
+    o.Append(");");
+    return o.ToString();
+  }
 }
+
+
