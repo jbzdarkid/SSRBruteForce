@@ -413,6 +413,17 @@ bool Level::HandleLadderMotion(Direction dir, bool& handled) {
       if (IsWall(ax, ay, nz) || !CanWalkOnto(ax, ay, nz)) return false;
       MovePlan plan = NewPlan();
       plan.stephen.x = ax; plan.stephen.y = ay; plan.stephen.z = nz;
+      // If the thrown fork lies on the cell we step off onto, the body shoves it one cell further along |dir| (a wall
+      // directly behind it blocks the whole climb), then it falls to its support -- the common reconnect at the end of
+      // Move() takes it back into hand when it lands one cell ahead at Stephen's level.
+      if (_stephen.forkX == ax && _stephen.forkY == ay && _stephen.forkZ == nz) {
+        s8 pfx = ax + fdx, pfy = ay + fdy;
+        if (IsWall(pfx, pfy, nz)) return false;
+        plan.stephen.forkX = pfx; plan.stephen.forkY = pfy;
+        while (plan.stephen.forkZ > 0 && !IsWall(pfx, pfy, plan.stephen.forkZ - 1)
+               && GetSausage(pfx, pfy, plan.stephen.forkZ - 1) == -1)
+          plan.stephen.forkZ--;
+      }
       handled = true;
       return ReactAndCommit(plan);
     }
