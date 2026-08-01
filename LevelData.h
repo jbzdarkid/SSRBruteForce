@@ -75,10 +75,14 @@ struct Ladder {
   Direction dir;
 };
 
-enum SpecialTile : u8 {
-  Over2,
-  Over3,
-  Over2Grill,
+struct SpecialTile {
+  u16 walls = 0;
+  u16 grills = 0;
+  // |solid| and |grill| are z-levels; e.g. {0, 2} is a traditional overhang.
+  explicit constexpr SpecialTile(std::initializer_list<u8> solid, std::initializer_list<u8> grill = {}) {
+    for (u8 z : solid) walls  |= (u16)(1u << z);
+    for (u8 z : grill) grills |= (u16)(1u << z);
+  }
 };
 
 struct Sausage {
