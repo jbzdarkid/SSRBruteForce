@@ -584,7 +584,58 @@ Level GatorPaddock(12, 10, "4-6 Gator Paddock",
   {},
   {SpecialTile::Over2Grill});
 
-Level SlopeView(18, 8, "5-1 Slope View",
+Level TheGorge(20, 11, "5-1 The Gorge",
+  "            ________"
+  "            ________"
+  "            ________"
+  "            _1R1_31_"
+  "333533?33332_1____1_"
+  "333333433332_1______"
+  "333334433311________"
+  "3333344333111_______"
+  "  __##_U___1_______ "
+  "  __##__1_____1____ "
+  "       ____         ",
+  Stephen{3, 6, 3, Up},
+  {},
+  {Sausage{1, 6, 2, 6, 3}, Sausage{11, 4, 11, 5, 2}, Sausage{13, 4, 13, 5, 1}},
+  {SpecialTile::Over3});
+
+Level WidowsFinger(16, 11, "5-2 Widow's Finger",
+  "             223"
+  "             2?2"
+  "             232"
+  "         222R222"
+  "     ##  232_222"
+  "     ##  222_222"
+  "_## _____U__ _22"
+  "_##_ ________   "
+  " 1  1L_______   "
+  " 1111_1______   "
+  "     ________   ",
+  Stephen{7, 7, 0, Up},
+  {Ladder{10, 5, 2, Up}, Ladder{13, 6, 1, Up}},
+  {Sausage{8, 8, 9, 8, 0}, Sausage{11, 8, 11, 9, 0}, Sausage{13, 1, 13, 2, 2}},
+  {SpecialTile::Over2});
+
+Level Skeleton(25, 11, "5-3 Skeleton",
+  "          _______________"
+  "          _______________"
+  "          _______________"
+  "          __111_______3__"
+  "1111  _   __121_______U__"
+  "1 _#__ 111L_111__________"
+  "1 _#   2  __111__________"
+  "U_#____? ____U___________"
+  "_____?___ _______________"
+  "___112    _______________"
+  "___U__    _____ _________",
+  Stephen{12, 9, 0, Up},
+  {},
+  {Sausage{17, 4, 17, 5, 0}, Sausage{18, 4, 18, 5, 0}, Sausage{19, 4, 19, 5, 0}},
+  {SpecialTile::Over2, SpecialTile::Over2});
+
+Level SlopeView(18, 8, "5-4 Slope View",
   "        $$     1  "
   "        $$___aa_1 "
   "2222222211__R11_  "
@@ -608,6 +659,119 @@ Level LandsEnd(13, 7, "5-5 Land's End",
   Stephen{10, 2, 3, Left},
   {Ladder{1, 1, 0, Left}, Ladder{7, 0, 0, Left}, Ladder{8, 2, 0, Left}, Ladder{8, 2, 1, Left}, Ladder{10, 3, 2, Left}},
   {Sausage{9, 2, 9, 3, 2}});
+
+Level Crater(13, 7, "5-6 Crater",
+  "2222222  1 # "
+  "2     2____#_"
+  "2     2__1_1#"
+  "2    22____1_"
+  "232%%2_______"
+  "   %% _______"
+  "         _   ",
+  Stephen{12, 5, 0, Up},
+  {Ladder{0, 4, 2, Right}, Ladder{6, 4, 1, Left}, Ladder{7, 2, 0, Left}, Ladder{7, 2, 1, Left}},
+  {Sausage{2, 4, 2, 5, 2}, Sausage{8, 4, 8, 5, 0}});
+
+Level PressurePoints(18, 13, "5-7 Pressure Points",
+  "     _____        "
+  "  222_____1       "
+  "  232_____1_____  "
+  "  222__1__1_____##"
+  "  _U___U____1_1_##"
+  "  __________ ___  "
+  "  __________ 1 _  "
+  "##___?2_____ _ _  "
+  "##__________ ___  "
+  "  __________1_1   "
+  "  ____________    "
+  "           _1_1   "
+  "           ___    ",
+  Stephen{8, 8, 0, Up},
+  {Ladder{3, 3, 2, Up}},
+  {Sausage{10, 6, 10, 7, 0}, Sausage{11, 2, 11, 3, 0}},
+  {SpecialTile::Over2});
+
+Level OpenBaths(17, 19, "5-8 Open Baths",
+  "         2       "
+  "         11111   "
+  "         1   U   "
+  "         U   _   "
+  "         _   _## "
+  "         _   _ # "
+  "         _   _   "
+  "         _   _   "
+  "         _   _   "
+  "  ________112?2  "
+  "  _______1_______"
+  "  _________1_____"
+  "  ____2?____ ____"
+  "  32_11_____     "
+  "  32_11_____     "
+  "##U__U______     "
+  "##__________     "
+  "       ##        "
+  "       ##        ",
+  Stephen{2, 13, 3, Right},
+  {},
+  {Sausage{3, 13, 3, 14, 2}, Sausage{5, 13, 6, 13, 1}, Sausage{15, 10, 15, 11, 0}},
+  {SpecialTile::Over2, SpecialTile::Over2});
+
+Level Drumlin(13, 7, "5-9 Drumlin",
+  "  111        "
+  "  1111111    "
+  "22211___1    "
+  "232_1___1    "
+  "222_U___1    "
+  "_U_______##__"
+  "_________##  ",
+  Stephen{4, 6, 0, Right},
+  {Ladder{1, 4, 2, Up}},
+  {Sausage{5, 2, 5, 3, 0}, Sausage{6, 3, 6, 4, 0}, Sausage{7, 2, 7, 3, 0}});
+
+Level TarryRidge(16, 7, "5-10 Tarry Ridge",
+  "       1111111  "
+  "   ____U___2U2  "
+  "222____111____  "
+  "232____U______##"
+  "222___________##"
+  "_U_________ ##  "
+  "            ##  ",
+  Stephen{9, 4, 0, Right},
+  {Ladder{1, 4, 2, Up}},
+  {Sausage{4, 2, 4, 3, 0}, Sausage{10, 0, 11, 0, 1}});
+
+Level RoughView(11, 13, "5-11 Rough View",
+  "    ##     "
+  " R33##     "
+  " _22__  1L_"
+  "_______##__"
+  "__21___##__"
+  "___U__  1_1"
+  "  1_______1"
+  " 1____  1_1"
+  "  _1#1____1"
+  "  ___#__1_1"
+  "   __1__ _ "
+  "   1____ _ "
+  "    1___   ",
+  Stephen{5, 7, 0, Up},
+  {Ladder{3, 4, 1, Left}},
+  {Sausage{2, 2, 3, 2, 2}, Sausage{10, 3, 10, 4, 0}});
+
+Level BabyRock(14, 10, "5-12 Baby Rock",
+  "           111"
+  " __222__ __121"
+  " _R232__ ##111"
+  " __232__ ##   "
+  " __232__ _    "
+  " __222__  _   "
+  "___________1  "
+  "_2______2111  "
+  "_1_____R1122  "
+  "_U______ 1    ",
+  Stephen{6, 7, 0, Down},
+  {Ladder{3, 2, 2, Right}, Ladder{1, 8, 1, Up}},
+  {Sausage{3, 7, 4, 7, 0}, Sausage{3, 8, 4, 8, 0}});
 
 Level FolkloreSetup(8, 9, "6-2.5 Folklore Setup",
   "________"
@@ -925,5 +1089,16 @@ std::vector<Level*> tests = {
   &FoulFen,
   &CrunchyLeaves,
   &GatorPaddock,
+  &TheGorge,
+  &WidowsFinger,
+  &Skeleton,
   &SlopeView,
+  &LandsEnd,
+  &Crater,
+  &PressurePoints,
+  &OpenBaths,
+  &Drumlin,
+  &TarryRidge,
+  &RoughView,
+  &BabyRock,
 };
