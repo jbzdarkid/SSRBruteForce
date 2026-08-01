@@ -195,6 +195,6 @@ private:
   u8 _height;
   NArray<u16> _walls;
   NArray<u16> _grills;
-  NArray<u8> _ladders;
+  NArray<u16> _ladders;
   Stephen _start;
 };
