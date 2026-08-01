@@ -132,6 +132,17 @@ public:
     _level.SetState(s);
   }
 
+  // Throw the fork loose at a logical cell/height/facing (the Stephen ctor can only express a HELD fork). Applies the
+  // arena's symmetry exactly as the ctor did, then re-syncs the engine scratch so the next move sees the detached fork.
+  void SetDetachedFork(s8 x, s8 y, s8 z, Direction dir) {
+    InlineTransform(x, y);
+    dir = _sym(dir);
+    for (Stephen* p : { &_level._stephen, &_level._start }) {
+      p->forkX = x; p->forkY = y; p->forkZ = z; p->forkDir = dir;
+    }
+    _level.SetState(_level.GetState());
+  }
+
   void AssertMoveSucceeds(Direction dir) {
     Assert::IsTrue(_level.Move(_sym(dir)));
   }
@@ -158,6 +169,11 @@ public:
     else if (dir == Right) forkX++;
     Assert::AreEqual(forkX, s.stephen.forkX);
     Assert::AreEqual(forkY, s.stephen.forkY);
+  }
+
+  // The fork is held (reattached into Stephen's hand), not lying detached in the world.
+  void AssertHasFork() {
+    Assert::IsTrue(_level.GetState().stephen.HasFork());
   }
 
   void AssertSausage(Sausage expected) {

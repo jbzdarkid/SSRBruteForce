@@ -72,6 +72,24 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 0, Sausage::Cook1A});
   }
 
+  // A thrown fork lies on the very cell Stephen climbs a ladder up onto. The step-off treats it as a solid: the body
+  // shoves it one cell further along, it falls to its support, and the end-of-move reconnect takes it back into hand
+  // (5-5 Land's End m30). Without the shove it would end co-located with Stephen and never reattach.
+  MAKE_SYMMETRICAL_TEST(ForkReattachClimbingOntoThrownFork) {
+    TestSymmetryHelper level(symmetry, Level(8, 5, "arena",
+      "________"
+      "_R11____"
+      "________"
+      "________"
+      "________",
+      Stephen{1, 1, 0, Right}, {},
+      { Sausage{5, 3, 6, 3, 0}, Sausage{4, 4, 5, 4, 0}, Sausage{1, 4, 2, 4, 0} }));
+    level.SetDetachedFork(2, 1, 1, Right); // fork thrown onto the ledge Stephen climbs up onto
+    level.AssertMoveSucceeds(Right);        // climb the ladder and step off onto the fork's cell
+    level.AssertPosition(2, 1, Right);      // on the ledge; the shoved fork sits one cell ahead at (3,1)
+    level.AssertHasFork();                   // ...taken back into hand
+  }
+
   // Speared Stephen backs up, dragging the speared sausage; a hat rests on BOTH the speared sausage and Stephen's head,
   // so both its supports move -- it must ride the full drag (3-4 Cold Trail m552).
   MAKE_SYMMETRICAL_TEST(SpearedBackDragCarriesHeadSpanningHat) {
