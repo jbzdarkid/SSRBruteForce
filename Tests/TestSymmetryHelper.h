@@ -176,6 +176,30 @@ public:
     Assert::IsTrue(_level.GetState().stephen.HasFork());
   }
 
+  // Assert only Stephen's body pose (cell, height, facing), ignoring the fork -- for forkless scenarios where the fork
+  // lies detached in the world and AssertPosition's held-fork assumption doesn't apply.
+  void AssertBodyAt(s8 x, s8 y, s8 z, Direction dir) {
+    InlineTransform(x, y);
+    dir = _sym(dir);
+    State s = _level.GetState();
+    Assert::AreEqual(x, s.stephen.x);
+    Assert::AreEqual(y, s.stephen.y);
+    Assert::AreEqual(z, s.stephen.z);
+    Assert::AreEqual(dir, s.stephen.dir);
+  }
+
+  // The fork is detached (thrown loose) and resting at the given logical cell/height/facing.
+  void AssertForkAt(s8 x, s8 y, s8 z, Direction dir) {
+    InlineTransform(x, y);
+    dir = _sym(dir);
+    State s = _level.GetState();
+    Assert::IsFalse(s.stephen.HasFork());
+    Assert::AreEqual(x, s.stephen.forkX);
+    Assert::AreEqual(y, s.stephen.forkY);
+    Assert::AreEqual(z, s.stephen.forkZ);
+    Assert::AreEqual(dir, s.stephen.forkDir);
+  }
+
   void AssertSausage(Sausage expected) {
     _expected = expected; // remember the logical baseline so AssertSausageMoved can step from it
     InlineTransform(expected.x1, expected.y1);

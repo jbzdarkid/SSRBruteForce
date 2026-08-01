@@ -90,6 +90,74 @@ TEST_CLASS(OneOffTests) {
     level.AssertHasFork();                   // ...taken back into hand
   }
 
+  // A single push fans out into a branching chain: the fork shoves sausage 'a', whose two ends butt into 'b' (free to
+  // slide) and 'c' (jammed against a wall). The push must be ATOMIC -- because one branch (c) is blocked the whole
+  // thing is refused and the fork merely spears 'a'; crucially 'b' must NOT have been dragged along. Before the fix,
+  // PlanSausagePush committed the first branch before discovering the second was blocked, stranding 'b' (5-3 Skeleton
+  // m273).
+  MAKE_SYMMETRICAL_TEST(BranchingPushIsAtomicWhenOneBranchBlocked) {
+    TestSymmetryHelper level(symmetry, Level(8, 8, "arena",
+      "___1____"
+      "__bc____"
+      "__bc____"
+      "__aa____"
+      "________"
+      "__^_____"
+      "________"
+      "________"));
+    level.AssertPosition(2, 5, Up);
+    level.AssertMoveSucceeds(Up);                       // fork tries to shove 'a' up; branch 'c' is walled -> refuse+spear
+    level.AssertPosition(2, 4, Up);                     // body stepped forward, fork lodged in 'a' at (2,3)
+    level.AssertSausage({2, 3, 3, 3, 0, Sausage::None}); // 'a' did not move (speared in place)
+    level.AssertSausage({2, 1, 2, 2, 0, Sausage::None}); // 'b' did NOT get dragged -- the whole push rolled back
+    level.AssertSausage({3, 1, 3, 2, 0, Sausage::None}); // 'c' still jammed against the wall
+  }
+
+  // A FORKLESS Stephen stands on top of a vertical log and presses across it (along his own facing). Even without the
+  // fork he still log-rolls: the sausage rolls the opposite way and he rides along on top of it, while the thrown fork
+  // just sits where it landed. Before the fix, a forkless press here walked straight off instead of rolling
+  // (5-9 Drumlin m292).
+  MAKE_SYMMETRICAL_TEST(ForklessStephenLogRollsRidingTheSausage) {
+    TestSymmetryHelper level(symmetry, Level(8, 8, "arena",
+      "________"
+      "________"
+      "________"
+      "____a___"
+      "____a___"
+      "________"
+      "________"
+      "________",
+      Stephen{4, 3, 1, Left}));           // perched on the (4,3) end of the vertical log, facing Left
+    level.SetDetachedFork(1, 1, 0, Right); // fork lies loose across the arena; it must not move
+    level.AssertBodyAt(4, 3, 1, Left);
+    level.AssertMoveSucceeds(Left);                          // press Left -> log rolls Right, Stephen rides Right with it
+    level.AssertBodyAt(5, 3, 1, Left);                       // carried one cell East, still on top, still facing Left
+    level.AssertSausage({5, 3, 5, 4, 0, Sausage::Rolled});   // the log rolled one cell East
+    level.AssertForkAt(1, 1, 0, Right);                      // the detached fork stayed exactly where it was thrown
+  }
+
+  // A forkless step tries to push a sausage that the thrown fork happens to be perched ON TOP of. The real game would
+  // fling the fork along with the rolling/sliding sausage and drop it somewhere -- a rider-fling we deliberately do not
+  // model. The engine must REFUSE the step rather than silently leave the fork mis-placed (a refusal is always safe: it
+  // just prunes that path). Guards the 5-1 The Gorge fork-fling case.
+  MAKE_SYMMETRICAL_TEST(ForklessStepRefusedWhenForkRidesThePushedSausage) {
+    TestSymmetryHelper level(symmetry, Level(8, 8, "arena",
+      "________"
+      "________"
+      "________"
+      "_>aa____"
+      "________"
+      "________"
+      "________"
+      "________"));
+    level.SetDetachedFork(2, 3, 1, Right); // fork perched on top of the sausage the step would push
+    level.AssertBodyAt(1, 3, 0, Right);
+    level.AssertMoveFails(Right);          // pushing the sausage would fling the fork -> refuse the whole step
+    level.AssertBodyAt(1, 3, 0, Right);    // nothing moved
+    level.AssertSausage({2, 3, 3, 3, 0, Sausage::None});
+    level.AssertForkAt(2, 3, 1, Right);
+  }
+
   // Speared Stephen backs up, dragging the speared sausage; a hat rests on BOTH the speared sausage and Stephen's head,
   // so both its supports move -- it must ride the full drag (3-4 Cold Trail m552).
   MAKE_SYMMETRICAL_TEST(SpearedBackDragCarriesHeadSpanningHat) {

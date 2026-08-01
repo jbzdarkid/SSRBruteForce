@@ -699,7 +699,7 @@ public:
         level->SetState(state);            // solver resets before each move (not fully transactional)
         if (level->Won()) { wonBreaks++; break; }
         if (!level->Move(dir)) continue;   // discard illegal moves
-        if (level->heuristic && !level->heuristic(level)) continue;
+        if (level->heuristic && !level->heuristic(level, 0)) continue;
         State ns = level->GetState();
         sink += (u64)ns.stephen.x;         // touch the result so nothing is optimized away
         validMoves++;
@@ -784,7 +784,7 @@ public:
         level->SetState(state);
         if (level->Won()) { winsA++; break; }
         if (!level->Move(dir)) continue;
-        if (level->heuristic && !level->heuristic(level)) continue;
+        if (level->heuristic && !level->heuristic(level, 0)) continue;
         State ns = level->GetState();
         if (bigSet.find(ns) != bigSet.end()) { winsA++; break; }
       }
@@ -802,7 +802,7 @@ public:
         if (!firstDir) level->SetState(state);
         firstDir = false;
         if (!level->Move(dir)) continue;
-        if (level->heuristic && !level->heuristic(level)) continue;
+        if (level->heuristic && !level->heuristic(level, 0)) continue;
         State ns = level->GetState();
         if (bigSet.find(ns) != bigSet.end()) { winsB++; break; }
       }
@@ -820,7 +820,7 @@ public:
         if (!firstDir) level->SetState(state);
         firstDir = false;
         if (!level->Move(dir)) continue;
-        if (level->heuristic && !level->heuristic(level)) continue;
+        if (level->heuristic && !level->heuristic(level, 0)) continue;
         State ns = level->GetState();
         if (smallSet.find(ns) != smallSet.end()) { winsC++; break; }
       }

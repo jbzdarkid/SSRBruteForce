@@ -216,15 +216,19 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   // facing Right on a horizontal log, a press Up just turns him to face Up). But a fork speared into a sausage locks
   // his rotation, so a perpendicular press can no longer turn -- it rolls the log instead, whatever way he faces. The
   // sausage spins backward underfoot, so it -- and Stephen with it -- rolls one cell the OPPOSITE way to the press.
-  // A DETACHED fork can't spear and can't lock rotation, so a forkless press along his facing is a plain walk off the
-  // sausage (the reference's Laden/along-axis path), never a roll -- gate the facing-along trigger on holding the fork.
+  // Whether he holds the fork or threw it, a press ALONG his facing axis reaches the reference's walk path
+  // (TryMovePlayer), which rolls the log when that press runs across the sausage's axis -- so a forkless press along his
+  // facing rolls too (the log spins backward underfoot, carrying it and Stephen one cell the OPPOSITE way to the press).
+  // A press PERPENDICULAR to his facing is normally a free turn that leaves the log unrolled; only a fork speared into a
+  // sausage locks his rotation so that a perpendicular press rolls the log instead, whatever way he faces.
   Sausage sausage = _sausages[onSausage];
-  s8 speared = _stephen.HasFork() ? GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ) : -1;
+  bool hasFork = _stephen.HasFork();
+  s8 speared = hasFork ? GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ) : -1;
   bool facingAlongPress = (dir == Up || dir == Down) ? (_stephen.dir == Up || _stephen.dir == Down)
                                                      : (_stephen.dir == Left || _stephen.dir == Right);
   bool across = ((sausage.IsHorizontal() && (dir == Up || dir == Down))
               || (sausage.IsVertical()   && (dir == Left || dir == Right)))
-             && ((_stephen.HasFork() && facingAlongPress) || speared != -1);
+             && (facingAlongPress || speared != -1);
   if (!across) return true; // a press along the axis is just an ordinary step -- let the pipeline handle it
   Direction roll = Inverse(dir);
 
@@ -244,20 +248,24 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   // so a blocked ride refuses the whole move even once the sausage can roll.
   auto [dx, dy] = Delta(roll);
   s8 newBodyX = _stephen.x + dx, newBodyY = _stephen.y + dy;
-  s8 newForkX = _stephen.forkX + dx, newForkY = _stephen.forkY + dy;
-  if (IsWall(newBodyX, newBodyY, _stephen.z) || IsWall(newForkX, newForkY, _stephen.forkZ)) return false;
+  // A HELD fork rides the roll with the body; a DETACHED fork lies in the world and stays put (leave its pose alone).
+  s8 newForkX = hasFork ? _stephen.forkX + dx : _stephen.forkX;
+  s8 newForkY = hasFork ? _stephen.forkY + dy : _stephen.forkY;
+  if (IsWall(newBodyX, newBodyY, _stephen.z) || (hasFork && IsWall(newForkX, newForkY, _stephen.forkZ))) return false;
 
   // That same ride shoulders any sausage standing where his fork or body lands, pushing it the roll direction. Use his
   // post-ride pose so a rider is judged correctly.
   Stephen mover = _stephen;
   mover.x = newBodyX; mover.y = newBodyY;
   mover.forkX = newForkX; mover.forkY = newForkY;
-  s8 forkDest = GetSausage(newForkX, newForkY, _stephen.forkZ);
-  if (forkDest != -1 && forkDest != onSausage && forkDest != speared && !(plan.mask & (1 << forkDest))) {
-    // The fork shoves the sausage in its path -- unless a wall blocks the shove, in which case it SPEARS it instead,
-    // riding into its cell and lodging there. PlanSausagePush refuses (leaving the plan untouched)
-    // exactly when the shove hits a wall, so a refused push simply falls through to the implicit spear.
-    PlanSausagePush(forkDest, roll, plan, &mover);
+  if (hasFork) {
+    s8 forkDest = GetSausage(newForkX, newForkY, _stephen.forkZ);
+    if (forkDest != -1 && forkDest != onSausage && forkDest != speared && !(plan.mask & (1 << forkDest))) {
+      // The fork shoves the sausage in its path -- unless a wall blocks the shove, in which case it SPEARS it instead,
+      // riding into its cell and lodging there. PlanSausagePush refuses (leaving the plan untouched)
+      // exactly when the shove hits a wall, so a refused push simply falls through to the implicit spear.
+      PlanSausagePush(forkDest, roll, plan, &mover);
+    }
   }
   s8 bodyDest = GetSausage(newBodyX, newBodyY, _stephen.z);
   if (bodyDest != -1 && bodyDest != onSausage && bodyDest != speared && !(plan.mask & (1 << bodyDest)))
@@ -289,8 +297,7 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   }
   plan.stephen.x += dx;
   plan.stephen.y += dy;
-  plan.stephen.forkX += dx;
-  plan.stephen.forkY += dy;
+  if (hasFork) { plan.stephen.forkX += dx; plan.stephen.forkY += dy; } // a detached fork stays where it was thrown
   while (!SausageSupported(plan, plan.stephen.x, plan.stephen.y, plan.stephen.z)) {
     if (plan.stephen.z <= 0) return false;
     plan.stephen.z--;
@@ -751,6 +758,11 @@ bool Level::HandleStepMotion(Direction dir, bool& handled) {
     s8 bumped = GetSausage(nbx, nby, nz);
     Stephen mover = _stephen; mover.x = nbx; mover.y = nby;
     if (bumped != -1 && !PlanSausagePush(bumped, dir, plan, &mover)) return false;
+    // A thrown fork perched on top of a sausage this step just rolled/slid away would be flung along by that motion and
+    // dropped -- a rider-fling we don't model. Refuse rather than leave the fork mis-placed (a refusal never yields a
+    // false divergence; the path just isn't explored). The fork's support is the sausage directly beneath it.
+    s8 forkBase = GetSausage(_stephen.forkX, _stephen.forkY, _stephen.forkZ - 1);
+    if (forkBase != -1 && (plan.mask & (1 << forkBase))) return false;
     plan.stephen.x = nbx; plan.stephen.y = nby;
     return ReactAndCommit(plan);
   }
@@ -1121,17 +1133,24 @@ bool Level::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const S
   s8 x2 = sausage.x2 + dx;
   s8 y2 = sausage.y2 + dy;
 
+  // A push either fully commits or leaves the plan exactly as it found it: a chain that bottoms out against a wall (or
+  // a rider that can't be carried) must not strand the sausages already pushed ahead of the failure. Snapshot up front
+  // and roll back on every refusal, so a caller that reinterprets a false return -- a forward push becoming a spear --
+  // sees no partial motion. (5-3 Skeleton m273: a fork-push chain shoved one sausage before a second, wall-blocked one
+  // refused the whole push; without rollback the first stayed shoved even though the move speared instead.)
+  MovePlan snapshot = plan;
+
   // A sausage cannot be pushed into a wall.
-  if (IsWall(x1, y1, z) || IsWall(x2, y2, z)) return false;
+  if (IsWall(x1, y1, z) || IsWall(x2, y2, z)) { plan = snapshot; return false; }
 
   // Push chain: another sausage standing where an end is headed gets pushed the same way first; if it can't move, the
   // whole chain is refused. (Skip our own other end -- a slide along the axis -- and anything already pushed.)
   s8 ahead1 = GetSausage(x1, y1, z);
   if (ahead1 != -1 && ahead1 != sausageNo && !(plan.mask & (1 << ahead1)))
-    if (!PlanSausagePush(ahead1, dir, plan, mover)) return false;
+    if (!PlanSausagePush(ahead1, dir, plan, mover)) { plan = snapshot; return false; }
   s8 ahead2 = GetSausage(x2, y2, z);
   if (ahead2 != -1 && ahead2 != sausageNo && !(plan.mask & (1 << ahead2)))
-    if (!PlanSausagePush(ahead2, dir, plan, mover)) return false;
+    if (!PlanSausagePush(ahead2, dir, plan, mover)) { plan = snapshot; return false; }
 
   // A push across the sausage's long axis rolls it (flipping which side faces down); a push along the axis slides it.
   // Motion only -- gravity (Settle) and heat (CookMoved) run after commit, so it keeps its level even if now cantilevered.
@@ -1189,9 +1208,9 @@ bool Level::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const S
   s8 aboveA = GetSausage(orig.x1, orig.y1, orig.z + 1);
   s8 aboveB = GetSausage(orig.x2, orig.y2, orig.z + 1);
   if (aboveA != -1 && aboveA != sausageNo && !(plan.mask & (1 << aboveA)))
-    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) return false;
+    if (!PlanSausageCarry(aboveA, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) { plan = snapshot; return false; }
   if (aboveB != -1 && aboveB != sausageNo && aboveB != aboveA && !(plan.mask & (1 << aboveB)))
-    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) return false;
+    if (!PlanSausageCarry(aboveB, dx, dy, dir, plan, mover, /*rigid=*/!rolls)) { plan = snapshot; return false; }
   return true;
 }
 

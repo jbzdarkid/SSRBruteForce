@@ -26,10 +26,10 @@ static class Oracle {
     // Strip the "1-1 " level prefix; the rest is the game's display name verbatim
     string displayName = levelName[(levelName.IndexOf(' ') + 1)..];
     GameState island = metaGame.islands.Values.FirstOrDefault(g => g.displayname == displayName);
-    if (island == null) throw new Exception($"No island with display name '{disp}' in merged_binary");
+    if (island == null) throw new Exception($"No island with display name '{displayName}' in merged_binary");
 
     // Fresh copy so the cached island isn't mutated; strip decoration/markers off the working copy.
-    GameState work = GameState.Load(island.Save(false, false), _blob, false);
+    GameState work = GameState.Load(island.Save(false, false), null, false);
     work.entities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
     work.dynamicentities.RemoveAll(e => e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage);
 
