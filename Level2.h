@@ -38,10 +38,10 @@ private:
   struct MovePlan {
     Stephen stephen;
     Sausage sausages[NUM_SAUSAGES];
-    u16 mask = 0;
-    u16 doubleMoveMask = 0;
-    u16 preCookedMask = 0;
-    u16 rigidLoad = 0; // sausages moving as ONE rigid load with Stephen this move (speared+riders, head/fork hat+stack); co-movers must never be treated as obstacles to each other
+    u64 mask = 0;
+    u64 doubleMoveMask = 0;
+    u64 preCookedMask = 0;
+    u64 rigidLoad = 0; // sausages moving as ONE rigid load with Stephen this move (speared+riders, head/fork hat+stack); co-movers must never be treated as obstacles to each other
     Direction doubleMoveDir[NUM_SAUSAGES] = {};
     bool rotating = false;
   };
@@ -82,10 +82,10 @@ private:
   // Pivot a "clean hat" -- a sausage cantilevered on Stephen's head, plus any sausages stacked on it -- 90 degrees about
   // the head cell as he turns to |dir|. Records the rotated sausages into |plan| and |hatMask|. No-op unless a clean hat
   // is present (far half over open space, swing not wall-blocked).
-  void PlanHatRotation(Direction dir, MovePlan& plan, u16& hatMask) const;
+  void PlanHatRotation(Direction dir, MovePlan& plan, u64& hatMask) const;
 
   // A sausage resting on Stephen's head or fork rides rigidly with a step (no roll); carries riders. Wall-blocked stays.
-  void PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u16 rigidMask) const;
+  void PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u64 rigidMask) const;
 
   // Common to every motion (Level1's HandleBurnedStep): a body left resting on a grill is on hot ground, so it recoils
   // straight back the way it came as its own fresh move. Sets |handled| when it fires.
@@ -105,17 +105,17 @@ private:
   // rides with him (grown here when a climb-up shoves a resting sausage upward); such body/fork-shoved sausages are also
   // recorded in |hatMask| so the step-off treats them as a head hat rather than a rigid rider. Returns false if the
   // fork/body would move into a wall, or into a sausage that itself can't rise (which blocks the climb).
-  bool LiftStephen(s8 dz, u16& carried, u16& hatMask);
+  bool LiftStephen(s8 dz, u64& carried, u64& hatMask);
 
   // Shove sausage |sausageNo| (and everything stacked transitively on top of it) up by |dz| as Stephen climbs into it:
   // record the whole tower into |carried| and |hatMask|. Returns false if any of them would rise into a wall.
-  bool LiftSausageStack(s8 sausageNo, s8 dz, u16& carried, u16& hatMask);
+  bool LiftSausageStack(s8 sausageNo, s8 dz, u64& carried, u64& hatMask);
 
   // The mask of |base| plus every sausage stacked transitively on top of it (growing through EITHER end) -- everything
   // that rides along with |base|, rigid or not. Used both as "the rigid tower the fork carries" and as the rigid
   // co-moving load (move-stages.md: "motion is one simultaneous event") so carries never ram members of the same load
   // into each other. Returns 0 for |base| == -1.
-  u16 CarriedMask(s8 base) const;
+  u64 CarriedMask(s8 base) const;
 
   // How GrowRigidStack treats an end with no stack sausage directly beneath it (below == -1):
   enum class Cantilever {
@@ -126,13 +126,13 @@ private:
   // a stack member or an allowed cantilever (see |cant|), with at least one end on a stack member. This is the shared
   // "which carried sausages ride flat" primitive for steps and ladder climbs; a squarely-stacked rider joins, a
   // cantilevered rider joins only under Cantilever::Air (a pure translation, or a fork-locked speared base).
-  u16 GrowRigidStack(u16 seed, Cantilever cant) const;
+  u64 GrowRigidStack(u64 seed, Cantilever cant) const;
 
   // The mask of |base| plus every sausage SQUARELY stacked on it -- one whose BOTH ends rest on stack members
   // (transitively). This is the rigid unit that rides without rolling (a head hat and anything squarely stacked on it);
   // a cantilevered rider (only one end on the stack) is excluded, so it rolls when carried across its axis. Returns 0
   // for |base| == -1. Contrast CarriedMask, which grows through EITHER end (everything that rides along, rigid or not).
-  u16 FullySupportedStack(s8 base) const;
+  u64 FullySupportedStack(s8 base) const;
 
   // Step Stephen one cell in |dir| while keeping his facing, as part of a ladder climb -- either OFF the top of a ladder
   // onto a ledge (|ladderMotion| false: the body needs footing), or OUT over a ladder at the start of a descent
@@ -140,7 +140,7 @@ private:
   // destination (the reference routes ladder motion through MoveStephenThroughSpace -- the fork
   // shoves a sausage as he steps onto/over the ledge), then gravity and heat resolve. |carried| is the sausage riding on
   // the fork (it translates rigidly with him, -1 if none). Returns false on a wall, a missing ledge, or an immovable push.
-  bool StepOffLadder(Direction dir, u16 carried, bool ladderMotion, u16 hatMask = 0, u16 rollMask = 0, s8 speared = -1);
+  bool StepOffLadder(Direction dir, u64 carried, bool ladderMotion, u64 hatMask = 0, u64 rollMask = 0, s8 speared = -1);
 
   // If Stephen's fork is lodged in a sausage, drag it rigidly (the speared-motion dispatch handler). Sets |handled| and
   // performs the drag; leaves |handled| false when nothing is speared so the step/turn classification can take over.
@@ -169,7 +169,7 @@ private:
   // its own fall). |movedMask| accumulates the sausages that fell (so they get cooked at their landing cell). A sausage
   // speared on the held fork is exempt. Returns false if a sausage falls out of the bottom of the world -- the move is
   // then refused (the plan is discarded uncommitted).
-  bool Settle(MovePlan& plan, u16& movedMask, const Sausage* preMove, const Stephen& prevStephen, u16 exclude = 0);
+  bool Settle(MovePlan& plan, u64& movedMask, const Sausage* preMove, const Stephen& prevStephen, u64 exclude = 0);
 
   // Central double-move DETECTOR -- the single place every path resolves double-move. Double-move is fundamentally
   // about ROLLING: a sausage left balanced across a perpendicular base that just rolled keeps tumbling one more cell.
@@ -191,12 +191,12 @@ private:
   // sausages that must never be pushed (the double-move's own group); pushed sausages are OR'd into |pushed|. Returns
   // false only when the chain wall-bottoms (the tumble is then stopped); a shove off the world is allowed here and left
   // for the following Settle to drown (which refuses the move).
-  bool PushPlanned(MovePlan& plan, s8 sausageNo, s8 dx, s8 dy, u16 protect, u16& pushed) const;
+  bool PushPlanned(MovePlan& plan, s8 sausageNo, s8 dx, s8 dy, u64 protect, u64& pushed) const;
 
   // Stage 6 (heat). Cook every sausage in |plan|'s tableau flagged in |movedMask| (those that moved or settled this
   // turn) at its resting cell, skipping any in |preCookedMask| (already browned inline -- a grill bounce or spear-drag).
   // Returns false if a sausage would burn (an already-cooked face touching a grill again), refusing the move.
-  bool CookMoved(MovePlan& plan, u16 movedMask, u16 preCookedMask = 0);
+  bool CookMoved(MovePlan& plan, u64 movedMask, u64 preCookedMask = 0);
 
   // True if a sausage end resting at (x,y,z) has something solid under it, judged against |plan|'s working tableau:
   // terrain (ground floor or a wall-top), a sausage below in |plan.sausages|, or Stephen's body or held fork (at the
