@@ -76,15 +76,17 @@ void Solver::ProcessOneLayer(u32 depth) {
 }
 
 void Solver::FindWinningStates(u32 depth) {
+  u32 newlyWinningStates = 0;
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
     LayerCache<State> layer("depth", depth, "bucket", bucket);
     for (const State& state : layer) {
       for (Direction dir : { Up, Down, Left, Right }) {
         _level->SetState(state);
-      
+
         // We will have multiple 'winning' depths, so it's possible that we find immediately winning states.
         if (_level->Won()) {
           _winningStates.emplace(state, depth);
+          newlyWinningStates++;
           break;
         }
 
@@ -102,6 +104,8 @@ void Solver::FindWinningStates(u32 depth) {
       }
     }
   }
+
+  std::cout << "Finished identifying winning states at depth " << depth << ", and found " << newlyWinningStates << " new winning states.\n";
 }
 
 void Solver::FindFastestSolution(const State& state, std::vector<Direction>& solution, u32 score) {
