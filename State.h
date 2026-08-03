@@ -10,9 +10,15 @@
 struct State {
   Stephen stephen;
   Sausage sausages[NUM_SAUSAGES];
+#if OVERWORLD_HACK
+  u64 overworldSausages = 0;
+#endif
 
   bool operator==(const State& other) const {
     if (stephen != other.stephen) return false;
+#if OVERWORLD_HACK
+    if (overworldSausages != other.overworldSausages) return false;
+#endif
 #define o(x) if (sausages[x] != other.sausages[x]) return false;
     SAUSAGES
 #undef o

@@ -2,7 +2,7 @@
 #include <ostream>
 #include "WitnessRNG/StdLib.h"
 
-#define OVERWORLD_HACK 0
+#define OVERWORLD_HACK 1
 #ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.
     #define SAUSAGES o(0) o(1) o(2)
 #endif
@@ -154,11 +154,15 @@ class LevelData {
 public:
   friend class TestSymmetryHelper;
 
-  LevelData(u8 width, u8 height, const char* name, const char* asciiGrid,
-    const Stephen& stephen = {},
-    std::vector<Ladder> ladders = {},
-    std::vector<Sausage> sausages = {},
-    std::vector<SpecialTile> specialTiles = {});
+  LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
+    , const Stephen& stephen = {}
+    , std::vector<Ladder> ladders = {}
+    , std::vector<Sausage> sausages = {}
+    , std::vector<SpecialTile> specialTiles = {}
+#if OVERWORLD_HACK
+  , std::vector<std::pair<Stephen, const char*>> levelEntrances = {}
+#endif
+  );
   void Print() const;
   bool Won() const;
 
@@ -189,11 +193,21 @@ protected: // Used in the Level engine
 
   Stephen _stephen;
   Vector<Sausage> _sausages;
+#if OVERWORLD_HACK
+  Vector<Sausage> _overworldSausages;
+  Vector<Stephen> _levelEntrances;
+#endif
 
 private:
   u8 _width;
   u8 _height;
+
+#if OVERWORLD_HACK // GetState/SetState needs to convert the sausages into walls
+protected:
+#endif
   NArray<u16> _walls;
+
+private:
   NArray<u16> _grills;
   NArray<u16> _ladders;
   Stephen _start;

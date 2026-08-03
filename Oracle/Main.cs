@@ -30,6 +30,71 @@ static class Oracle {
       return 0;
     }
 
+    // THROWAWAY: dump one world's overworld geometry in absolute overworld coords -- global spawn, each level's
+    // entry cell, the world-sausage cells, and every island near the world (to spot connectors between land pieces).
+    if (args.Length >= 2 && args[0] == "--world-info") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      string shrine = args[1];
+      Coord so = mg.offsets[shrine];
+      Console.WriteLine($"startpos (overworld spawn) = {mg.startpos}");
+      if (mg.offsets.ContainsKey("start"))
+        Console.WriteLine($"start island: offset={mg.offsets["start"]} player={mg.islands["start"].player.pos} abs={mg.islands["start"].player.pos + mg.offsets["start"]}");
+      Console.WriteLine($"shrine {shrine}: offset={so} display=\"{mg.islands[shrine].displayname}\"");
+      var prereqs = mg.templedat.TryGetValue(shrine, out var pr) ? pr : new List<string>();
+      Console.WriteLine($"prereqs ({prereqs.Count}): {string.Join(", ", prereqs)}");
+
+      Console.WriteLine("--- world sausage (D) cells: abs = rel + shrineOffset ---");
+      foreach (var kv in mg.sausagepositions[shrine])
+        Console.WriteLine($"  rel={kv.Key} abs={kv.Key + so} dir={kv.Value}");
+
+      Console.WriteLine("--- world levels: offset, entry cell (playerpos abs), display ---");
+      var worldKeys = new List<string> { shrine };
+      worldKeys.AddRange(prereqs);
+      foreach (string k in worldKeys) {
+        string entry = mg.playerpositions.ContainsKey(k)
+          ? $"entry_abs={mg.playerpositions[k].Key + mg.offsets[k]} dir={mg.playerpositions[k].Value}"
+          : "entry=(none)";
+        string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : "?";
+        Console.WriteLine($"  {k} offset={mg.offsets[k]} {entry} \"{disp}\"");
+      }
+
+      int minx = worldKeys.Min(k => mg.offsets[k].x), maxx = worldKeys.Max(k => mg.offsets[k].x);
+      int miny = worldKeys.Min(k => mg.offsets[k].y), maxy = worldKeys.Max(k => mg.offsets[k].y);
+      Console.WriteLine($"--- world island bbox x[{minx}..{maxx}] y[{miny}..{maxy}]; islands within margin 8 ---");
+      const int margin = 8;
+      foreach (string k in mg.islandnames.OrderBy(k => mg.offsets[k].y).ThenBy(k => mg.offsets[k].x)) {
+        Coord o = mg.offsets[k];
+        if (o.x < minx - margin || o.x > maxx + margin || o.y < miny - margin || o.y > maxy + margin) continue;
+        string tag = (k == shrine ? "[SHRINE]" : mg.IsShrine(k) ? "[shrine]" : "") + (worldKeys.Contains(k) ? "[world]" : "") + (k == "start" ? "[START]" : "");
+        string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : "?";
+        Console.WriteLine($"  {k} offset={o} {tag} \"{disp}\"");
+      }
+      return 0;
+    }
+
+    // THROWAWAY: like --world-tolevelh but also merges in |extraKeys| islands (e.g. start,controls) and spawns the
+    // player at the real overworld "start" landing, so the connective land between the world's pieces is visible.
+    if (args.Length >= 2 && args[0] == "--world-render") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      var extras = args.Length >= 3 ? args[2].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() : new List<string>();
+      Console.WriteLine(EmitWorldLevel(mg, args[1], "1-final Overworld sausage", extras, preferStartPlayer: true));
+      return 0;
+    }
+
+    // NEW SCHEMA: shrines as clearable lettered sausage-walls + D as 'zz' + a levelEntrances tail. See EmitWorldSchema.
+    if (args.Length >= 2 && args[0] == "--world-schema") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      var extras = args.Length >= 3 ? args[2].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() : new List<string>();
+      Console.WriteLine(EmitWorldSchema(mg, args[1], "1-final Overworld sausage", extras, preferStartPlayer: true));
+      return 0;
+    }
+
     string levelName = args[0];
     string demos = args[1];
     if (Directory.Exists(args[1])) BulkReplay(levelName, demos);
@@ -114,23 +179,29 @@ static class Oracle {
 
   // THROWAWAY: build one world's overworld island (temple shrine + prereq level islands, merged at offsets; per-level
   // sausages dropped, world sausage kept) and emit its C++ Level(...) def with a proper OverworldSausageN var name.
-  static string EmitWorldLevel(MetaGameState mg, string shrine, string name) {
+  static string EmitWorldLevel(MetaGameState mg, string shrine, string name, List<string> extraKeys = null, bool preferStartPlayer = false) {
     var worldKeys = new List<string> { shrine };
     if (mg.templedat.TryGetValue(shrine, out var prereqs)) worldKeys.AddRange(prereqs);
+    if (extraKeys != null) worldKeys.AddRange(extraKeys);
     GameState world = GameState.Load("*", null, false);
     int id = 0;
-    Entity player = null;
+    Entity player = null, startPlayer = null;
     foreach (string key in worldKeys) {
       if (!mg.offsets.TryGetValue(key, out Coord io) || !mg.islands.ContainsKey(key)) continue;
       GameState isl = GameState.Load(mg.islands[key].Save(false, false), null, false);
       foreach (Entity e in isl.entities) {
         if (e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage || e.type == EntType.sausage) continue;
-        if (e.type == EntType.player) { if (key == shrine && player == null) { e.pos += io; player = e; } continue; }
+        if (e.type == EntType.player) {
+          if (key == "start") { e.pos += io; startPlayer = e; }
+          else if (key == shrine && player == null) { e.pos += io; player = e; }
+          continue;
+        }
         e.pos += io; e.id = id++;
         world.entities.Add(e);
         if (e.type.Dynamic()) world.dynamicentities.Add(e);
       }
     }
+    if (preferStartPlayer && startPlayer != null) player = startPlayer;
     foreach (var p in mg.sausagepositions[shrine]) {
       Entity s = new Entity(world) { type = EntType.sausage, pos = p.Key + mg.offsets[shrine], direction = p.Value, rot = 0, cookdata = 0, id = id++ };
       world.entities.Add(s); world.dynamicentities.Add(s);
@@ -141,8 +212,185 @@ static class Oracle {
     world.player = player;
     int minx = world.entities.Min(e => e.pos.x), miny = world.entities.Min(e => e.pos.y), minz = world.entities.Min(e => e.pos.z);
     string translated = GameState.Translate(world.Save(false, false), new Coord(-minx, -miny, -1 - minz));
-    string def = ConvertToLevelH(name, GameState.Load(translated, null, true));
+    string def = ConvertToLevelH(name, GameState.Load(translated, null, true), inlineLadders: false);
     return def.Replace("Level Overworldsausage(", $"Level OverworldSausage{name.Split('-')[0]}(");
+  }
+
+  // ===== NEW-SCHEMA overworld export. Unlike EmitWorldLevel (which bakes shrines as terrain and keeps only D),
+  // this emits every prereq sub-level's sausages as CLEARABLE lettered sausage-walls (uppercase A.., then a..y in
+  // grid reading order, so the C++ overworld parser's num==Size() invariant holds), the world sausage D as 'zz'
+  // (the engine's world-sausage marker), and a trailing levelEntrances list pairing each shrine's entrance pose
+  // with the string of letters it clears (strchr-matched, so one entrance can own several sausages). =====
+  static string EmitWorldSchema(MetaGameState mg, string shrine, string name, List<string> extraKeys = null, bool preferStartPlayer = false) {
+    var prereqs = mg.templedat.TryGetValue(shrine, out var pr) ? pr : new List<string>();
+    var worldKeys = new List<string> { shrine };
+    worldKeys.AddRange(prereqs);
+    if (extraKeys != null) worldKeys.AddRange(extraKeys);
+    var warnings = new List<string>();
+
+    // --- Merge terrain (drop all sausages here; we re-add them as lettered walls) and locate the spawn ---
+    GameState world = GameState.Load("*", null, false);
+    int id = 0;
+    Entity player = null, startPlayer = null;
+    foreach (string key in worldKeys) {
+      if (!mg.offsets.TryGetValue(key, out Coord io) || !mg.islands.ContainsKey(key)) continue;
+      GameState isl = GameState.Load(mg.islands[key].Save(false, false), null, false);
+      foreach (Entity e in isl.entities) {
+        if (e.Decoration() || e.type == EntType.island || e.type == EntType.spectralsausage || e.type == EntType.sausage) continue;
+        if (e.type == EntType.player) {
+          if (key == "start") { e.pos += io; startPlayer = e; }
+          else if (key == shrine && player == null) { e.pos += io; player = e; }
+          continue;
+        }
+        e.pos += io; e.id = id++;
+        world.entities.Add(e);
+        if (e.type.Dynamic()) world.dynamicentities.Add(e);
+      }
+    }
+    if (preferStartPlayer && startPlayer != null) player = startPlayer;
+    if (player == null) player = new Entity(world) { type = EntType.player, direction = Direction.North, pos = mg.sausagepositions[shrine][0].Key + mg.offsets[shrine] };
+
+    // --- Gather shrine sausages (per prereq), the world sausage D, and entrances, in ABS coords ---
+    var saus = new List<(Coord a, Coord b, string owner)>();
+    foreach (string k in prereqs) {
+      if (!mg.sausagepositions.ContainsKey(k)) continue;
+      Coord io = mg.offsets[k];
+      foreach (var kv in mg.sausagepositions[k]) { Coord a = kv.Key + io; saus.Add((a, a + kv.Value, k)); }
+    }
+    Coord dOff = mg.offsets[shrine];
+    var dkv = mg.sausagepositions[shrine][0];
+    Coord dA = dkv.Key + dOff, dB = dA + dkv.Value;
+    var entrances = new List<(string owner, Coord pos, Direction dir)>();
+    foreach (string k in prereqs)
+      if (mg.playerpositions.ContainsKey(k))
+        entrances.Add((k, mg.playerpositions[k].Key + mg.offsets[k], mg.playerpositions[k].Value));
+
+    // --- Translation (match EmitWorldLevel: floor -> z=-1, spawn -> z=0) ---
+    var everyCoord = new List<Coord>();
+    foreach (var e in world.entities) everyCoord.Add(e.pos);
+    everyCoord.Add(player.pos);
+    foreach (var s in saus) { everyCoord.Add(s.a); everyCoord.Add(s.b); }
+    everyCoord.Add(dA); everyCoord.Add(dB);
+    foreach (var en in entrances) everyCoord.Add(en.pos);
+    int minx = everyCoord.Min(c => c.x), miny = everyCoord.Min(c => c.y), minz = everyCoord.Min(c => c.z);
+    int sx = -minx, sy = -miny, sz = -1 - minz;
+    Coord T(Coord c) => new Coord(c.x + sx, c.y + sy, c.z + sz);
+
+    // --- Grid dimensions cover terrain + every sausage/D cell ---
+    var terrain = world.entities.Where(e => e.type == EntType.ground || e.type == EntType.barrier
+                                         || e.type == EntType.bbq || e.type == EntType.ladder).ToList();
+    int W = 0, H = 0;
+    void Extend(Coord c) { Coord t = T(c); W = Math.Max(W, t.x + 1); H = Math.Max(H, t.y + 1); }
+    foreach (Entity e in terrain) Extend(e.pos);
+    foreach (var s in saus) { Extend(s.a); Extend(s.b); }
+    Extend(dA); Extend(dB);
+
+    // --- Terrain char maps (same rules as ConvertToLevelH) ---
+    var solid = new HashSet<int>[H, W]; var grill = new HashSet<int>[H, W];
+    for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) { solid[y, x] = new(); grill[y, x] = new(); }
+    var ladders = new List<(int x, int y, int z, Direction dir)>();
+    foreach (Entity e in terrain) {
+      Coord t = T(e.pos); int x = t.x, y = t.y, b = t.z + 1;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (e.type == EntType.ground || e.type == EntType.barrier) solid[y, x].Add(b);
+      else if (e.type == EntType.bbq) { solid[y, x].Add(b); grill[y, x].Add(b); }
+      else if (e.type == EntType.ladder) { solid[y, x].Add(b); ladders.Add((x, y, t.z, e.direction)); }
+    }
+
+    // --- Overlay letters: D -> 'z', prereq sausages -> A..Z,a..y in grid reading order ---
+    var overlay = new char[H, W];
+    var ownerLetters = new Dictionary<string, List<char>>();
+    void Put(Coord c, char ch) {
+      Coord t = T(c);
+      if (t.x < 0 || t.y < 0 || t.x >= W || t.y >= H) { warnings.Add($"overlay cell ({t.x},{t.y}) for '{ch}' is off-grid"); return; }
+      if (overlay[t.y, t.x] != '\0') warnings.Add($"overlay collision at ({t.x},{t.y}): '{overlay[t.y, t.x]}' vs '{ch}'");
+      overlay[t.y, t.x] = ch;
+    }
+    Put(dA, 'z'); Put(dB, 'z');
+    // reading order by translated min-cell (row-major); guarantees the C++ num==Size() invariant on first encounter
+    Coord MinCell(Coord a, Coord b) { Coord ta = T(a), tb = T(b); return (ta.y < tb.y || (ta.y == tb.y && ta.x <= tb.x)) ? a : b; }
+    saus.Sort((s1, s2) => { Coord m1 = T(MinCell(s1.a, s1.b)), m2 = T(MinCell(s2.a, s2.b)); return m1.y != m2.y ? m1.y - m2.y : m1.x - m2.x; });
+    if (saus.Count > 51) warnings.Add($"{saus.Count} shrine sausages exceed the 51 letter slots (A..Z,a..y)");
+    for (int i = 0; i < saus.Count; i++) {
+      char L = i < 26 ? (char)('A' + i) : (char)('a' + (i - 26));
+      Put(saus[i].a, L); Put(saus[i].b, L);
+      if (!ownerLetters.TryGetValue(saus[i].owner, out var list)) ownerLetters[saus[i].owner] = list = new();
+      list.Add(L);
+    }
+
+    // --- Render grid chars (overlay wins; otherwise ConvertToLevelH terrain rules) ---
+    var specials = new List<string>();
+    var grid = new char[H, W];
+    for (int y = 0; y < H; y++) {
+      for (int x = 0; x < W; x++) {
+        if (overlay[y, x] != '\0') { grid[y, x] = overlay[y, x]; continue; }
+        var S = solid[y, x]; var G = grill[y, x];
+        if (S.Count == 0) { grid[y, x] = ' '; continue; }
+        int top = S.Max();
+        bool grillTop = G.Contains(top) && top <= 2;
+        bool contigFromMin = Enumerable.Range(S.Min(), top - S.Min() + 1).All(S.Contains);
+        bool grillOk = G.Count == 0 || (grillTop && G.Count == 1);
+        if (contigFromMin && grillOk) {
+          grid[y, x] = grillTop ? "#$%"[top] : "_12345678"[Math.Clamp(top, 0, 8)];
+        } else {
+          grid[y, x] = '?';
+          var wallBits = Enumerable.Range(0, S.Min()).Concat(S).OrderBy(v => v).ToList();
+          specials.Add(G.Count == 0
+            ? $"SpecialTile({{{string.Join(", ", wallBits)}}})"
+            : $"SpecialTile({{{string.Join(", ", wallBits)}}}, {{{string.Join(", ", G.OrderBy(v => v))}}})");
+        }
+      }
+    }
+
+    // --- Ladders -> explicit list (overworld mode: U/D/L/R aren't grid chars) ---
+    var kept = ladders
+      .Select(l => { var st = Step(l.dir); return (x: l.x + st.dx, y: l.y + st.dy, z: l.z, dir: CppDir(Opposite(l.dir))); })
+      .Where(l => l.x >= 0 && l.y >= 0 && l.x < W && l.y < H && l.z >= 0)
+      .Distinct().OrderBy(l => l.y).ThenBy(l => l.x).ThenBy(l => l.z).ToList();
+    foreach (var l in kept.Where(l => overlay[l.y, l.x] != '\0'))
+      warnings.Add($"ladder anchor ({l.x},{l.y},{l.z}) {l.dir} sits on a sausage-wall cell");
+
+    // --- Stephen (inline arrow when he lands at z=0 on plain ground) ---
+    Coord P = T(player.pos);
+    char StephenChar(Direction d) => d switch { Direction.North => '^', Direction.South => 'v', Direction.West => '<', Direction.East => '>', _ => '?' };
+    bool stephenInline = P.z == 0 && P.x >= 0 && P.y >= 0 && P.x < W && P.y < H
+                      && overlay[P.y, P.x] == '\0' && grid[P.y, P.x] == '_';
+    if (stephenInline) grid[P.y, P.x] = StephenChar(player.direction);
+
+    // --- levelEntrances: one entry per prereq -> (entrance pose, its letters) ---
+    var entryParts = new List<string>();
+    foreach (string k in prereqs) {
+      var en = entrances.FirstOrDefault(e => e.owner == k);
+      if (en.owner == null) { if (ownerLetters.ContainsKey(k)) warnings.Add($"prereq {k} has sausages but no entrance"); continue; }
+      if (!ownerLetters.TryGetValue(k, out var letters)) { warnings.Add($"prereq {k} has an entrance but no sausages"); continue; }
+      Coord E = T(en.pos);
+      string letterStr = new string(letters.OrderBy(c => c).ToArray());
+      entryParts.Add($"{{ Stephen{{{E.x}, {E.y}, {E.z}, {CppDir(en.dir)}}}, \"{letterStr}\" }}");
+    }
+
+    // --- Assemble ---
+    specials.Reverse(); // grid parser pops specialTiles from the back per '?'
+    var rows = new List<string>();
+    for (int y = 0; y < H; y++) {
+      var sb = new System.Text.StringBuilder();
+      for (int x = 0; x < W; x++) sb.Append(grid[y, x]);
+      rows.Add(sb.ToString());
+    }
+    string laddersArg = kept.Count == 0 ? "{}" : "{" + string.Join(", ", kept.Select(l => $"Ladder{{{l.x}, {l.y}, {l.z}, {l.dir}}}")) + "}";
+    string specialsArg = specials.Count == 0 ? "{}" : "{" + string.Join(", ", specials) + "}";
+    string stephenArg = stephenInline ? "{}" : $"Stephen{{{P.x}, {P.y}, {P.z}, {CppDir(player.direction)}}}";
+    string entrancesArg = "{\n    " + string.Join(",\n    ", entryParts) + "\n  }";
+
+    var o = new System.Text.StringBuilder();
+    if (warnings.Count > 0) o.AppendLine($"// WARNING: {string.Join("; ", warnings)}");
+    o.AppendLine($"Level OverworldSausage{name.Split('-')[0]}({W}, {H}, \"{name}\",");
+    for (int y = 0; y < H; y++) o.AppendLine($"  \"{rows[y]}\",");
+    o.AppendLine($"  {stephenArg},");
+    o.AppendLine($"  {laddersArg},");
+    o.AppendLine("  {}, // sausages: all shrine-walls + D are inline grid letters");
+    o.AppendLine($"  {specialsArg},");
+    o.Append($"  {entrancesArg});");
+    return o.ToString();
   }
 
   static void BulkReplay(string levelName, string folderPath) {
@@ -243,7 +491,7 @@ static class Oracle {
     Direction.East => Direction.West, Direction.West => Direction.East, _ => d
   };
 
-  static string ConvertToLevelH(string name, GameState gs) {
+  static string ConvertToLevelH(string name, GameState gs, bool inlineLadders = true) {
     var terrain = gs.entities.Where(e => e.type == EntType.ground || e.type == EntType.barrier
                                       || e.type == EntType.bbq    || e.type == EntType.ladder).ToList();
     int W = terrain.Max(e => e.pos.x) + 1;
@@ -349,7 +597,7 @@ static class Oracle {
         for (int z = 0; z < 9; z++) { produced.Add(z); if (!IsWallEff(ax + sx, ay + sy, z + 1)) break; }
         inlinable = produced.SetEquals(zset);
       }
-      if (inlinable) grid[ay, ax] = DirChar(dir);
+      if (inlineLadders && inlinable) grid[ay, ax] = DirChar(dir);
       else stillList.AddRange(g);
     }
     kept = stillList.OrderBy(l => l.y).ThenBy(l => l.x).ThenBy(l => l.z).ToList();

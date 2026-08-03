@@ -1,55 +1,73 @@
 ﻿#pragma once
 #include "Level2.h"
 
-// ABC: The Anchorage
-// D: Overworld Sausage 1
-// EGR: The Clover
-// FI: Burning Wharf
-// H: Bay's Neck
-// JM: Inlet Shore
-// K: Happy Pool
-// LP: Eastreach
-// NO: Little Fire
-// QV: Seafinger
-// S: Maiden's Walk
-// TU: Merchant's Elegy
-// WX: Comely Hearth
-// YZ: Fiery Jut
-// ab: Infant's Break
-// cd: Southjaunt
-// efg: Lachrymose Head
-Level OverworldSausage1(29, 26, "1-final Overworld sausage",
-  "   _______                   "
-  "   _ _   ________            "
-  " ####ABC __1_DD__            "
-  " ####ABC_________            "
-  "          _____>_            "
-  "__##EE_____________#_        "
-  "    ##   ________ _ ___FF__  "
-  "    ## ##G_______H#___I## _  "
-  "   ____##G__J_   H__  I## _  "
-  "    ##______J# _KK______L__# "
-  "    ##_   #M____   _NN#OLPP##"
-  "_##QRR_   _M___  # __#_O___  "
-  "_##Q______#S_#_ #  ______##  "
-  "_##  _#TU##S___   __ ___ ##  "
-  "   V__#TU# ____________      "
-  "   V________       WW#XX     "
-  "      ###  _       _##_      "
-  "      ###YZ_       ___       "
-  "      ###YZ_       ___       "
-  "      ###  _       aab       "
-  "                 ##__b#      "
-  "                 ## __##     "
-  "                   _____###_ "
-  "                   c##deef__ "
-  "                   c##d__fgg "
-  "                   _____###_ ",
+#if OVERWORLD_HACK
+
+// Regenerated: Oracle --world-schema temple2j1 start,controls,bridge1,improv3 -- world 1 plus the landing/controls
+// spawn and the bridge/Emerson-Jetty pathway to world 2. NEW SCHEMA: each prereq sub-level's sausages are emitted as
+// CLEARABLE lettered sausage-walls (A..Z then a.. in grid reading order); the world sausage D is 'zz'; the trailing
+// levelEntrances list pairs each shrine's entrance pose with the string of letters it clears (see SetState/GetState).
+// Start = landing '^'. Exit = world-2 entry. D is immovable until every shrine bit is set (all of world 1 beaten).
+Level OverworldSausage1(41, 37, "1-final Overworld sausage",
+  "                               ___  _    "
+  "                      ___?4?_________1 1 "
+  "                      ____?__1__     __  "
+  "                      ______11_1     1_  "
+  "                ____  __________      _  "
+  "               ______ __________      _  "
+  "               ______     _____       _  "
+  "   _______     ___11__11111______________"
+  "   _ _   _________1__    _1___    _   _2_"
+  " ####ABC __1_zz______    _____    _1  ___"
+  " ####ABC______________    ___     _      "
+  "          __________              _      "
+  "__##DD_____________#_            1__     "
+  "    ##   ________ _ ___EE__        _     "
+  "    ## ##F_______G#___H## _      ____    "
+  "   ____##F__I_   G__  H## _     ##_1_    "
+  "    ##______I# _JJ______K__#    ##___    "
+  "    ##_   #L____   _MM#NKOO##            "
+  "_##PQQ_   _L___  # __#_N___              "
+  "_##P______#R_#_ #  ______##              "
+  "_##  _#ST##R___   __ ___ ##              "
+  "   U__#ST# ____________                  "
+  "   U_______________VV#WW                 "
+  "      ###  _________##_                  "
+  "      ###XY__1________                   "
+  "      ###XY______1____                   "
+  "      ###  ________ZZa                   "
+  "            _____##__a#                  "
+  "          _ _____## __##                 "
+  "          _  __^________###_             "
+  "            _ _____b##cdde__             "
+  "            __  ___b##c__eff             "
+  "             __ ________###_             "
+  "            _ _ ____                     "
+  "             ___                         "
+  "               _                         "
+  "             __                          ",
   {},
-  {},
-  {},
-  {},
-  {{9, 3, None, "ABC"}, {16, 2, Right, "D", true}, {3, 8, None, "EGR"}, {21, 6, None, "FI"}, {20, 7, None, "H"}, {10, 9, None, "JM"}, {14, 13, None, "K"}, {25, 11, None, "LP"}, {21, 12, None, "NO"}, {4, 14, None, "QV"}, {12, 14, None, "S"}, {5, 14, None, "TU"}, {21, 14, None, "WX"}, {11, 18, None, "YZ"}, {20, 20, None, "ab"}, {20, 21, None, "cd"}, {23, 25, None, "efg"}});
+  {Ladder{18, 9, 0, Up}, Ladder{26, 9, 0, Up}},
+  {}, // sausages: all shrine-walls + D are inline grid letters
+  {SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3})},
+  {
+    { Stephen{20, 14, 0, Left}, "G" },
+    { Stephen{4, 21, 0, Up}, "PU" },
+    { Stephen{3, 15, 0, Right}, "DFQ" },
+    { Stephen{14, 20, 0, Down}, "J" },
+    { Stephen{21, 21, 0, Left}, "VW" },
+    { Stephen{21, 19, 0, Right}, "MN" },
+    { Stephen{12, 21, 0, Up}, "R" },
+    { Stephen{25, 18, 0, Left}, "KO" },
+    { Stephen{5, 21, 0, Up}, "ST" },
+    { Stephen{21, 13, 0, Right}, "EH" },
+    { Stephen{9, 10, 0, Up}, "ABC" },
+    { Stephen{10, 16, 0, Up}, "IL" },
+    { Stephen{11, 25, 0, Down}, "XY" },
+    { Stephen{23, 32, 0, Up}, "def" },
+    { Stephen{20, 27, 0, Left}, "Za" },
+    { Stephen{20, 28, 0, Right}, "bc" }
+  });
 
 // AB: Beautiful Horizon
 // CD: The Paddock
@@ -289,3 +307,6 @@ Level OverworldSausage5(73, 49, "5-final Overworld sausage",
   {Sausage{59, 6, 60, 6, 1}, Sausage{36, 7, 36, 8, 2}, Sausage{38, 7, 38, 8, 1}, Sausage{21, 8, 21, 9, 2}, Sausage{26, 9, 27, 9, 3}, Sausage{45, 12, 46, 12, 2}, Sausage{17, 27, 17, 28, 2}, Sausage{30, 29, 30, 30, 2}, Sausage{32, 29, 33, 29, 1}, Sausage{11, 34, 11, 35, 2}, Sausage{9, 36, 9, 37, 2}},
   {SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 1, 3}), SpecialTile({0, 2, 3, 4}), SpecialTile({0, 2}), SpecialTile({0, 3})},
   {{49, 6, None, "ABC"}, {58, 10, None, "D"}, {48, 17, None, "E"}, {15, 14, None, "FG"}, {23, 23, None, "HIJ"}, {59, 21, None, "KL"}, {15, 29, None, "MP"}, {29, 29, None, "N"}, {21, 35, None, "Q"}, {22, 44, None, "RS"}});
+
+
+#endif

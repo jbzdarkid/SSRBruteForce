@@ -2,12 +2,15 @@
 #include <cstdio>
 #include <vector>
 
-LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGrid,
-  const Stephen& stephen,
-  std::vector<Ladder> extraLadders,
-  std::vector<Sausage> sausages,
-  std::vector<SpecialTile> specialTiles)
-  : _width(width),
+LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
+  , const Stephen& stephen
+  , std::vector<Ladder> extraLadders
+  , std::vector<Sausage> sausages
+  , std::vector<SpecialTile> specialTiles
+#if OVERWORLD_HACK
+  , std::vector<std::pair<Stephen, const char*>> levelEntrances
+#endif
+  ) : _width(width),
     _height(height),
     _walls(NArray<u16>(_width, _height)),
     _grills(NArray<u16>(_width, _height)),
@@ -39,12 +42,12 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c == '7') { _walls(x, y) = 0b1111'1111; }
     else if (c == '8') { _walls(x, y) = 0b1'1111'1111; }
     else if (c == '?') {
-        SpecialTile tile = specialTiles.back();
-        _walls(x, y) = tile.walls;
-        _grills(x, y) = tile.grills;
-        specialTiles.pop_back();
+      SpecialTile tile = specialTiles.back();
+      _walls(x, y) = tile.walls;
+      _grills(x, y) = tile.grills;
+      specialTiles.pop_back();
     }
-#if (OVERWORLD_HACK == 0 || OVERWORLD_HACK >= 2) // need to use these capital letters for sausages I mean not really but whatever
+#if !OVERWORLD_HACK // We need a lot of sausages in the overworld levels, so ladders need to be explicit
     else if (c == 'U') { _walls(x, y) = 0b0000'0001; ladders.push_back(Ladder{x, y, 0, Up}); }
     else if (c == 'D') { _walls(x, y) = 0b0000'0001; ladders.push_back(Ladder{x, y, 0, Down}); }
     else if (c == 'L') { _walls(x, y) = 0b0000'0001; ladders.push_back(Ladder{x, y, 0, Left}); }
@@ -57,42 +60,61 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
 #if OVERWORLD_HACK
+      // Fill in the floor and the sausage as a 'wall'. They will be removed by SetState at runtime once each level is completed.
+      _walls(x, y) = 0b0000'0011;
+
       if (c >= 'A' && c <= 'Z') {
-        _walls(x, y) = 0b0000'0001;
         num = c - 'A';
       } else {
-        _walls(x, y) = 0b0000'0001;
         num = c - 'a' + 26;
       }
+
+      for (const auto& [position, letters] : levelEntrances) {
+        if (strchr(letters, c)) {
+          if (num == _overworldSausages.Size()) {
+            assert(_overworldSausages.Size() == _levelEntrances.Size()); // Should stay in sync for all levels
+            _overworldSausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
+            _levelEntrances.Push(position);
+          } else {
+            _overworldSausages[num].x2 = x;
+            _overworldSausages[num].y2 = y;
+          }
+          break;
+        }
+      }
+
+      // In the overworld, these are not real sausages -- they cannot move. Don't add them to _sausages.
+      if (c != 'z') continue;
+
+      // The final sausage will need to be movable later, so wefall through into the mainline path to add it.
+      num = 0;
+
 #else
-      if (c >= 'A' && c <= 'Z') {
+      if (c >= 'A' && c <= 'Z') { // Over air
         _walls(x, y) = 0b0000'0000;
         num = c - 'A';
-      } else {
+      } else { // Over ground
         _walls(x, y) = 0b0000'0001;
         num = c - 'a';
       }
 #endif
 
-      // We need to do this here because, even if we don't *solve* levels
-      // with less than the expected count, we still construct them.
-      assert(num <= _sausages.Size()); // There shouldn't be any gaps in level data or sausages out of order.
-      while (_sausages.Size() < num + 1) _sausages.Push({-127, -127, -127, -127, Sausage::Flags::None});
-      if (_sausages[num].x1 == x-1 && _sausages[num].y1 == y) {
-        _sausages[num].x2 = x;
-        _sausages[num].y2 = y;
-      } else if (_sausages[num].x1 == x && _sausages[num].y1 == y-1) {
-        _sausages[num].x2 = x;
-        _sausages[num].y2 = y;
+      if (num == _sausages.Size()) {
+        _sausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
       } else {
-        _sausages[num].x1 = x;
-        _sausages[num].y1 = y;
+        _sausages[num].x2 = x;
+        _sausages[num].y2 = y;
       }
     } else {
       printf("Couldn't parse character '%c' for puzzle '%s', giving up\n", c, name);
       return;
     }
   }
+
+#if OVERWORLD_HACK
+  _overworldSausages.Push(_sausages[0]); // Add the final sausage in as a wall (but not a level entrance).
+#endif
+
   if (stephen.x > -1) {
     _stephen = stephen;
     _start = stephen;

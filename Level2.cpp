@@ -14,17 +14,48 @@ State Level::GetState(bool sort) const {
       if (a.y2 != b.y2) return a.y2 - b.y2;
       if (a.flags != b.flags) return a.flags - b.flags;
       return 0;
-      });
+    });
   } else {
     // Disabled for the 'cost' computation, which needs to compare sausage positions between consecutive states
     _sausages.CopyIntoArray(s.sausages, sizeof(s.sausages));
   }
+
+#if OVERWORLD_HACK // In the overworld, sausages are walls until collected.
+  for (int i = 0; i < _levelEntrances.Size(); i++) {
+    const Sausage& sausage = _overworldSausages[i];
+    // The sausage is completed if we've already dropped the sausage-walls,
+    // or if stephen is currently on the level entrance (and thus completed the level).
+    if (!IsWall(sausage.x1, sausage.y1, sausage.z) || _stephen == _levelEntrances[i]) {
+      s.overworldSausages |= 1ull << i;
+    }
+  }
+
+  // If all other levels are cleared, mark the final sausage as cleared
+  u64 allLevelsCleared = (1ull << _levelEntrances.Size()) - 1;
+  if (s.overworldSausages == allLevelsCleared) {
+    s.overworldSausages |= (allLevelsCleared + 1);
+  }
+#endif
+
   return s;
 }
 
 void Level::SetState(const State& state) {
   _stephen = state.stephen;
   _sausages.CopyFromArray(state.sausages, sizeof(state.sausages));
+
+#if OVERWORLD_HACK // In the overworld, sausages are walls until collected.
+  for (int i = 0; i < _overworldSausages.Size(); i++) {
+    const Sausage& sausage = _overworldSausages[i];
+    if ((state.overworldSausages >> i) & 1) {
+      _walls(sausage.x1, sausage.y1) &= ~(2 << sausage.z);
+      _walls(sausage.x2, sausage.y2) &= ~(2 << sausage.z);
+    } else {
+      _walls(sausage.x1, sausage.y1) |= (2 << sausage.z);
+      _walls(sausage.x2, sausage.y2) |= (2 << sausage.z);
+    }
+  }
+#endif
 }
 
 bool Level::Move(Direction dir) {
