@@ -8,7 +8,8 @@
 param(
     [string] $TestName = "",
     [string] $DemoOverride = "",
-    [switch] $Solve
+    [switch] $Solve,
+    [switch] $DebugMode
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,7 +22,11 @@ if (-not $vsPath) { throw "No Visual Studio installation found" }
 $msbuild = Join-Path $vsPath "MSBuild\Current\Bin\MSBuild.exe"
 if (-not (Test-Path $msbuild)) { throw "Latest installation $vsPath does not have MSBuild.exe" }
 
-$Configuration = "Release"
+if ($DebugMode) {
+    $devenv = Join-Path $vsPath "Common7\IDE\devenv.exe"
+}
+
+$Configuration = if ($DebugMode) { "Debug" } else { "Release" }
 $exe = ".\x64\$Configuration\SSRBruteForce.exe"
 
 $levelDemos = @(
@@ -41,6 +46,7 @@ $levelDemos = @(
     [pscustomobject]@{ Name = "1-14 The Clover";       Dem = "1-14.dem"; Sausages = 3 }
     [pscustomobject]@{ Name = "1-15 Inlet Shore";      Dem = "1-15.dem"; Sausages = 2 }
     [pscustomobject]@{ Name = "1-16 The Anchorage";    Dem = "1-16.dem"; Sausages = 3 }
+    [pscustomobject]@{ Name = "World 1 route";         Dem = "1-route.dem"; Sausages = -1 }
     [pscustomobject]@{ Name = "2-1 Emerson Jetty";     Dem = "2-1.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "2-2 Sad Farm";          Dem = "2-2.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "2-3 Cove";              Dem = "2-3.dem";  Sausages = 2 }
@@ -86,8 +92,13 @@ $levelDemos = @(
 
 function Build-Variant {
     param([int] $N)
+    $env:_CL_ = "/DLAYERCACHE_ZSTD /DLAYERCACHE_ZSTD_LEVEL=3"
+    if ($N -eq -1) {
+      $env:_CL_ += " /DOVERWORLD_HACK=1"
+      $N = -$N
+    }
     $macro = (0..($N-1) | ForEach-Object { "o($_)" }) -join " "
-    $env:_CL_ = "/DSAUSAGES=`"$macro`" /DLAYERCACHE_ZSTD /DLAYERCACHE_ZSTD_LEVEL=3"
+    $env:_CL_ += " /DSAUSAGES=`"$macro`""
     # Rebuild since changing the _CL_ macro won't otherwise trigger a rebuild.
     & $msbuild SSRBruteForce.vcxproj /p:Configuration=$Configuration /p:Platform=x64 /p:PlatformToolset=v143 /v:minimal /m /t:Rebuild
     if ($LASTEXITCODE -ne 0) {
@@ -111,6 +122,7 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
     foreach ($lvl in $candidates) {
         if ($lvl.Sausages -ne $n) { continue }
 
+        # TODO: This is becoming a mess.
         if ($Solve) {
             echo "Solving $($lvl.Name)"
             if ($TestName) {
@@ -126,8 +138,15 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
             } else {
                 $path = $DemoOverride
             }
+            if ($DebugMode) {
+                $path = "../../" + $path
+            }
             if ($TestName) {
-                & $exe $lvl.Name $path
+                if ($DebugMode) {
+                    & $devenv /debugexe $exe $lvl.Name $path
+                } else {
+                    & $exe $lvl.Name $path
+                }
             } else {
                 & $exe $lvl.Name $path *>> $null
             }

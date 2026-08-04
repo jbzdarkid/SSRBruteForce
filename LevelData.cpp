@@ -112,13 +112,19 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
   }
 
 #if OVERWORLD_HACK
-  _overworldSausages.Push(_sausages[0]); // Add the final sausage in as a wall (but not a level entrance).
+  // Add the final sausage in as a wall (but not a level entrance).
+  if (_sausages.Size() > 0) _overworldSausages.Push(_sausages[0]);
 #endif
 
-  if (stephen.x > -1) {
+  if (stephen.x > -1 && _stephen.x > -1) {
+    // Both argument and ascii specified; _start becomes the 'level exit' and stephen is the startpoint.
+    _start = _stephen;
     _stephen = stephen;
-    _start = stephen;
+  } else if (stephen.x > -1) {
+    // Just argument specified; set both based on arg
+    _start = _stephen = stephen;
   } else if (_stephen.x > -1) {
+    // Just ascii specified; set both based on grid
     _start = _stephen;
   } else {
     printf("No stephen for puzzle '%s', giving up\n", name);
@@ -172,19 +178,36 @@ void LevelData::Print() const {
         } else if (GetSausage(x, y, z) != -1) {
           s8 sausageNo = GetSausage(x, y, z);
 #if OVERWORLD_HACK
-          if (sausageNo < 26) putchar('A' + sausageNo);
-          if (sausageNo >= 26) putchar('a' + sausageNo - 26);
+          putchar('z' - sausageNo);
 #else
           if (_walls(x, y) == 0) putchar('A' + sausageNo);
           if (_walls(x, y) != 0) putchar('a' + sausageNo);
 #endif
         }
+#if !OVERWORLD_HACK
         else if (IsLadder(x, y, z, Up))     putchar('U');
         else if (IsLadder(x, y, z, Left))   putchar('L');
         else if (IsLadder(x, y, z, Right))  putchar('R');
         else if (IsLadder(x, y, z, Down))   putchar('D');
+#endif
         else if (IsGrill(x, y, z))          putchar(" #$ %"[_grills(x, y)]);
-        else if (IsWall(x, y, z))           putchar("_12345678"[z]);
+#if OVERWORLD_HACK
+        else if (_walls(x, y) & (1 << z)) {
+          s8 overworldSausage = -1;
+          for (int i = 0; i < _levelEntrances.Size(); i++) {
+            if (_overworldSausages[i].IsAt(x, y, z - 1)) {
+              overworldSausage = i;
+              break;
+            }
+          }
+          if (overworldSausage >= 26)     putchar('a' + overworldSausage - 26);
+          else if (overworldSausage > -1) putchar('A' + overworldSausage);
+          else                            putchar("_12345678"[z]); // Not IsWall because we need to be one terrain cell lower
+          break;
+        }
+#else
+        else if (_walls(x, y) & (1 << z)) putchar("_12345678"[z]); // Not IsWall because we need to be one terrain cell lower
+#endif
         else {
           if (z > 0) continue; // Not yet handled, keep looking for something at a lower Z
           if (z == 0) putchar(' '); // Bottom of the world, put an empty cell
@@ -203,12 +226,12 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-#if !OVERWORLD_HACK
   if (_stephen != _start) return false;
-#endif
+#if !OVERWORLD_HACK
   for (Sausage sausage : _sausages) {
     if (!sausage.IsFullyCooked()) return false;
   }
+#endif
   return true;
 }
 

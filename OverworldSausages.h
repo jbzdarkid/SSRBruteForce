@@ -3,72 +3,64 @@
 
 #if OVERWORLD_HACK
 
-// Regenerated: Oracle --world-schema temple2j1 start,controls,bridge1,improv3 -- world 1 plus the landing/controls
-// spawn and the bridge/Emerson-Jetty pathway to world 2. NEW SCHEMA: each prereq sub-level's sausages are emitted as
-// CLEARABLE lettered sausage-walls (A..Z then a.. in grid reading order); the world sausage D is 'zz'; the trailing
-// levelEntrances list pairs each shrine's entrance pose with the string of letters it clears (see SetState/GetState).
-// Start = landing '^'. Exit = world-2 entry. D is immovable until every shrine bit is set (all of world 1 beaten).
-Level OverworldSausage1(41, 37, "1-final Overworld sausage",
-  "                               ___  _    "
-  "                      ___?4?_________1 1 "
-  "                      ____?__1__     __  "
-  "                      ______11_1     1_  "
-  "                ____  __________      _  "
-  "               ______ __________      _  "
-  "               ______     _____       _  "
-  "   _______     ___11__11111______________"
-  "   _ _   _________1__    _1___    _   _2_"
-  " ####ABC __1_zz______    _____    _1  ___"
-  " ####ABC______________    ___     _      "
-  "          __________              _      "
-  "__##DD_____________#_            1__     "
-  "    ##   ________ _ ___EE__        _     "
-  "    ## ##F_______G#___H## _      ____    "
-  "   ____##F__I_   G__  H## _     ##_1_    "
-  "    ##______I# _JJ______K__#    ##___    "
-  "    ##_   #L____   _MM#NKOO##            "
-  "_##PQQ_   _L___  # __#_N___              "
-  "_##P______#R_#_ #  ______##              "
-  "_##  _#ST##R___   __ ___ ##              "
-  "   U__#ST# ____________                  "
-  "   U_______________VV#WW                 "
-  "      ###  _________##_                  "
-  "      ###XY__1________                   "
-  "      ###XY______1____                   "
-  "      ###  ________ZZa                   "
-  "            _____##__a#                  "
-  "          _ _____## __##                 "
-  "          _  __^________###_             "
-  "            _ _____b##cdde__             "
-  "            __  ___b##c__eff             "
-  "             __ ________###_             "
-  "            _ _ ____                     "
-  "             ___                         "
-  "               _                         "
-  "             __                          ",
+Level OverworldSausage1(30, 33, "World 1 route",
+  "                ____       __ "
+  "               ______      __ "
+  "               ______     ____"
+  "   _______     ___11__11111___"
+  "   _ _   _________1__    _1___"
+  " ####ABC __1_zz______    _>___"
+  " ####ABC______________    ___ "
+  "          __________          "
+  "__##DD_____________#_         "
+  "    ##   ________ _ ___EE__   "
+  "    ## ##F_______G#___H## _   "
+  "   ____##F__I_   G__  H## _   "
+  "    ##______I# _JJ______K__#  "
+  "    ##_   #L____   _MM#NKOO## "
+  "_##PQQ_   _L___  # __#_N___   "
+  "_##P______#R_#_ #  ______##   "
+  "_##  _#ST##R___   __ ___ ##   "
+  "   U__#ST# ____________       "
+  "   U_______________VV#WW      "
+  "      ###  _________##_       "
+  "      ###XY__1________        "
+  "      ###XY______1____        "
+  "      ###  ________ZZa        "
+  "            _____##__a#       "
+  "          _ _____## __##      "
+  "          _  ___________###_  "
+  "            _ _____b##cdde__  "
+  "            __  ___b##c__eff  "
+  "             __ ________###_  "
+  "            _ _ ____          "
+  "             ___              "
+  "               _              "
+  "             __               ",
+  Stephen{15, 25, 0, Up},
+  {Ladder{18, 5, 0, Up}, Ladder{26, 5, 0, Up}},
   {},
-  {Ladder{18, 9, 0, Up}, Ladder{26, 9, 0, Up}},
-  {}, // sausages: all shrine-walls + D are inline grid letters
-  {SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3})},
+  {},
   {
-    { Stephen{20, 14, 0, Left}, "G" },
-    { Stephen{4, 21, 0, Up}, "PU" },
-    { Stephen{3, 15, 0, Right}, "DFQ" },
-    { Stephen{14, 20, 0, Down}, "J" },
-    { Stephen{21, 21, 0, Left}, "VW" },
-    { Stephen{21, 19, 0, Right}, "MN" },
-    { Stephen{12, 21, 0, Up}, "R" },
-    { Stephen{25, 18, 0, Left}, "KO" },
-    { Stephen{5, 21, 0, Up}, "ST" },
-    { Stephen{21, 13, 0, Right}, "EH" },
-    { Stephen{9, 10, 0, Up}, "ABC" },
-    { Stephen{10, 16, 0, Up}, "IL" },
-    { Stephen{11, 25, 0, Down}, "XY" },
-    { Stephen{23, 32, 0, Up}, "def" },
-    { Stephen{20, 27, 0, Left}, "Za" },
-    { Stephen{20, 28, 0, Right}, "bc" }
+    { Stephen{9, 6, 0, Up}, "ABC" }, // The Anchorage
+    { Stephen{3, 11, 0, Right}, "DFQ" }, // The Clover
+    { Stephen{21, 9, 0, Right}, "EH" }, // Burning Wharf
+    { Stephen{20, 10, 0, Left}, "G" }, // Bay's Neck
+    { Stephen{10, 12, 0, Up}, "IL" }, // Inlet Shore
+    { Stephen{14, 16, 0, Down}, "J" }, // Happy Pool
+    { Stephen{25, 14, 0, Left}, "KO" }, // Eastreach
+    { Stephen{21, 15, 0, Right}, "MN" }, // Little Fire
+    { Stephen{4, 17, 0, Up}, "PU" }, // Seafinger
+    { Stephen{12, 17, 0, Up}, "R" }, // Maiden's Walk
+    { Stephen{5, 17, 0, Up}, "ST" }, // Merchant's Elegy
+    { Stephen{21, 17, 0, Left}, "VW" }, // Comely Hearth
+    { Stephen{11, 21, 0, Down}, "XY" }, // Fiery Jut
+    { Stephen{20, 23, 0, Left}, "Za" }, // Infant's Break
+    { Stephen{20, 24, 0, Right}, "bc" }, // Southjaunt
+    { Stephen{23, 28, 0, Up}, "def" } // Lachrymose Head
   });
 
+  /*
 // AB: Beautiful Horizon
 // CD: The Paddock
 // EF: The Great Tower
@@ -309,4 +301,5 @@ Level OverworldSausage5(73, 49, "5-final Overworld sausage",
   {{49, 6, None, "ABC"}, {58, 10, None, "D"}, {48, 17, None, "E"}, {15, 14, None, "FG"}, {23, 23, None, "HIJ"}, {59, 21, None, "KL"}, {15, 29, None, "MP"}, {29, 29, None, "N"}, {21, 35, None, "Q"}, {22, 44, None, "RS"}});
 
 
+  */
 #endif

@@ -357,16 +357,18 @@ static class Oracle {
                       && overlay[P.y, P.x] == '\0' && grid[P.y, P.x] == '_';
     if (stephenInline) grid[P.y, P.x] = StephenChar(player.direction);
 
-    // --- levelEntrances: one entry per prereq -> (entrance pose, its letters) ---
-    var entryParts = new List<string>();
+    // --- levelEntrances: one entry per prereq (entrance pose + its letters), sorted by letter for readability ---
+    var entries = new List<(string letters, string name, string init)>();
     foreach (string k in prereqs) {
       var en = entrances.FirstOrDefault(e => e.owner == k);
       if (en.owner == null) { if (ownerLetters.ContainsKey(k)) warnings.Add($"prereq {k} has sausages but no entrance"); continue; }
       if (!ownerLetters.TryGetValue(k, out var letters)) { warnings.Add($"prereq {k} has an entrance but no sausages"); continue; }
       Coord E = T(en.pos);
       string letterStr = new string(letters.OrderBy(c => c).ToArray());
-      entryParts.Add($"{{ Stephen{{{E.x}, {E.y}, {E.z}, {CppDir(en.dir)}}}, \"{letterStr}\" }}");
+      string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : k;
+      entries.Add((letterStr, disp, $"{{ Stephen{{{E.x}, {E.y}, {E.z}, {CppDir(en.dir)}}}, \"{letterStr}\" }}"));
     }
+    entries.Sort((a, b) => string.CompareOrdinal(a.letters, b.letters));
 
     // --- Assemble ---
     specials.Reverse(); // grid parser pops specialTiles from the back per '?'
@@ -379,7 +381,7 @@ static class Oracle {
     string laddersArg = kept.Count == 0 ? "{}" : "{" + string.Join(", ", kept.Select(l => $"Ladder{{{l.x}, {l.y}, {l.z}, {l.dir}}}")) + "}";
     string specialsArg = specials.Count == 0 ? "{}" : "{" + string.Join(", ", specials) + "}";
     string stephenArg = stephenInline ? "{}" : $"Stephen{{{P.x}, {P.y}, {P.z}, {CppDir(player.direction)}}}";
-    string entrancesArg = "{\n    " + string.Join(",\n    ", entryParts) + "\n  }";
+    string entrancesArg = "{\n" + string.Join("\n", entries.Select((e, i) => $"    {e.init}{(i < entries.Count - 1 ? "," : "")} // {e.name}")) + "\n  }";
 
     var o = new System.Text.StringBuilder();
     if (warnings.Count > 0) o.AppendLine($"// WARNING: {string.Join("; ", warnings)}");

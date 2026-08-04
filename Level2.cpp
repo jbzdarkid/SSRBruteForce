@@ -1191,6 +1191,10 @@ void Level::PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& pl
 
 bool Level::PlanSausagePush(s8 sausageNo, Direction dir, MovePlan& plan, const Stephen* mover) const {
   Sausage sausage = _sausages[sausageNo];
+#if OVERWORLD_HACK // Sausage may not be pushed in the overworld if there's a wall in the way.
+  if (IsWall(sausage.x1, sausage.y1, sausage.z) || IsWall(sausage.x2, sausage.y2, sausage.z)) return false;
+#endif
+
   auto [dx, dy] = Delta(dir);
   s8 z = sausage.z;
   s8 x1 = sausage.x1 + dx;

@@ -2,7 +2,6 @@
 #include <ostream>
 #include "WitnessRNG/StdLib.h"
 
-#define OVERWORLD_HACK 1
 #ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.
     #define SAUSAGES o(0) o(1) o(2)
 #endif

@@ -144,50 +144,6 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
   printf("  wrote %d leaf demos (of %d landmarks) -> %s/\n", n, landmarks, outDir.c_str());
 }
 
-// Replay every .dem in |dir| through THIS build's engine and compare the engine's end-of-simulation geometry to the
-// state recorded on the demo's trailing line (written by whichever engine generated it). Prints how many demos the
-// current engine ends differently on. Built into both engines, so running it from the reference build over Level2's
-// demos reports exactly where the reference disagrees with Level2 (and, since Level2 tracks the game almost perfectly,
-// with the game). Non-destructive: the demos are only read.
-static void Reverify(Level* level, const std::string& dir) {
-  State start = level->GetState();
-  int total = 0, changed = 0;
-  std::vector<std::string> mismatches;
-  for (const auto& e : std::filesystem::directory_iterator(dir)) {
-    if (e.path().extension() != ".dem") continue;
-    std::vector<Direction> moves;
-    std::string recorded;
-    {
-      std::ifstream in(e.path());
-      std::string line;
-      bool afterStop = false;
-      while (std::getline(in, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line == "Stop") { afterStop = true; continue; }
-        if (afterStop) { if (recorded.empty()) recorded = line; continue; }
-        if      (line == "North") moves.push_back(Up);
-        else if (line == "South") moves.push_back(Down);
-        else if (line == "East")  moves.push_back(Right);
-        else if (line == "West")  moves.push_back(Left);
-      }
-    }
-    level->SetState(start);
-    for (Direction d : moves) {
-      if (!level->Move(d)) break;
-      if (level->Won()) break;
-    }
-    std::ostringstream oss;
-    oss << level->GetState();
-    total++;
-    if (oss.str() != recorded) {
-      changed++;
-      if (mismatches.size() < 20) mismatches.push_back(e.path().filename().string());
-    }
-  }
-  printf("Reverify %s: %d demos, %d end differently from the recorded state.\n", dir.c_str(), total, changed);
-  for (const std::string& m : mismatches) printf("  %s\n", m.c_str());
-}
-
 bool TestLevel(Level* level, std::vector<Direction> moves) {
   printf("=== initial state ===\n");
   level->Print();
@@ -199,6 +155,7 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
     bool success = level->Move(dir);
 
     State state = level->GetState();
+    level->SetState(state); // Re-materialize overworld walls from the new bit-state (no-op for normal levels).
     printf("\n=== move %d: %s %s ===\n", (i+1), DIR_NAMES[dir], (success ? "SUCCEEDED" : "FAILED"));
 
     u32 moveUnits = Solver(level).ComputeScore(previousState, dir, state);
@@ -254,13 +211,6 @@ int main(int argc, char* argv[]) {
         std::string safe = test->name;
         for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
         RRTExplore(test, iterations, rolloutLen, bin, 8, seed, "oracle-demos/" + safe);
-        return 0;
-      }
-      if (demoPath == "reverify") {
-        std::string safe = test->name;
-        for (char& c : safe) if (!std::isalnum((unsigned char)c)) c = '_';
-        std::string dir = (argc >= 4) ? std::string{ argv[3] } : ("oracle-demos/" + safe);
-        Reverify(test, dir);
         return 0;
       }
       std::ifstream file(demoPath);
