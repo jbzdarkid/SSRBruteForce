@@ -522,7 +522,8 @@ Level WretchsRetreat(11, 8, "4-1 Wretch's Retreat",
   "____bb_>___"
   "___________");
 
-Level ToadsFolly(10, 10, "4-2 Toad's Folly",
+Level ToadsFolly = [] {
+  Level toadsFolly(10, 10, "4-2 Toad's Folly",
   "__________"
   "_##_______"
   "_##_____2_"
@@ -536,6 +537,19 @@ Level ToadsFolly(10, 10, "4-2 Toad's Folly",
   {},
   {},
   {Sausage{7, 2, 8, 2, 2}, Sausage{7, 8, 8, 8, 1}});
+  toadsFolly.heuristic = [](const Level* level, u32 depth) {
+    // This level has 3 sausages, one of which is on a 2-high pillar.
+    // To beat the level, you must knock it off the pillar and cook it.
+    // The fastest any path does this is move 84,
+    // so we allocate +10 moves in case there's a more efficient setup for the other sausages.
+    if (depth < 94) return true; // move-84 clear + 10-move buffer
+    for (const Sausage& sausage : level->GetSausages()) {
+      if (sausage.IsAt(8, 2, 2)) return false;
+    }
+    return true;
+  }
+  return toadsFolly;
+}();
 
 Level SludgeCoast(10, 11, "4-3 Sludge Coast",
   "11111_____"
