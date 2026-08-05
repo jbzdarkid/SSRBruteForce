@@ -4,6 +4,7 @@
 #include "Levels.h"    // ColdTrail (to benchmark real Move expansion on cached states)
 
 #include <absl/container/flat_hash_map.h> // mirrors Solver's _winningStates for the Stage-2 bench
+#include <absl/container/flat_hash_set.h> // BFS closed set for the endgame-explosion proof
 
 #include <algorithm>
 #include <array>
@@ -13,6 +14,7 @@
 #include <cstring>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <intrin.h>
 #include <limits>
 #include <string>
@@ -841,5 +843,698 @@ public:
 
     // The Won() hoist must not change which states are winning (same set, same logic).
     Assert::AreEqual(winsA, winsB, L"Won() hoist changed the winning-state count");
+  }
+
+  // Confirms (safely, no unbounded exploration) whether an EARLIER pillar gate would have helped. The tightest gate
+  // that keeps a solution admits only the earliest knockdowns (pillar cleared by depth 84 -- the earliest any reachable
+  // state clears it is depth 83). We build the set of states reachable from JUST those early knockdowns while keeping
+  // the pillar clear (memory-capped, so it can never blow up), then measure what fraction of the ACTUAL gated cache
+  // layers past depth 94 those early lineages already reproduce. If coverage is ~100%, the late (buffer) knockdowns add
+  // nothing -- an earlier gate would produce the same deep layers, so it would NOT have relieved the explosion.
+  TEST_METHOD(ToadsFollyEarlyKnockdownCoverage) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    Level* level = &ToadsFolly;
+    auto occupied = [](const State& s) {
+      for (const Sausage& sg : s.sausages) if (sg.IsAt(8, 2, 2)) return true;
+      return false;
+    };
+
+    // 1) Earliest-knockdown seeds: every pillar-cleared state at depth 83-84 (survive the tightest meaningful gate).
+    std::vector<State> seeds;
+    for (int d : { 83, 84 }) {
+      for (int b = 0; b < 32; b++) {
+        try {
+          LayerCache<State> layer("depth", d, "bucket", b);
+          for (const State& s : layer) if (!occupied(s)) seeds.push_back(s);
+        } catch (const std::exception&) {}
+      }
+    }
+    Logger::WriteMessage(std::format("earliest-knockdown seeds (pillar cleared by depth 84): {}\n", seeds.size()).c_str());
+    if (seeds.empty()) { std::filesystem::current_path(savedCwd); Logger::WriteMessage("SKIP: no early seeds found.\n"); return; }
+
+    // 2) Build the pillar-clear reachable set from those early seeds, HARD-capped so RAM stays bounded (~1.5 GB).
+    const size_t cap = 30'000'000;
+    absl::flat_hash_set<State> seen(seeds.begin(), seeds.end());
+    std::vector<State> cur(seeds), next;
+    bool hitCap = false; int reachedDepth = 84;
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int step = 1; step <= 60 && !hitCap; step++) {
+      next.clear();
+      for (const State& st : cur) {
+        for (Direction dir : { Up, Down, Left, Right }) {
+          level->SetState(st);
+          if (!level->Move(dir)) continue;
+          State ns = level->GetState();
+          if (occupied(ns)) continue; // keep the pillar clear (an earlier gate would too)
+          if (seen.insert(ns).second) { next.push_back(ns); if (seen.size() >= cap) { hitCap = true; break; } }
+        }
+        if (hitCap) break;
+      }
+      cur.swap(next); reachedDepth = 84 + step;
+      if (cur.empty()) break;
+    }
+    auto el = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - t0).count();
+    Logger::WriteMessage(std::format("early-reachable set: {} states, BFS reached ~depth {}{}  ({}s)\n",
+      seen.size(), reachedDepth, hitCap ? " (memory-capped)" : "", (long long)el).c_str());
+
+    // 3) Coverage: for gated cache layers past the cutoff, what fraction is already reproduced by early knockdowns?
+    //    Only trust depths comfortably below reachedDepth (early lineages need a few extra moves to arrive).
+    std::string out = "\n=== gated cache layer vs early-knockdown coverage (bucket 0) ===\n depth | pillar-clear states | reproduced by early | coverage%\n";
+    for (int d : { 94, 96, 98, 100, 103, 106, 110 }) {
+      if (d > reachedDepth - 3) { out += std::format("  {:>4} | (beyond early-BFS reach -- skipped)\n", d); continue; }
+      u64 nClear = 0, covered = 0;
+      try {
+        LayerCache<State> layer("depth", d, "bucket", 0);
+        for (const State& s : layer) { if (occupied(s)) continue; nClear++; if (seen.contains(s)) covered++; if (nClear >= 3000000) break; }
+      } catch (const std::exception&) {}
+      out += std::format("  {:>4} | {:>19} | {:>19} | {:6.2f}%\n", d, nClear, covered, nClear ? 100.0 * covered / nClear : 0.0);
+    }
+    Logger::WriteMessage(out.c_str());
+
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(!seeds.empty());
+  }
+
+  // Designs a second (endgame) filter that keeps the loose pillar buffer. Replays the confirmed 142-move solution to
+  // find the tight region its sausages occupy during the cooking endgame, then measures how many deep cache states
+  // (depths 120-141) have a sausage OUTSIDE that region -- i.e. the prune yield of an "all sausages within the cooking
+  // box" filter that bites before the state space blows up.
+  TEST_METHOD(ToadsFollySecondFilterDesign) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    const std::filesystem::path root = std::filesystem::current_path();
+    Level* level = &ToadsFolly;
+
+    std::vector<Direction> moves;
+    { std::ifstream in(root / "toads-folly-142.dem"); std::string line;
+      while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "North") moves.push_back(Up); else if (line == "South") moves.push_back(Down);
+        else if (line == "East") moves.push_back(Right); else if (line == "West") moves.push_back(Left);
+      }
+    }
+    if (moves.empty()) { std::filesystem::current_path(savedCwd); Logger::WriteMessage("SKIP: toads-folly-142.dem not found.\n"); return; }
+
+    auto maxXY = [](const State& s, int& mx, int& my) {
+      mx = -99; my = -99;
+      for (const Sausage& sg : s.sausages) {
+        mx = (std::max)(mx, (std::max)((int)sg.x1, (int)sg.x2));
+        my = (std::max)(my, (std::max)((int)sg.y1, (int)sg.y2));
+      }
+    };
+
+    // 1) Replay, recording the sausages' (maxX, maxY) at each depth.
+    std::vector<std::pair<int, int>> env(moves.size() + 1, { -99, -99 });
+    const State init = level->GetState();
+    level->SetState(init);
+    { int mx, my; maxXY(level->GetState(), mx, my); env[0] = { mx, my }; }
+    u32 depth = 0;
+    for (Direction d : moves) { if (!level->Move(d)) break; depth++; int mx, my; maxXY(level->GetState(), mx, my); env[depth] = { mx, my }; if (level->Won()) break; }
+
+    std::string out = "\n=== 142-solution sausage envelope (max x, max y over all halves) by depth ===\n";
+    for (u32 d = 90; d <= depth; d += 2) out += std::format("  depth {:>3}: maxX={:>2} maxY={:>2}\n", d, env[d].first, env[d].second);
+    for (int D : { 100, 110, 120, 125 }) {
+      int mx = -99, my = -99;
+      for (u32 d = (u32)D; d <= depth; d++) { mx = (std::max)(mx, env[d].first); my = (std::max)(my, env[d].second); }
+      out += std::format("tightest sound box for gate depth >= {}: maxX<={}, maxY<={}\n", D, mx, my);
+    }
+    Logger::WriteMessage(out.c_str());
+
+    // 2) Prune yield: fraction of deep cache states with a sausage OUTSIDE a candidate box.
+    struct Box { int bx, by; };
+    Box boxes[] = { { 4, 3 }, { 5, 3 }, { 5, 4 }, { 6, 4 } };
+    std::string out3 = "\n=== prune yield of 'every sausage half x<=BX and y<=BY' (bucket 0, first <=3M) ===\n";
+    for (const Box& box : boxes) {
+      out3 += std::format(" box x<={} y<={}:\n", box.bx, box.by);
+      for (int d : { 120, 125, 130, 135, 141 }) {
+        u64 n = 0, pruned = 0;
+        try {
+          LayerCache<State> layer("depth", d, "bucket", 0);
+          for (const State& s : layer) {
+            n++;
+            bool outOfBox = false;
+            for (const Sausage& sg : s.sausages)
+              if (sg.x1 > box.bx || sg.x2 > box.bx || sg.y1 > box.by || sg.y2 > box.by) { outOfBox = true; break; }
+            if (outOfBox) pruned++;
+            if (n >= 3000000) break;
+          }
+        } catch (const std::exception&) {}
+        out3 += std::format("   depth {:>3}: n={:>9} pruned={:>9} ({:5.1f}%)\n", d, n, pruned, n ? 100.0 * pruned / n : 0.0);
+      }
+    }
+    Logger::WriteMessage(out3.c_str());
+
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(!moves.empty());
+  }
+
+  // Regression guard: the two-filter heuristic (pillar + cooking box) must not prune any state on the confirmed
+  // 142-move solution. Fails loudly if either gate is ever tightened enough to kill the solution.
+  TEST_METHOD(ToadsFollyHeuristicKeepsSolution) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    const std::filesystem::path root = std::filesystem::current_path();
+    Level* level = &ToadsFolly;
+    Assert::IsTrue(level->heuristic != nullptr, L"ToadsFolly has no heuristic");
+
+    std::vector<Direction> moves;
+    { std::ifstream in(root / "toads-folly-142.dem"); std::string line;
+      while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "North") moves.push_back(Up); else if (line == "South") moves.push_back(Down);
+        else if (line == "East") moves.push_back(Right); else if (line == "West") moves.push_back(Left);
+      }
+    }
+    if (moves.empty()) { std::filesystem::current_path(savedCwd); Logger::WriteMessage("SKIP: toads-folly-142.dem not found.\n"); return; }
+
+    const State initialState = level->GetState();
+    level->SetState(initialState);
+    int prunedAt = -1; u32 depth = 0;
+    if (!level->heuristic(level, depth)) prunedAt = 0;
+    for (Direction d : moves) {
+      if (!level->Move(d)) break;
+      depth++;
+      if (prunedAt < 0 && !level->heuristic(level, depth)) prunedAt = (int)depth;
+      if (level->Won()) break;
+    }
+    const bool won = level->Won();
+    std::filesystem::current_path(savedCwd);
+    Logger::WriteMessage(std::format("142-solution vs admissible heuristic: replayed {} moves, won={}, first pruned depth={} (-1 = never pruned)\n",
+      depth, won ? "yes" : "no", prunedAt).c_str());
+    Assert::IsTrue(won, L"demo did not reach Won()");
+    Assert::AreEqual(-1, prunedAt, L"heuristic pruned a state on the confirmed optimal path");
+  }
+
+  // Toward a RIGID (provably sound) endgame bound rather than the survey box. (1) Measures the per-move speed limit --
+  // how far a sausage half can move in one move, including being pushed/chain-rolled (GetState(false) keeps sausage
+  // indices stable so we can track each one across the move). (2) From that, a sausage that is not fully cooked needs
+  // at least (Manhattan-distance-to-grill / speed) moves just to reach the grill, so a state at depth d with budget
+  // 142-d is provably dead if any uncooked sausage is farther than that. Reports where such a rigid bound actually bites.
+  TEST_METHOD(ToadsFollyRigidBound) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    Level* level = &ToadsFolly;
+    const int W = 10, H = 10, kWin = 142;
+    const std::pair<int, int> grill[] = { {1,1},{2,1},{1,2},{2,2} };
+    auto manhToGrill = [&](int x, int y) { int m = 999; for (auto& g : grill) m = (std::min)(m, std::abs(x - g.first) + std::abs(y - g.second)); return m; };
+
+    // 1) Max per-move sausage-half displacement (Manhattan and Chebyshev), tracked by index via GetState(false).
+    int maxManh = 0, maxCheb = 0; State exB{}, exA{}; int exDir = -1;
+    for (int d : { 100, 110, 119 }) {
+      for (int b = 0; b < 2; b++) {
+        try {
+          LayerCache<State> layer("depth", d, "bucket", b);
+          u64 cnt = 0;
+          for (const State& s : layer) {
+            for (Direction dir : { Up, Down, Left, Right }) {
+              level->SetState(s);
+              if (!level->Move(dir)) continue;
+              State ns = level->GetState(false); // unsorted: sausage[i] still corresponds to s.sausage[i]
+              for (int i = 0; i < NUM_SAUSAGES; i++) {
+                const Sausage& a = s.sausages[i]; const Sausage& c = ns.sausages[i];
+                int m1 = std::abs(c.x1 - a.x1) + std::abs(c.y1 - a.y1);
+                int m2 = std::abs(c.x2 - a.x2) + std::abs(c.y2 - a.y2);
+                int ch = (std::max)({ std::abs(c.x1 - a.x1), std::abs(c.y1 - a.y1), std::abs(c.x2 - a.x2), std::abs(c.y2 - a.y2) });
+                int mm = (std::max)(m1, m2);
+                if (mm > maxManh) { maxManh = mm; exB = s; exA = ns; exDir = dir; }
+                maxCheb = (std::max)(maxCheb, ch);
+              }
+            }
+            if (++cnt >= 300000) break;
+          }
+        } catch (const std::exception&) {}
+      }
+    }
+    std::string out = std::format("\n=== per-move sausage-half displacement (sampled depths 100/110/119) ===\n"
+      "max Manhattan step = {}   max Chebyshev step = {}\n", maxManh, maxCheb);
+    if (exDir >= 0) {
+      const char* dn = exDir == Up ? "Up" : exDir == Down ? "Down" : exDir == Left ? "Left" : exDir == Right ? "Right" : "?";
+      out += std::format("worst example (move {}):\n", dn);
+      for (int i = 0; i < NUM_SAUSAGES; i++)
+        out += std::format("  s{}: ({},{})-({},{}) z{}  ->  ({},{})-({},{}) z{}\n", i,
+          (int)exB.sausages[i].x1, (int)exB.sausages[i].y1, (int)exB.sausages[i].x2, (int)exB.sausages[i].y2, (int)exB.sausages[i].z,
+          (int)exA.sausages[i].x1, (int)exA.sausages[i].y1, (int)exA.sausages[i].x2, (int)exA.sausages[i].y2, (int)exA.sausages[i].z);
+    }
+    Logger::WriteMessage(out.c_str());
+
+    // 2) Rigid bite: an uncooked sausage needs >= ceil(ManhToGrill / maxManh) moves to reach the grill.
+    const int speed = (std::max)(1, maxManh);
+    int worstCell = 0; for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) worstCell = (std::max)(worstCell, manhToGrill(x, y));
+    std::string out2 = std::format("\n=== rigid 'uncooked sausage too far to reach the grill' bound (speed {}/move) ===\n"
+      "worst on-grid Manhattan-to-grill = {}  (so the bound cannot bite until budget < {})\n"
+      " depth | budget | dead if manhToGrill > | # of 100 grid cells that fails\n", speed, worstCell, worstCell);
+    for (int depth : { 120, 125, 128, 130, 132, 135, 138, 141 }) {
+      int budget = kWin - depth;
+      int thresh = budget * speed;
+      int dead = 0; for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) if (manhToGrill(x, y) > thresh) dead++;
+      out2 += std::format("  {:>4} | {:>6} | {:>21} | {}\n", depth, budget, thresh, dead);
+    }
+    Logger::WriteMessage(out2.c_str());
+
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(true);
+  }
+
+  // RIGID cooking-time bound, measured on a synthetic OPEN arena (no cache touched). A ground sausage rolls 1 tile/move
+  // and only moves when Stephen pushes it, so cooking a sausage that starts D tiles from the grill costs real moves:
+  // travel + flips + Stephen shuffling. An open arena is a relaxation of the real level (obstacles only slow things
+  // down), so the BFS minimum here is a valid LOWER bound on the real cook time -> a sound "uncooked sausage too far
+  // to cook in time" prune. This test never opens LayerCache or the solver, so the 649 GB cache is untouched.
+  TEST_METHOD(ToadsFollyCookTimeBound) {
+    const int W = 18, H = 8;
+    // Play area rows 0-5 (2x2 grill top-left); row 6 is a void moat; row 7 holds two pre-cooked, unreachable decoy
+    // sausages so the level has NUM_SAUSAGES(=3) and "all cooked" <=> the target sausage is cooked (index-independent).
+    const char* grid =
+      "__________________"
+      "_##_______________"
+      "_##_______________"
+      "__________________"
+      "__________________"
+      "__________________"
+      "                  "
+      "__________________";
+    auto grillManh = [](int x, int y) { int m = 999; for (int gx = 1; gx <= 2; gx++) for (int gy = 1; gy <= 2; gy++) m = (std::min)(m, std::abs(x - gx) + std::abs(y - gy)); return m; };
+
+    std::string out = "\n=== min moves to FULLY COOK one sausage vs its distance from the 2x2 grill (open arena) ===\n"
+      " dist | sausage start | min cook moves\n";
+    const size_t cap = 12'000'000;
+
+    // --- diagnostic: for the closest case, check whether a lone sausage can be cooked at all ---
+    {
+      Level dbg(W, H, "cook-dbg", grid, Stephen{ 5, 2, 0, Right }, {},
+        { Sausage{ 3, 2, 4, 2, 0, Sausage::None },
+          Sausage{ 0, 7, 1, 7, 0, Sausage::FullyCooked },
+          Sausage{ 3, 7, 4, 7, 0, Sausage::FullyCooked } });
+      auto target = [](const State& s) -> const Sausage& { for (const Sausage& sg : s.sausages) if (!sg.IsFullyCooked()) return sg; return s.sausages[0]; };
+      State s0 = dbg.GetState();
+      absl::flat_hash_set<State> seen; seen.insert(s0);
+      std::vector<State> cur{ s0 }, next; int maxCooked = 0; bool moved = false;
+      const Sausage& t0 = target(s0);
+      for (int d = 0; d < 40; d++) {
+        next.clear();
+        for (const State& s : cur) {
+          const Sausage& t = target(s);
+          maxCooked = (std::max)(maxCooked, std::popcount((unsigned)(t.flags & Sausage::FullyCooked)));
+          if (t.x1 != t0.x1 || t.y1 != t0.y1 || t.x2 != t0.x2 || t.y2 != t0.y2) moved = true;
+          for (Direction dir : { Up, Down, Left, Right }) { dbg.SetState(s); if (!dbg.Move(dir)) continue; State ns = dbg.GetState(); if (seen.insert(ns).second) next.push_back(ns); }
+        }
+        cur.swap(next); if (cur.empty()) break;
+      }
+      Logger::WriteMessage(std::format("\n[diag] lone sausage at (3,2)-(4,2), Stephen clear at (8,4): reachable={}, target-moved={}, max cooked faces={}/4\n",
+        seen.size(), moved ? "yes" : "no", maxCooked).c_str());
+    }
+
+    for (int col = 3; col <= 14; col++) {
+      const int sy = 2;
+      int dist = (std::min)(grillManh(col, sy), grillManh(col + 1, sy));
+      Level cook(W, H, "cook-test", grid, Stephen{ (s8)(col + 2), (s8)2, 0, Right }, {},
+        { Sausage{ (s8)col, (s8)sy, (s8)(col + 1), (s8)sy, 0, Sausage::None },
+          Sausage{ 0, 7, 1, 7, 0, Sausage::FullyCooked },
+          Sausage{ 3, 7, 4, 7, 0, Sausage::FullyCooked } });
+      auto allCooked = [&](const State& s) { for (const Sausage& sg : s.sausages) if (!sg.IsFullyCooked()) return false; return true; };
+      absl::flat_hash_set<State> seen; State init = cook.GetState(); seen.insert(init);
+      std::vector<State> cur{ init }, next; int found = -1; bool capped = false;
+      for (int d = 0; d <= 80 && found < 0 && !capped; d++) {
+        for (const State& s : cur) if (allCooked(s)) { found = d; break; }
+        if (found >= 0) break;
+        next.clear();
+        for (const State& s : cur) {
+          for (Direction dir : { Up, Down, Left, Right }) {
+            cook.SetState(s); if (!cook.Move(dir)) continue;
+            State ns = cook.GetState();
+            if (seen.insert(ns).second) { next.push_back(ns); if (seen.size() >= cap) { capped = true; break; } }
+          }
+          if (capped) break;
+        }
+        cur.swap(next); if (cur.empty()) break;
+      }
+      out += std::format("  {:>3} | ({},{})-({},{}) | {}\n", dist, col, sy, col + 1, sy, capped ? std::string("capped") : std::to_string(found));
+    }
+    Logger::WriteMessage(out.c_str());
+    Assert::IsTrue(true);
+  }
+
+  // Calibrates a cook-distance heuristic "uncooked sausage: distToGrill + C > budget => prune" against the confirmed
+  // 142-move solution: what is the largest C that never prunes a state on the solution? Then shows how deep that bites.
+  // Reads only the demo file; no LayerCache / solver, so the cache is untouched.
+  TEST_METHOD(ToadsFollyCookDistanceCalibration) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    const std::filesystem::path root = std::filesystem::current_path();
+    Level* level = &ToadsFolly;
+    const int kWin = 142;
+    const std::pair<int, int> grill[] = { {1,1},{2,1},{1,2},{2,2} };
+    auto distToGrill = [&](const Sausage& sg) {
+      int best = 999;
+      for (auto& g : grill) {
+        best = (std::min)(best, std::abs((int)sg.x1 - g.first) + std::abs((int)sg.y1 - g.second));
+        best = (std::min)(best, std::abs((int)sg.x2 - g.first) + std::abs((int)sg.y2 - g.second));
+      }
+      return best;
+    };
+
+    std::vector<Direction> moves;
+    { std::ifstream in(root / "toads-folly-142.dem"); std::string line;
+      while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "North") moves.push_back(Up); else if (line == "South") moves.push_back(Down);
+        else if (line == "East") moves.push_back(Right); else if (line == "West") moves.push_back(Left);
+      }
+    }
+    if (moves.empty()) { std::filesystem::current_path(savedCwd); Logger::WriteMessage("SKIP: toads-folly-142.dem not found.\n"); return; }
+
+    int minSlackNF = 999, bindNFd = -1, bindNFdist = -1; // "not fully cooked" definition
+    int minSlack0 = 999, bind0d = -1, bind0dist = -1;    // "0 cooked faces" definition
+    auto eval = [&](u32 d) {
+      State s = level->GetState();
+      for (const Sausage& sg : s.sausages) {
+        int cooked = std::popcount((unsigned)(sg.flags & Sausage::FullyCooked));
+        int dist = distToGrill(sg), slack = (kWin - (int)d) - dist;
+        if (cooked < 4 && slack < minSlackNF) { minSlackNF = slack; bindNFd = (int)d; bindNFdist = dist; }
+        if (cooked == 0 && slack < minSlack0) { minSlack0 = slack; bind0d = (int)d; bind0dist = dist; }
+      }
+    };
+    const State init = level->GetState();
+    level->SetState(init); eval(0);
+    u32 depth = 0;
+    for (Direction dir : moves) { if (!level->Move(dir)) break; depth++; eval(depth); if (level->Won()) break; }
+    std::filesystem::current_path(savedCwd);
+
+    std::string out = std::format("\n=== cook-distance calibration on the 142 solution (largest safe C) ===\n"
+      " 'not fully cooked' def: max safe C = {}  (binds at depth {}, dist {})\n"
+      " 'fully uncooked'   def: max safe C = {}  (binds at depth {}, dist {})\n",
+      minSlackNF, bindNFd, bindNFdist, minSlack0, bind0d, bind0dist);
+    // Bite: for a few candidate C, the distance threshold above which an uncooked sausage is pruned, by depth.
+    for (int C : { 5, minSlack0, minSlackNF }) {
+      if (C < 0) continue;
+      out += std::format("\n C={}: prune uncooked sausage whose distToGrill exceeds:\n", C);
+      for (int d : { 118, 120, 122, 125, 128, 130, 133, 135 }) out += std::format("   depth {:>3}: dist > {}\n", d, (kWin - d) - C);
+    }
+    Logger::WriteMessage(out.c_str());
+    Assert::IsTrue(!moves.empty());
+  }
+
+  // PROOF (not survey): builds the REAL Toad's Folly cooking geometry as a one-sausage relaxation and computes, by
+  // exhaustive enumeration + reverse BFS, the exact minimum number of moves to FULLY COOK a sausage that is currently
+  // fully uncooked at Manhattan distance D from the 2x2 grill. Rows 0-6 are byte-for-byte the real level (every wall and
+  // board edge that could brace a roll is preserved); row 7 is a void moat that confines Stephen+target to the cooking
+  // area and isolates the two forced decoys (NUM_SAUSAGES==3), which are pre-cooked and never move. Deleting only the
+  // far-away rows 7-9 floor cannot shorten a cook near the grill and adds no bracing, so F_cook(D) here is the true
+  // real-geometry floor. C_sound = min_D (F_cook(D) - D) is then the LARGEST provably-sound constant for the Filter-3
+  // rule "fully-uncooked sausage: distToGrill + C > budget => prune". Purely in-memory; the 649 GB cache is untouched.
+  TEST_METHOD(ToadsFollyCookFloorProof) {
+    const char* grid =
+      "__________"
+      "_##_______"
+      "_##_____2_"
+      "__________"
+      "222L______"
+      "252L______"
+      "222_______"
+      "          "  // void moat: confines play to rows 0-6 and seals off the decoy shelf below
+      "__________"
+      "__________";
+    Level lvl(10, 10, "cook-floor", grid, Stephen{ 5, 5, 0, Up }, {},
+      { Sausage{ 7, 5, 8, 5, 0, Sausage::None },           // target: fully uncooked, free to roam rows 0-6
+        Sausage{ 0, 8, 1, 8, 0, Sausage::FullyCooked },    // decoy 1: parked below the moat, unreachable + inert
+        Sausage{ 3, 8, 4, 8, 0, Sausage::FullyCooked } }); // decoy 2
+
+    auto distBox = [](int px, int py) { int dx = px < 1 ? 1 - px : (px > 2 ? px - 2 : 0); int dy = py < 1 ? 1 - py : (py > 2 ? py - 2 : 0); return dx + dy; };
+    auto allCooked = [](const State& s) { for (const Sausage& sg : s.sausages) if (!sg.IsFullyCooked()) return false; return true; };
+
+    // ---- exhaustive forward enumeration of the reachable single-sausage state space (real Move mechanics) ----
+    const u32 CAP = 6'000'000;
+    absl::flat_hash_map<State, u32> id; id.reserve(1'000'000);
+    std::vector<State> states; states.reserve(1'000'000);
+    std::vector<std::pair<u32, u32>> edges; edges.reserve(4'000'000);
+    auto intern = [&](const State& s) -> u32 {
+      auto it = id.find(s); if (it != id.end()) return it->second;
+      u32 n = (u32)states.size(); id.emplace(s, n); states.push_back(s); return n;
+    };
+    u32 seedId = intern(lvl.GetState());
+    std::vector<u32> q{ seedId };
+    bool capped = false;
+    for (size_t head = 0; head < q.size() && !capped; head++) {
+      u32 u = q[head]; State su = states[u]; // copy: `states` may reallocate inside intern()
+      for (Direction dir : { Up, Down, Left, Right }) {
+        lvl.SetState(su); if (!lvl.Move(dir)) continue;
+        u32 before = (u32)states.size();
+        u32 cid = intern(lvl.GetState());
+        edges.emplace_back(u, cid);
+        if (cid == before) { if (states.size() >= CAP) { capped = true; break; } q.push_back(cid); }
+      }
+    }
+    const u32 N = (u32)states.size();
+
+    // ---- reverse adjacency in CSR form ----
+    std::vector<u32> revStart(N + 1, 0);
+    for (auto& e : edges) revStart[e.second + 1]++;
+    for (u32 i = 0; i < N; i++) revStart[i + 1] += revStart[i];
+    std::vector<u32> revNodes(edges.size());
+    { std::vector<u32> cur(revStart.begin(), revStart.begin() + N);
+      for (auto& e : edges) revNodes[cur[e.second]++] = e.first; }
+
+    // ---- reverse BFS from every fully-cooked (goal) state => dist[i] = min forward moves to fully cook the target ----
+    std::vector<u16> dist(N, 0xFFFF);
+    std::vector<u32> bfs; bfs.reserve(N);
+    for (u32 i = 0; i < N; i++) if (allCooked(states[i])) { dist[i] = 0; bfs.push_back(i); }
+    const u32 goalCount = (u32)bfs.size();
+    for (size_t head = 0; head < bfs.size(); head++) {
+      u32 u = bfs[head]; u16 d = dist[u];
+      for (u32 k = revStart[u]; k < revStart[u + 1]; k++) { u32 p = revNodes[k]; if (dist[p] == 0xFFFF) { dist[p] = (u16)(d + 1); bfs.push_back(p); } }
+    }
+
+    // ---- F_cook(D) = min moves-to-fully-cook over reachable states whose target is FULLY uncooked at distToGrill D ----
+    std::array<int, 40> best; best.fill(999);
+    for (u32 i = 0; i < N; i++) {
+      if (dist[i] == 0xFFFF) continue; // fully-uncooked configs that can never be cooked are unwinnable anyway
+      int uncooked = 0; const Sausage* tgt = nullptr;
+      for (const Sausage& sg : states[i].sausages) if ((sg.flags & Sausage::FullyCooked) == 0) { uncooked++; tgt = &sg; }
+      if (uncooked != 1) continue; // premise of Filter 3: exactly one fully-uncooked sausage (rest cooked)
+      int D = (std::min)(distBox(tgt->x1, tgt->y1), distBox(tgt->x2, tgt->y2));
+      if (D >= 0 && D < (int)best.size() && dist[i] < best[D]) best[D] = dist[i];
+    }
+
+    std::string out = std::format("\n=== PROVEN min moves to fully cook a fully-uncooked sausage vs distToGrill (real Toad's Folly geometry) ===\n"
+      " states enumerated = {}{}, goal (all-cooked) states = {}\n"
+      "  D | F_cook(D) | F_cook(D)-D\n", N, capped ? "  *** CAPPED -- NOT A COMPLETE PROOF ***" : "", goalCount);
+    int cFloor = 999, cFloorD = -1;
+    for (int D = 0; D < (int)best.size(); D++) {
+      if (best[D] == 999) continue;
+      out += std::format("  {:>1} | {:>9} | {:>11}\n", D, best[D], best[D] - D);
+      if (best[D] - D < cFloor) { cFloor = best[D] - D; cFloorD = D; }
+    }
+    out += std::format("\n  Largest provably-sound C = min_D (F_cook(D)-D) = {}  (binds at D={})\n"
+      "  Filter 3 currently uses C=8  =>  {}.\n",
+      cFloor, cFloorD, cFloor >= 8 ? "PROVEN SOUND" : "NOT sound as a hard bound (survey only) -- this is the sound floor");
+    Logger::WriteMessage(out.c_str());
+    Assert::IsFalse(capped); // a capped enumeration would not be a valid proof
+  }
+
+  // Evaluates an ADMISSIBLE endgame heuristic (a true lower bound on moves-remaining-to-win) for Toad's Folly, for the
+  // goal "prove 142 is optimal AND keep any 143/144 solutions". Part A replays the confirmed 142-move solution and
+  // asserts H(state) <= 142-depth at every step (necessary condition for admissibility -- an admissible H can never
+  // exceed the true remaining on an optimal path). Part B reads the REAL cached layers (read-only) at several depths and
+  // reports what fraction of states an admissible prune (depth + H > T) would remove, for T=141 (the proof) and T=144
+  // (keep-slower). H terms are each provably <= remaining: (all-cooked) Stephen must walk home; (uncooked) Stephen must
+  // reach the grill to finish cooking AND the farthest uncooked sausage must reach the grill, then Stephen returns home
+  // (+6 = min grill->home Manhattan). The 649 GB cache is only read.
+  TEST_METHOD(ToadsFollyAdmissibleHeuristicBite) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    const std::filesystem::path root = std::filesystem::current_path();
+    const int kWin = 142;
+    const std::pair<int, int> grill[] = { {1,1},{2,1},{1,2},{2,2} };
+    auto md = [](int ax, int ay, int bx, int by) { return std::abs(ax - bx) + std::abs(ay - by); };
+    auto dGrillPt = [&](int x, int y) { int m = 99; for (auto& g : grill) m = (std::min)(m, md(x, y, g.first, g.second)); return m; };
+    const int grillToHome = 6; // proven min Manhattan from a grill cell (2,2) to home (5,5)
+    auto H = [&](const State& s) -> int {
+      int homeD = md(s.stephen.x, s.stephen.y, 5, 5);
+      int maxSaus = -1; bool anyUncooked = false;
+      for (const Sausage& sg : s.sausages)
+        if (!sg.IsFullyCooked()) { anyUncooked = true; maxSaus = (std::max)(maxSaus, (std::min)(dGrillPt(sg.x1, sg.y1), dGrillPt(sg.x2, sg.y2))); }
+      if (!anyUncooked) return homeD;
+      int base = (std::max)(dGrillPt(s.stephen.x, s.stephen.y), maxSaus) + grillToHome;
+      return (std::max)(base, homeD);
+    };
+
+    // ---- Part A: admissibility on the confirmed optimal path (H must never exceed 142-depth) ----
+    std::vector<Direction> moves;
+    { std::ifstream in(root / "toads-folly-142.dem"); std::string line;
+      while (std::getline(in, line)) { if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "North") moves.push_back(Up); else if (line == "South") moves.push_back(Down);
+        else if (line == "East") moves.push_back(Right); else if (line == "West") moves.push_back(Left); } }
+    std::string outA = "\n=== admissible H vs true remaining on the 142 solution (H must be <= remaining) ===\n depth | remaining | H | slack\n";
+    int worstViolation = -9999; bool haveDem = !moves.empty();
+    if (haveDem) {
+      Level* level = &ToadsFolly;
+      const State init = level->GetState(); level->SetState(init);
+      auto check = [&](u32 d) { int rem = kWin - (int)d, h = H(level->GetState()); worstViolation = (std::max)(worstViolation, h - rem);
+        if (d >= 118 || d % 20 == 0) outA += std::format("  {:>4} | {:>9} | {:>2} | {:>4}\n", d, rem, h, rem - h); };
+      check(0); u32 depth = 0;
+      for (Direction dir : moves) { if (!level->Move(dir)) break; depth++; check(depth); if (level->Won()) break; }
+    }
+    outA += std::format(" worst (H - remaining) over the whole solution = {}  ({})\n",
+      worstViolation, worstViolation <= 0 ? "ADMISSIBLE on the optimal path" : "INADMISSIBLE -- would prune the optimum!");
+    Logger::WriteMessage(outA.c_str());
+
+    // ---- Part B: how hard does an admissible prune bite the REAL cached layers? ----
+    std::string outB = "\n=== admissible-prune bite on real cached states (bucket 0 sample, <=5M/depth) ===\n"
+      " depth | sampled | prune%% @T=141 (prove) | prune%% @T=144 (keep 143/144)\n";
+    for (int d : { 120, 125, 130, 133, 135, 137, 139 }) {
+      u64 n = 0, cut141 = 0, cut144 = 0;
+      try {
+        LayerCache<State> layer("depth", d, "bucket", 0);
+        for (const State& s : layer) { int h = H(s); int reach = d + h; if (reach > 141) cut141++; if (reach > 144) cut144++; if (++n >= 5'000'000) break; }
+      } catch (const std::exception&) {}
+      if (n == 0) { outB += std::format("  {:>4} | (no cache layer)\n", d); continue; }
+      outB += std::format("  {:>4} | {:>7} | {:>20.2f} | {:>27.2f}\n", d, n, 100.0 * cut141 / n, 100.0 * cut144 / n);
+    }
+    Logger::WriteMessage(outB.c_str());
+
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(worstViolation <= 0 || !haveDem); // fail loudly if H is inadmissible on the optimal path
+  }
+
+  // Projects how many states an admissible-heuristic search would actually explore, using the REAL per-depth layer sizes
+  // (from the production solve log) times the REAL keep-fraction (states with depth + H <= T) measured on the cache. An
+  // admissible bound never prunes an ancestor of a <=T solution, so pruning the tail to zero cascades: those states never
+  // spawn the multi-billion deep layers. This is the feasibility check for "prove 142 optimal AND keep 143/144" (T=144).
+  // Read-only; cache untouched.
+  TEST_METHOD(ToadsFollyAdmissibleProofFeasibility) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    const std::pair<int, int> grill[] = { {1,1},{2,1},{1,2},{2,2} };
+    auto md = [](int ax, int ay, int bx, int by) { return std::abs(ax - bx) + std::abs(ay - by); };
+    auto dGrillPt = [&](int x, int y) { int m = 99; for (auto& g : grill) m = (std::min)(m, md(x, y, g.first, g.second)); return m; };
+    auto H = [&](const State& s) -> int {
+      int homeD = md(s.stephen.x, s.stephen.y, 5, 5);
+      int maxSaus = -1; bool anyUncooked = false;
+      for (const Sausage& sg : s.sausages)
+        if (!sg.IsFullyCooked()) { anyUncooked = true; maxSaus = (std::max)(maxSaus, (std::min)(dGrillPt(sg.x1, sg.y1), dGrillPt(sg.x2, sg.y2))); }
+      if (!anyUncooked) return homeD;
+      return (std::max)((std::max)(dGrillPt(s.stephen.x, s.stephen.y), maxSaus) + 6, homeD);
+    };
+
+    // Real layer sizes (new states per depth) from the production solve log.
+    const std::pair<int, u64> layer[] = {
+      {119,34092956},{120,39977141},{121,47494623},{122,57147657},{123,69873790},{124,86480553},
+      {125,108392131},{126,136717048},{127,173471795},{128,219993674},{129,279051027},{130,352140272},
+      {131,442967347},{132,553249845},{133,688151452},{134,849821654},{135,1045643067},{136,1278772917},
+      {137,1559830728},{138,1893346548},{139,2293693983},{140,2766202737} };
+
+    std::string out = "\n=== admissible-heuristic proof feasibility (real layer sizes x measured keep-fraction) ===\n"
+      " depth |    layer size | keep%% T=141 | keep%% T=144 |  kept T=141 |  kept T=144\n";
+    u64 totalAll = 0, keptProve = 0, keptKeep = 0;
+    for (auto& [d, size] : layer) {
+      totalAll += size;
+      u64 n = 0, k141 = 0, k144 = 0;
+      try {
+        LayerCache<State> lc("depth", d, "bucket", 0);
+        for (const State& s : lc) { int f = d + H(s); if (f <= 141) k141++; if (f <= 144) k144++; if (++n >= 3'000'000) break; }
+      } catch (const std::exception&) {}
+      double f141 = n ? (double)k141 / n : 0, f144 = n ? (double)k144 / n : 0;
+      u64 kp = (u64)(size * f141), kk = (u64)(size * f144);
+      keptProve += kp; keptKeep += kk;
+      out += std::format("  {:>4} | {:>13} | {:>10.2f} | {:>10.2f} | {:>11} | {:>11}\n", d, size, 100 * f141, 100 * f144, kp, kk);
+    }
+    out += std::format("\n  unpruned states, depths 119-140      : {:>15}\n"
+      "  explored with H, T=141 (prove 142)   : {:>15}   ({:.1f}x smaller)\n"
+      "  explored with H, T=144 (keep 143/144): {:>15}   ({:.1f}x smaller)\n",
+      totalAll, keptProve, keptProve ? (double)totalAll / keptProve : 0,
+      keptKeep, keptKeep ? (double)totalAll / keptKeep : 0);
+    Logger::WriteMessage(out.c_str());
+
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(true);
+  }
+
+  // Answers "is the top-left (grill) box enough, or do we also need the home box?" by measuring, on the real cached
+  // layers: what fraction of states are already all-cooked (where the grill box prunes nothing), and how much extra the
+  // home box removes on top of the grill box. Budget 145 (the wired value). Read-only; cache untouched.
+  TEST_METHOD(ToadsFollyGrillBoxSufficiency) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    auto gd = [](int x, int y) { int dx = x < 1 ? 1 - x : (x > 2 ? x - 2 : 0); int dy = y < 1 ? 1 - y : (y > 2 ? y - 2 : 0); return dx + dy; };
+    std::string out = "\n=== grill box vs grill+home box on real cached states (budget 145, bucket 0, <=3M/depth) ===\n"
+      " depth | sampled | all-cooked%% | keep%% grill-only | keep%% grill+home | home box removes\n";
+    for (int d : { 125, 130, 133, 135, 137, 139 }) {
+      const int slack = 145 - d, reach = slack - 6;
+      u64 n = 0, cooked = 0, keepGrill = 0, keepFull = 0;
+      try {
+        LayerCache<State> lc("depth", d, "bucket", 0);
+        for (const State& s : lc) {
+          bool allCooked = true, grillPruned = false;
+          for (const Sausage& sg : s.sausages) {
+            if (sg.IsFullyCooked()) continue;
+            allCooked = false;
+            if ((std::min)(gd(sg.x1, sg.y1), gd(sg.x2, sg.y2)) > reach) grillPruned = true;
+          }
+          if (!allCooked && gd(s.stephen.x, s.stephen.y) > reach) grillPruned = true;
+          bool homePruned = (std::abs(s.stephen.x - 5) + std::abs(s.stephen.y - 5)) > slack;
+          if (allCooked) cooked++;
+          if (!grillPruned) keepGrill++;
+          if (!grillPruned && !homePruned) keepFull++;
+          if (++n >= 3'000'000) break;
+        }
+      } catch (const std::exception&) {}
+      if (n == 0) { out += std::format("  {:>4} | (no cache layer)\n", d); continue; }
+      out += std::format("  {:>4} | {:>7} | {:>10.2f} | {:>16.2f} | {:>16.2f} | {:>15.2f}%%\n",
+        d, n, 100.0 * cooked / n, 100.0 * keepGrill / n, 100.0 * keepFull / n, 100.0 * (keepGrill - keepFull) / n);
+    }
+    Logger::WriteMessage(out.c_str());
+    std::filesystem::current_path(savedCwd);
+    Assert::IsTrue(true);
+  }
+
+  // Cheap re-test of the wired heuristic on KNOWN winning states (no BFS): replay the confirmed 142-move solution and
+  // apply the heuristic to every state on it. The heuristic must keep all of them (first-pruned depth = -1). Also reports
+  // the tightest x+y margin the winning path leaves under the limit -- i.e. how many moves the 145 budget could be
+  // tightened before it would ever prune the known solution. Reads only the demo file; the cache is untouched.
+  TEST_METHOD(ToadsFollyHeuristicKeepsKnownWinners) {
+    const std::filesystem::path savedCwd = std::filesystem::current_path();
+    if (!ChdirToCacheDir()) { Logger::WriteMessage("SKIP: no cache/ directory found.\n"); return; }
+    Level* lvl = &ToadsFolly;
+    if (lvl->heuristic == nullptr) { std::filesystem::current_path(savedCwd); Assert::Fail(L"ToadsFolly has no heuristic"); }
+    const State startState = lvl->GetState();
+
+    std::vector<Direction> moves;
+    { std::ifstream in(std::filesystem::current_path() / "toads-folly-142.dem"); std::string line;
+      while (std::getline(in, line)) { if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line == "North") moves.push_back(Up); else if (line == "South") moves.push_back(Down);
+        else if (line == "East") moves.push_back(Right); else if (line == "West") moves.push_back(Left); } }
+    if (moves.empty()) { std::filesystem::current_path(savedCwd); Logger::WriteMessage("SKIP: toads-folly-142.dem not found.\n"); return; }
+
+    // Replay the known-winning solution into a per-depth list of states.
+    std::vector<State> path; lvl->SetState(startState); path.push_back(startState);
+    for (Direction dir : moves) { if (!lvl->Move(dir)) break; path.push_back(lvl->GetState()); if (lvl->Won()) break; }
+
+    // Apply the heuristic to every winning state; track the first (if any) it prunes and the tightest x+y margin.
+    int firstPruned = -1, minSlack = 999, minSlackDepth = -1;
+    for (int d = 0; d < (int)path.size(); d++) {
+      lvl->SetState(path[d]);
+      if (!lvl->heuristic(lvl, (u32)d) && firstPruned < 0) firstPruned = d;
+      if (d >= 94) { // grill bound is only active in the danger zone; margin = limit - worst uncooked/Stephen x+y
+        const int limit = 143 - d;
+        int worst = -1;
+        for (const Sausage& s : path[d].sausages) if (!s.IsFullyCooked()) worst = (std::max)(worst, (int)(s.x1 + s.y1));
+        if (worst >= 0) {
+          worst = (std::max)(worst, (int)(path[d].stephen.x + path[d].stephen.y));
+          int slack = limit - worst;
+          if (slack < minSlack) { minSlack = slack; minSlackDepth = d; }
+        }
+      }
+    }
+
+    std::string out = std::format("\n=== heuristic re-tested on the {} known winning states of the 142 solution ===\n"
+      "  first pruned depth = {}  ({})\n"
+      "  tightest x+y margin on the winning path = {} (at depth {}): the 145 budget could be tightened by up to {} before\n"
+      "  the known 142 solution would be pruned.\n",
+      path.size(), firstPruned, firstPruned < 0 ? "never pruned -- all winners kept" : "PRUNED A WINNER!",
+      minSlack, minSlackDepth, minSlack);
+    Logger::WriteMessage(out.c_str());
+    std::filesystem::current_path(savedCwd);
+    Assert::AreEqual(-1, firstPruned);
   }
 };
