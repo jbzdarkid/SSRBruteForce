@@ -108,7 +108,7 @@ Level TheAnchorage(10, 6, "The Anchorage",
   "__##      ");
 
 
-Level EmersonJetty(19, 17, "2-1 Emerson Jetty",
+Level EmersonJetty(19, 17, "Emerson Jetty",
   "         ___  _    "
   "____1__________1 1 "
   "_______1__     __  "
@@ -127,7 +127,7 @@ Level EmersonJetty(19, 17, "2-1 Emerson Jetty",
   "          ##_1_    "
   "          ##___    ");
 
-Level SadFarm(11, 9, "2-2 Sad Farm",
+Level SadFarm(11, 9, "Sad Farm",
   "   11111   "
   "___1___1   "
   "___1___1   "
@@ -138,7 +138,7 @@ Level SadFarm(11, 9, "2-2 Sad Farm",
   "___1_____##"
   "^__1111    ");
 
-Level Cove(8, 6, "2-3 Cove",
+Level Cove(8, 6, "Cove",
   "__1__#v_"
   "_____#__"
   "________"
@@ -159,7 +159,7 @@ Level GreatTowerImanex(14, 11, "2-4 Great Tower (after imanex's start) (with no 
   " # ___________"
   " 11L__________");
 
-Level TheGreatTower(19, 19, "2-4 The Great Tower",
+Level TheGreatTower(19, 19, "The Great Tower",
   "         $  $      "
   "        $$ $$      "
   "         #  #      "
@@ -183,7 +183,7 @@ Level TheGreatTower(19, 19, "2-4 The Great Tower",
   {},
   {Sausage{11, 10, 12, 10, 1}, Sausage{11, 10, 11, 11, 2}, Sausage{11, 10, 12, 10, 3}, Sausage{12, 10, 12, 11, 2}, Sausage{11, 11, 12, 11, 1}, Sausage{11, 11, 12, 11, 3}});
 
-Level ThePaddock(10, 6, "2-5 The Paddock",
+Level ThePaddock(10, 6, "The Paddock",
   " 11____111"
   "1_#_aa_# 1"
   "1_#_bb_# 1"
@@ -191,14 +191,14 @@ Level ThePaddock(10, 6, "2-5 The Paddock",
   " ________ "
   " ________ ");
 
-Level BeautifulHorizon(8, 5, "2-6 Beautiful Horizon",
+Level BeautifulHorizon(8, 5, "Beautiful Horizon",
   "   ____#"
   "  1__1_#"
   " ab____#"
   "1ab__>_#"
   "  1     ");
 
-Level BarrowSet(18, 6, "2-7 Barrow Set",
+Level BarrowSet(18, 6, "Barrow Set",
   "   ___            "
   "   ___1___________"
   "_________111_aa___"
@@ -206,20 +206,20 @@ Level BarrowSet(18, 6, "2-7 Barrow Set",
   "_##_____ __ ______"
   "________1111______");
 
-Level RoughField(9, 5, "2-8 Rough Field",
+Level RoughField(9, 5, "Rough Field",
   "________ "
   "__>_____ "
   "____1_111"
   "_ab____#1"
   "_ab____#1");
 
-Level FallowEarth(7, 4, "2-9 Fallow Earth",
+Level FallowEarth(7, 4, "Fallow Earth",
   "_a#11__"
   "_A#_1__"
   "___>___"
   "  ___  ");
 
-Level TwistyFarm(10, 14, "2-10 Twisty Farm",
+Level TwistyFarm(10, 14, "Twisty Farm",
   "       11 "
   "      1_##"
   "     1__##"

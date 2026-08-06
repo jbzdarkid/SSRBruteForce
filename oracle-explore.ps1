@@ -128,11 +128,12 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
     foreach ($lvl in $candidates) {
         if ($lvl.Sausages -ne $n) { continue }
         $name = $lvl.Name
-        $safe = ($name.ToCharArray() | ForEach-Object { if ($_ -match '[a-zA-Z0-9]') { $_ } else { '_' } }) -join ''
+        $cppName = $name -replace '^\d+-\d+ ', ''  # C++ levels dropped their numeric prefix; the oracle still needs it
+        $safe = ($cppName.ToCharArray() | ForEach-Object { if ($_ -match '[a-zA-Z0-9]') { $_ } else { '_' } }) -join ''
         $folder = ".\oracle-demos\$safe"
 
         # Level2 grows one RRT tree and writes leaf demos into $folder (clearing any prior ones).
-        & $exe $name rrt $Iterations $RolloutLen $Bin $Seed *> $null
+        & $exe $cppName rrt $Iterations $RolloutLen $Bin $Seed *> $null
         $demoCount = (Get-ChildItem $folder -Filter *.dem -EA SilentlyContinue | Measure-Object).Count
         if ($demoCount -eq 0) { $results[$name] = @{ Lost = 0; Posdiff = 0; Reasons = ""; Repro = "" }; continue }
 

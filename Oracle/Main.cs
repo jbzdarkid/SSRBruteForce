@@ -407,7 +407,6 @@ static class Oracle {
     foreach ((string reason, List<string> demos) in failureReasons) {
       Console.WriteLine($"Reason: {reason}; Count: {demos.Count}; Sample: {demos[0]}");
     }
-    File.WriteAllLines("diverging_demos.txt", failureReasons.Where(kv => kv.Key.Length > 0).SelectMany(kv => kv.Value)); // TEMP diagnostic
   }
   
   static string ReplayDemo(string levelName, string demoPath, bool debug=false) {
