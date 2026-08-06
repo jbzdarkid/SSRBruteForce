@@ -1,58 +1,57 @@
 #pragma once
 #include "Level2.h"
-#include "OverworldSausages.h" // in a separate file for now, because they're big
 
-Level LachrymoseHead(5, 4, "1-1 Lachrymose Head",
+Level LachrymoseHead(5, 4, "Lachrymose Head",
   "_###_"
   "aab__"
   "__bcc"
   "^###_");
 
-Level Southjaunt(4, 5, "1-2 Southjaunt",
+Level Southjaunt(4, 5, "Southjaunt",
   " >_ "
   "____"
   "a##b"
   "a##b"
   "____");
 
-Level InfantsBreak(7, 4, "1-3 Infant's Break",
+Level InfantsBreak(7, 4, "Infant's Break",
   "  ___  "
   "  aab  "
   "##_<b# "
   "##   ##");
 
-Level ComelyHearth(5, 5, "1-4 Comely Hearth",
+Level ComelyHearth(5, 5, "Comely Hearth",
   "  ___"
   "__<_ "
   "aa#bB"
   "_##_ "
   "___  ");
 
-Level LittleFire(4, 4, "1-5 Little Fire",
+Level LittleFire(4, 4, "Little Fire",
   "____"
   "aa#b"
   "_#_b"
   "_>__");
 
-Level Eastreach(5, 5, "1-6 Eastreach",
+Level Eastreach(5, 5, "Eastreach",
   "a__# "
   "abb##"
   "_<_  "
   "_##  "
   " ##  ");
 
-Level BaysNeck(4, 4, "1-7 Bay's Neck",
+Level BaysNeck(4, 4, "Bay's Neck",
   "__#_"
   " _ _"
   "a#_<"
   "a__ ");
 
-Level BurningWharf(6, 3, "1-8 Burning Wharf",
+Level BurningWharf(6, 3, "Burning Wharf",
   ">_aa__"
   "_b## _"
   " B## _");
 
-Level HappyPool(6, 6, "1-9 Happy Pool",
+Level HappyPool(6, 6, "Happy Pool",
   " _aa__"
   "__   _"
   "_  # _"
@@ -60,32 +59,32 @@ Level HappyPool(6, 6, "1-9 Happy Pool",
   "v   __"
   "_____ ");
 
-Level MaidensWalk(4, 4, "1-10 Maiden's Walk",
+Level MaidensWalk(4, 4, "Maiden's Walk",
   "#a_#"
   "#a__"
   " _^_"
   "__  ");
 
-Level FieryJut(6, 4, "1-11 Fiery Jut",
+Level FieryJut(6, 4, "Fiery Jut",
   "###  _"
   "###ab_"
   "###abv"
   "###  _");
 
-Level MerchantsElegy(5, 4, "1-12 Merchant's Elegy",
+Level MerchantsElegy(5, 4, "Merchant's Elegy",
   "_____"
   "_#ab#"
   "^#ab#"
   "_____");
 
-Level Seafinger(5, 5, "1-13 Seafinger",
+Level Seafinger(5, 5, "Seafinger",
   "_##A "
   "_##a_"
   "_##  "
   "   b^"
   "   b_");
 
-Level TheClover(7, 7, "1-14 The Clover",
+Level TheClover(7, 7, "The Clover",
   " aa____"
   " ##   _"
   " ## ##b"
@@ -94,13 +93,13 @@ Level TheClover(7, 7, "1-14 The Clover",
   " ##_   "
   " cc_   ");
 
-Level InletShore(4, 4, "1-15 Inlet Shore",
+Level InletShore(4, 4, "Inlet Shore",
   "__a_"
   "^_a#"
   "#b__"
   "_b__");
 
-Level TheAnchorage(10, 6, "1-16 The Anchorage",
+Level TheAnchorage(10, 6, "The Anchorage",
   "   _______"
   "   _ _   _"
   " ####ABC _"
@@ -838,6 +837,314 @@ Level CuriousDragons2(11, 9, "6-11 Curious Dragons (Part 2/2)",
   "    __##___"
   "    _______");
 
+#if OVERWORLD_HACK
+
+const std::vector<Level::LevelEntrance> World1Entrances = {
+  { Stephen{9, 6, 0, Up},      "ABC", &TheAnchorage },
+  { Stephen{3, 11, 0, Right},  "DFQ", &TheClover },
+  { Stephen{21, 9, 0, Right},  "EH",  &BurningWharf },
+  { Stephen{20, 10, 0, Left},  "G",   &BaysNeck },
+  { Stephen{10, 12, 0, Up},    "IL",  &InletShore },
+  { Stephen{14, 16, 0, Down},  "J",   &HappyPool },
+  { Stephen{25, 14, 0, Left},  "KO",  &Eastreach },
+  { Stephen{21, 15, 0, Right}, "MN",  &LittleFire },
+  { Stephen{4, 17, 0, Up},     "PU",  &Seafinger },
+  { Stephen{12, 17, 0, Up},    "R",   &MaidensWalk },
+  { Stephen{5, 17, 0, Up},     "ST",  &MerchantsElegy },
+  { Stephen{21, 17, 0, Left},  "VW",  &ComelyHearth },
+  { Stephen{11, 21, 0, Down},  "XY",  &FieryJut },
+  { Stephen{20, 23, 0, Left},  "Za",  &InfantsBreak },
+  { Stephen{20, 24, 0, Right}, "bc",  &Southjaunt },
+  { Stephen{23, 28, 0, Up},    "def", &LachrymoseHead },
+};
+
+Level OverworldSausage1(30, 33, "World 1 route",
+  "                ____       __ "
+  "               ______      __ "
+  "               ______     ____"
+  "   _______     ___11__11111___"
+  "   _ _   _________1__    _1___"
+  " ####ABC __1_zz______    _>___"
+  " ####ABC______________    ___ "
+  "          __________          "
+  "__##DD_____________#_         "
+  "    ##   ________ _ ___EE__   "
+  "    ## ##F_______G#___H## _   "
+  "   ____##F__I_   G__  H## _   "
+  "    ##______I# _JJ______K__#  "
+  "    ##_   #L____   _MM#NKOO## "
+  "_##PQQ_   _L___  # __#_N___   "
+  "_##P______#R_#_ #  ______##   "
+  "_##  _#ST##R___   __ ___ ##   "
+  "   U__#ST# ____________       "
+  "   U_______________VV#WW      "
+  "      ###  _________##_       "
+  "      ###XY__1________        "
+  "      ###XY______1____        "
+  "      ###  ________ZZa        "
+  "            _____##__a#       "
+  "          _ _____## __##      "
+  "          _  ___________###_  "
+  "            _ _____b##cdde__  "
+  "            __  ___b##c__eff  "
+  "             __ ________###_  "
+  "            _ _ ____          "
+  "             ___              "
+  "               _              "
+  "             __               ",
+  Stephen{15, 25, 0, Up},
+  {Ladder{18, 5, 0, Up}, Ladder{26, 5, 0, Up}},
+  {},
+  {},
+  World1Entrances);
+
+const std::vector<Level::LevelEntrance> World2Entrances = {
+  { Stephen{40, 3, 0, Right},  "AB", &BeautifulHorizon },
+  { Stephen{42, 7, 0, Down},   "CD", &ThePaddock },
+  { Stephen{36, 17, 0, Right}, "EF", &TheGreatTower },  // its 8 sausages collapse to the 2 that actually block the path
+  { Stephen{22, 26, 0, Right}, "GH", &BarrowSet },
+  { Stephen{35, 32, 0, Up},    "I",  &SadFarm },
+  { Stephen{18, 30, 0, Right}, "JK", &RoughField },
+  { Stephen{33, 29, 0, Down},  "LM", &Cove },
+  { Stephen{9, 33, 0, Right},  "NP", &TwistyFarm },
+  { Stephen{19, 36, 0, Right}, "O",  &FallowEarth },
+  { Stephen{45, 39, 0, Right}, "Q",  &EmersonJetty },
+};
+
+Level OverworldSausage2(54, 49, "World 2 route",
+  "                                      ____#           "
+  "                                     1__1_#           "
+  "                                    AB____#           "
+  "                                   1AB____#           "
+  "                                     211____111       "
+  "                                 $  $1_#_CC_#_1       "
+  "                                $$ $$1_#_DD_#_1       "
+  "                                 #  #111____111       "
+  "                               1##1## ________        "
+  "                            1111 11 1 ________        "
+  "                            1______________           "
+  "                            1______________           "
+  "                        $$##1______________           "
+  "                         $ # ______________           "
+  "                           11______________           "
+  "                        $$##1______EF______           "
+  "                         $ # ______EF______           "
+  "                  ______   11______________           "
+  "             111111_11_____________________           "
+  "             11111___1111__z1______________           "
+  "          ___<_    ___?71__z1______________           "
+  "           ___     ___661__11______________           "
+  "                   ___111___1______________           "
+  "              11   ________________________           "
+  "             1_##   ___2___________   11111           "
+  "            1__##_________111_GG______1___1           "
+  "           1____ _##_____1111_HH_1____1___1           "
+  "       1_____  # _##_____ __ _________1_1_1           "
+  "       1____   ##________1111_______I___1_1           "
+  "       1__      ________   __1__#___I___1_1111        "
+  "        1__     ________   _____#_____1_____##        "
+  "         1__    ____1_111  ___________1_____##        "
+  "          1______JK____#1     __LM____1111  ___  _    "
+  "         ___N  __JK____#1      _LM____?4?_________1 1 "
+  "         ___N 2__O#11__        ________?__1__     __  "
+  "         _PP_  __O#_1__            ______11_1     1_  "
+  "            ___________      ____  _QQ_______      _  "
+  "                  ___       ______ __________      _  "
+  "                            ______     _____       _  "
+  "                            ___11__11111______________"
+  "                              _1__    _1___    _   _2_"
+  "                              ____    _____    _1  ___"
+  "                              _____    ___     _      "
+  "                              ___              _      "
+  "                                              1__     "
+  "                                                _     "
+  "                                              ____    "
+  "                                             ##_1_    "
+  "                                             ##___    ",
+  Stephen{39, 41, 0, Right},  // start = world 1's exit; the grid '<' at (13,20) is the goal, reached by descending Ladder{13,20} into world 3
+  {Ladder{13, 8, 0, Right}, Ladder{5, 9, 0, Left}, Ladder{36, 10, 0, Up}, Ladder{29, 17, 0, Left}, Ladder{13, 20, 0, Up}, Ladder{21, 20, 0, Up}, Ladder{31, 41, 0, Up}, Ladder{39, 41, 0, Up}},
+  {},
+  {SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 1, 2, 6, 7, 8})},
+  World2Entrances);
+
+/*
+
+// ACD: Cold Ladder
+// B: Cold Terrace
+// E: Cold Gate
+// F: Overworld Sausage 3
+// GH: Cold Jag
+// IJ: Cold Frustration
+// K: Cold Finger
+// LM: Cold Escarpment
+Level OverworldSausage3(78, 49, "3-final Overworld sausage",
+"                                       1$$1                                   "
+"                                       1111                                   "
+"                                       1211                                   "
+"                                       1111                                   "
+"                                       1111  1111111111                       "
+"                                    11____   11111111112222                   "
+"                                    11____   11111111112222                   "
+"                         111111     __1111   12221111112222                   "
+"                  ###### 11111111111__1111   12321111112222                   "
+"                  ######11111111$$11__1111   12221111112222__                 "
+"                  ###### 1111111$$11__1111   1111111111____####               "
+"                         11111111111__11111111111111111____####               "
+"           222222______11122211__222__1111111   _$$11111111 111               "
+"           2  222______111____________1111111   _$$1111111111111_______       "
+"#####      2  222______111__1___________AA___      1111111111111_______       "
+"####?22277 2##___ _ _ __#____BB_1_______CD___##__  111__11111111_______       "
+"####?21$$1 2##____ _ _ _##______________CD___##__1_111__11111111_________1111 "
+"####?21$$1  ______        ____________________   1    ##   11111________ ## # "
+" 1    117_##______             ##   __________   1    ##   11111_______ _##_##"
+" 1    11 _##__E___             ##8_8_8_8         11$$1__   ____________       "
+" 1         1__E___             _________         1 $$111   ____________       "
+"21          ______             __8_8_8_8         11111     _____________      "
+" 1          ______               __F____                   ______________     "
+" _1         _                    <_F_8_8                    222_3__1          "
+" ____________                    __1____  2  _____          1_GH____          "
+"                                 ____8_8  111_____          1_GH____          "
+"                                          1    222      __##______11          "
+"                                          __1_#_____    __##________          "
+"                                          _I_ #___1_____________              "
+"                                          _I1_#_________________              "
+"                                          _J__22____3?_K________1             "
+"                                          _J__22_______K______1__             "
+"                                          ____22______________1__##__         "
+"                                                   ________  __ _##__         "
+"                                                   ________                   "
+"                                                   ________                   "
+"                                                   __LL__222                  "
+"                                                   ______232_____             "
+"                                                   ______222_____             "
+"                                                   ______ _______             "
+"                                                   __M___ _______             "
+"                                                   __M___222__222             "
+"                                                   ______232  222             "
+"                                                   ______222__222             "
+"                                                   ____     _____             "
+"                                                   ____    1_____             "
+"                                                   ____1####_____             "
+"                                                        ####                  "
+"                                                         11                   ",
+{},
+{Ladder{59, 9, 1, Left}, Ladder{37, 10, 0, Right}, Ladder{47, 10, 1, Up}, Ladder{56, 10, 0, Up}, Ladder{56, 10, 1, Up}, Ladder{57, 11, 0, Down}, Ladder{28, 13, 1, Up}, Ladder{30, 13, 0, Up}, Ladder{33, 13, 1, Up}, Ladder{40, 14, 0, Up}, Ladder{28, 15, 0, Up}, Ladder{9, 16, 1, Up}, Ladder{9, 16, 2, Up}, Ladder{9, 16, 3, Up}, Ladder{9, 16, 4, Up}, Ladder{9, 16, 5, Up}, Ladder{9, 16, 6, Up}, Ladder{12, 16, 0, Left}, Ladder{12, 16, 1, Left}, Ladder{72, 16, 0, Right}, Ladder{64, 17, 0, Left}, Ladder{7, 18, 1, Right}, Ladder{7, 18, 2, Right}, Ladder{7, 18, 3, Right}, Ladder{7, 18, 4, Right}, Ladder{7, 18, 5, Right}, Ladder{7, 18, 6, Right}, Ladder{12, 20, 0, Left}, Ladder{1, 23, 0, Up}, Ladder{45, 25, 0, Left}, Ladder{47, 25, 0, Down}, Ladder{47, 25, 1, Down}, Ladder{60, 26, 0, Up}, Ladder{42, 27, 0, Up}, Ladder{48, 27, 0, Up}, Ladder{48, 27, 1, Up}, Ladder{45, 31, 0, Right}, Ladder{45, 31, 1, Right}, Ladder{58, 35, 0, Down}, Ladder{58, 35, 1, Down}, Ladder{60, 41, 0, Left}, Ladder{60, 41, 1, Left}, Ladder{63, 44, 0, Up}, Ladder{63, 44, 1, Up}, Ladder{60, 45, 0, Left}, Ladder{54, 46, 0, Right}},
+{Sausage{56, 6, 57, 6, 2}, Sausage{39, 7, 40, 7, 1}, Sausage{50, 7, 51, 7, 1}, Sausage{53, 7, 53, 8, 1}, Sausage{56, 7, 56, 8, 2}, Sausage{57, 7, 57, 8, 2}, Sausage{26, 8, 27, 8, 1}, Sausage{28, 8, 29, 8, 1}, Sausage{38, 8, 38, 9, 1}, Sausage{26, 9, 27, 9, 1}, Sausage{26, 10, 27, 10, 1}, Sausage{28, 10, 29, 10, 1}, Sausage{15, 12, 16, 12, 2}, Sausage{26, 12, 27, 12, 2}, Sausage{34, 12, 35, 12, 2}, Sausage{15, 13, 15, 14, 2}, Sausage{57, 14, 58, 14, 1}, Sausage{52, 15, 52, 16, 1}, Sausage{60, 15, 61, 15, 1}, Sausage{60, 16, 60, 17, 1}, Sausage{61, 16, 61, 17, 1}, Sausage{14, 19, 14, 20, 1}, Sausage{14, 19, 14, 20, 2}, Sausage{14, 19, 14, 20, 3}, Sausage{14, 19, 14, 20, 4}, Sausage{14, 19, 14, 20, 5}, Sausage{14, 19, 14, 20, 6}, Sausage{67, 23, 67, 24, 1}, Sausage{55, 30, 55, 31, 1}, Sausage{55, 30, 55, 31, 2}, Sausage{46, 32, 47, 32, 2}},
+{SpecialTile({0, 3}), SpecialTile({0, 2}, {0}), SpecialTile({0, 2}, {0}), SpecialTile({0, 2}, {0})},
+{{40, 13, None, "ACD"}, {29, 17, None, "B"}, {16, 20, None, "E"}, {61, 27, None, "GH"}, {42, 31, None, "IJ"}, {59, 30, None, "K"}, {54, 44, None, "LM"}});
+
+// AB: Wretch's Retreat
+// C: Gator Paddock
+// D: Toad's Folly
+// EF: Crunchy Leaves
+// GH: Sludge Coast
+Level OverworldSausage4(31, 29, "4-final Overworld sausage",
+"                        1      "
+"                        #      "
+"                   _______111_ "
+"                   ____A__121_ "
+"                   ____A__111_ "
+"                   __1________ "
+"                   ____BB_____ "
+"                   ___________ "
+"                 111__________ "
+"                 121_##_______ "
+"____11111211 222 111_##_____2_ "
+"____1____?#1 232##____________ "
+"_CC______##1 222##  222_______ "
+"____1____##1____  _1252____DD_ "
+"____11111111_EE_  _1222_______ "
+"_________________F____________ "
+"______12_____1___F__________1_ "
+"______12__________   _________ "
+"_______1____12221111111111_____"
+"____________12321111111111_____"
+"???5__1     12221113111222?____"
+"???4__2     11111111111111_____"
+"???3v__     11111111111111_____"
+"3333___     _____111111G_______"
+"______2     _____#_____G_______"
+"2222__1     __##_11_______HH___"
+"___2__1     _________    ##    "
+"                         ##    "
+"                         __    ",
+{},
+{Ladder{27, 5, 0, Up}, Ladder{14, 12, 2, Up}, Ladder{23, 12, 0, Left}, Ladder{23, 12, 1, Left}, Ladder{13, 13, 0, Up}, Ladder{13, 13, 1, Up}, Ladder{18, 13, 0, Right}, Ladder{23, 13, 0, Left}, Ladder{23, 13, 1, Left}, Ladder{19, 15, 0, Up}, Ladder{6, 16, 1, Right}, Ladder{5, 17, 0, Right}, Ladder{6, 18, 0, Right}, Ladder{7, 18, 1, Up}, Ladder{14, 21, 1, Up}, Ladder{15, 21, 1, Up}, Ladder{24, 23, 0, Up}, Ladder{3, 24, 0, Up}, Ladder{3, 24, 1, Up}, Ladder{3, 24, 2, Up}, Ladder{17, 26, 0, Up}},
+{Sausage{19, 9, 19, 10, 1}, Sausage{27, 10, 28, 10, 2}, Sausage{27, 16, 28, 16, 1}, Sausage{2, 21, 2, 22, 3}, Sausage{17, 21, 17, 22, 1}},
+{SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 2}), SpecialTile({0, 3, 4, 5}), SpecialTile({0, 3, 4}), SpecialTile({0, 3, 4}), SpecialTile({0, 2}, {0})},
+{{26, 6, None, "AB"}, {5, 17, None, "C"}, {25, 13, None, "D"}, {15, 15, None, "EF"}, {24, 23, None, "GH"}});
+
+// ABC: Drumlin
+// D: Tarry Ridge
+// E: Rough View
+// FG: Widow's Finger
+// HIJ: Skeleton
+// KL: Baby Rock
+// MP: Slope View
+// N: Open Baths
+// O: Overworld Sausage 5
+// Q: Crater
+// RS: Pressure Points
+Level OverworldSausage5(73, 49, "5-final Overworld sausage",
+"                                               111                       "
+"                                               1111111                   "
+"                                             22211A_B1                   "
+"                                     ________232_1ACB1                   "
+"                                     ________222___C_1                   "
+"                                     _________________##__               "
+"                                     _1_1_31__________##1111111          "
+"                     223 333533?33332_1____1_       ________2_2          "
+"                     2?2 333333?3?332_1______    222_D__111____          "
+"                     232 333334433311________    232_D_________##        "
+"                 222_222 3333344333111_______  ##222___________##        "
+"             ##  232_222   __##_____1________33##___________ ##          "
+"             ##  222_222   __##__1_____1_____22__  1__       ##          "
+"        _## ________ _22        ____       _______##_E                   "
+"        _##_ _______________________       __21___##_E          111      "
+"         1  1___FF_G________________       ______  1_1__222__ __121      "
+"         1111_1____G________________2        1_______1__232__ ##111      "
+"             __________111_______3__11111   1____  1_1__232__ ##         "
+"           1111  _   __121__HIJ_____1   _    _1#1____1__232__ _          "
+"           1 _#__ 111__111__HIJ______   _    ___#__1_1__222__  _         "
+"           1 _#   2  __111___________   _##   __1__ ____________1        "
+"           __#____? _________________   _ #   1____ __2_KK___2111        "
+"           _____?___ ________________   _      1___  _1_LL___1122        "
+"           ___112    ________________   _            ________ 1          "
+"           ______  $$_____1__________   _                         ____1_1"
+"              __   $$___MM_1 ________112?2                        __1_1_1"
+"           ??22222211___11_  _______1_____N_                      _______"
+"           2222322211______  _________1___N_                      _O_^1_1"
+"           2222222211___PP_##____2?____ ____                      _O__1_1"
+"           2222222211______##32_11_____                           _______"
+"         2222222  1 # ##     32_11_____                           12__211"
+"         2     2____#_##   ##__________                                  "
+"         2     2__1_1#     ##__________                                  "
+"         2    22____1_            ##                                     "
+"      _1 232%%2__Q____            ##                                     "
+"_1___ __  3 %% __Q____                                                   "
+"____ ___223__     ______                                                 "
+"_____ __223__   222_____1                                                "
+"____ ________   232_____1R____                                           "
+"   ##________   222__1__1R____##                                         "
+"   ##________   __________1_1_##                                         "
+"                __________ ___                                           "
+"                ________S_ 1 _                                           "
+"              ##___?2___S_ _ _                                           "
+"              ##__________ ___                                           "
+"                __________1_1                                            "
+"                ____________                                             "
+"                         _1_1                                            "
+"                         ___                                             ",
+{},
+{Ladder{46, 4, 2, Up}, Ladder{49, 4, 0, Up}, Ladder{46, 5, 0, Up}, Ladder{46, 5, 1, Up}, Ladder{39, 6, 0, Right}, Ladder{56, 7, 0, Up}, Ladder{61, 7, 0, Up}, Ladder{56, 9, 0, Up}, Ladder{20, 10, 0, Right}, Ladder{20, 10, 1, Right}, Ladder{50, 10, 2, Up}, Ladder{32, 11, 0, Up}, Ladder{32, 11, 1, Up}, Ladder{32, 11, 2, Up}, Ladder{44, 11, 0, Right}, Ladder{44, 11, 1, Right}, Ladder{44, 11, 2, Right}, Ladder{50, 11, 0, Up}, Ladder{50, 11, 1, Up}, Ladder{18, 12, 2, Up}, Ladder{52, 12, 0, Left}, Ladder{17, 13, 0, Up}, Ladder{17, 13, 1, Up}, Ladder{21, 13, 1, Up}, Ladder{46, 14, 1, Left}, Ladder{13, 15, 0, Left}, Ladder{46, 15, 0, Up}, Ladder{55, 16, 0, Right}, Ladder{55, 16, 1, Right}, Ladder{56, 16, 2, Right}, Ladder{33, 18, 0, Up}, Ladder{33, 18, 1, Up}, Ladder{33, 18, 2, Up}, Ladder{40, 18, 0, Up}, Ladder{21, 19, 0, Left}, Ladder{36, 19, 0, Up}, Ladder{11, 21, 0, Up}, Ladder{24, 21, 0, Up}, Ladder{54, 22, 1, Up}, Ladder{60, 22, 0, Right}, Ladder{54, 23, 0, Up}, Ladder{14, 24, 0, Up}, Ladder{23, 26, 0, Right}, Ladder{15, 28, 2, Up}, Ladder{19, 29, 1, Left}, Ladder{21, 29, 0, Left}, Ladder{29, 31, 0, Up}, Ladder{29, 31, 1, Up}, Ladder{29, 31, 2, Up}, Ladder{32, 31, 0, Up}, Ladder{16, 32, 0, Left}, Ladder{16, 32, 1, Left}, Ladder{6, 34, 0, Right}, Ladder{9, 34, 2, Right}, Ladder{15, 34, 0, Up}, Ladder{15, 34, 1, Left}, Ladder{15, 34, 1, Up}, Ladder{0, 35, 0, Right}, Ladder{7, 36, 0, Right}, Ladder{7, 36, 1, Right}, Ladder{9, 37, 2, Right}, Ladder{17, 39, 2, Up}, Ladder{17, 40, 0, Up}, Ladder{17, 40, 1, Up}, Ladder{21, 40, 0, Up}},
+{Sausage{59, 6, 60, 6, 1}, Sausage{36, 7, 36, 8, 2}, Sausage{38, 7, 38, 8, 1}, Sausage{21, 8, 21, 9, 2}, Sausage{26, 9, 27, 9, 3}, Sausage{45, 12, 46, 12, 2}, Sausage{17, 27, 17, 28, 2}, Sausage{30, 29, 30, 30, 2}, Sausage{32, 29, 33, 29, 1}, Sausage{11, 34, 11, 35, 2}, Sausage{9, 36, 9, 37, 2}},
+{SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 1, 3}), SpecialTile({0, 2, 3, 4}), SpecialTile({0, 2}), SpecialTile({0, 3})},
+{{49, 6, None, "ABC"}, {58, 10, None, "D"}, {48, 17, None, "E"}, {15, 14, None, "FG"}, {23, 23, None, "HIJ"}, {59, 21, None, "KL"}, {15, 29, None, "MP"}, {29, 29, None, "N"}, {21, 35, None, "Q"}, {22, 44, None, "RS"}});
+
+
+*/
+#endif
+
 std::vector<Level*> tests = {
   &LachrymoseHead,
   &Southjaunt,
@@ -899,5 +1206,6 @@ std::vector<Level*> tests = {
   &BabyRock,
 #if OVERWORLD_HACK
   &OverworldSausage1,
+  &OverworldSausage2,
 #endif
 };

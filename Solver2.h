@@ -11,7 +11,7 @@ public:
 
   std::vector<Direction> Solve();
 
-  u32 ComputeScore(const State& state, Direction dir, const State& newState);
+  s32 ComputeScore(const State& state, Direction dir, const State& newState);
 
 private:
   Level* _level = nullptr;
@@ -25,11 +25,8 @@ private:
   // Stage 2
   absl::flat_hash_map<State, u32> _winningStates;
 
-  void FindWinningStates(u32 depth);
-
-  void FindFastestSolution(const State& state, std::vector<Direction>& solution, u32 score);
+  void FindWinningStates(s32 depth);
 
   // Stage 3
-  u32 _bestScore = 0xFFFF'FFFF;
-  std::vector<Direction> _bestSolution;
+  std::vector<Direction> FindFastestSolution(const State& initialState);
 };

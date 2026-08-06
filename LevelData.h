@@ -1,5 +1,8 @@
 #pragma once
 #include <ostream>
+#include <vector>
+#include <tuple>
+
 #include "WitnessRNG/StdLib.h"
 
 #ifndef SAUSAGES // Overwritten by scripts. Defaults to 3 for testing.
@@ -105,7 +108,7 @@ struct Sausage {
     FullyCooked = Cook1A | Cook1B | Cook2A | Cook2B, // If all 4 sides are cooked
   };
 
-  u8 flags; // Typeless because otherwise we have to define |=, &=, etc.
+  u8 flags = 0; // Typeless because otherwise we have to define |=, &=, etc.
   u16 _ = 0; // Unused, padding
 
   inline bool IsVertical() const { return x1 == x2; }
@@ -152,6 +155,7 @@ struct Sausage {
 class LevelData {
 public:
   friend class TestSymmetryHelper;
+  using LevelEntrance = std::tuple<Stephen, const char*, const LevelData*>;
 
   LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
     , const Stephen& stephen = {}
@@ -159,7 +163,7 @@ public:
     , std::vector<Sausage> sausages = {}
     , std::vector<SpecialTile> specialTiles = {}
 #if OVERWORLD_HACK
-  , std::vector<std::pair<Stephen, const char*>> levelEntrances = {}
+  , std::vector<LevelEntrance> levelEntrances = {}
 #endif
   );
   void Print() const;
@@ -168,6 +172,14 @@ public:
   // Frequently used for level heuristics.
   const Vector<Sausage>& GetSausages() const { return _sausages; }
   const Stephen& GetStephen() const { return _stephen; }
+
+#if OVERWORLD_HACK
+  const char* EnteredLevel() const {
+    for (int i = 0; i < _levelEntrances.Size(); i++)
+      if (_stephen == _levelEntrances[i]) return _levelNames[i];
+    return nullptr;
+  }
+#endif
 
   // Used by Solver2 to compute traversal costs
   bool IsGrill(s8 x, s8 y, s8 z) const;
@@ -194,7 +206,8 @@ protected: // Used in the Level engine
   Vector<Sausage> _sausages;
 #if OVERWORLD_HACK
   Vector<Sausage> _overworldSausages;
-  Vector<Stephen> _levelEntrances;
+  Vector<Stephen> _levelEntrances;         // entrance poses -- read by the solver (GetState)
+  Vector<const char*> _levelNames;         // destination level name per entrance -- tracking only, replayed after solving
 #endif
 
 private:

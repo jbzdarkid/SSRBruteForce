@@ -60,6 +60,15 @@ void Level::SetState(const State& state) {
 
 bool Level::Move(Direction dir) {
   bool handled = false;
+  // A DETACHED fork lodged inside a sausage (co-located at its cell) is carried by that sausage when it moves this
+  // turn. Record its host up front (in the pre-move layout); after the handler commits we track the fork to the
+  // sausage's settled end, flipping its facing if the sausage rolled -- but only if the handler itself left the fork
+  // put (a handler that already repositioned the detached fork owns it). (5-1 The Gorge m209/m218/m227.)
+  bool preDetached = !_stephen.HasFork();
+  s8 preForkX = _stephen.forkX, preForkY = _stephen.forkY, preForkZ = _stephen.forkZ;
+  s8 preHost = preDetached ? GetSausage(preForkX, preForkY, preForkZ) : (s8)-1;
+  Sausage preHostSausage = preHost != -1 ? _sausages[preHost] : Sausage{};
+
   if (!HandleLogRolling(dir, handled)) return false;
   if (!handled) {
     if (!HandleLadderMotion(dir, handled)) return false;
@@ -71,6 +80,21 @@ bool Level::Move(Direction dir) {
           if (!HandleRotation(dir, handled)) return false;
         }
       }
+    }
+  }
+
+  // Track a lodged detached fork onto its host sausage's new pose (see the note at the top of Move).
+  if (preHost != -1 && !_stephen.HasFork()
+      && _stephen.forkX == preForkX && _stephen.forkY == preForkY && _stephen.forkZ == preForkZ) {
+    const Sausage& post = _sausages[preHost];
+    bool moved = post.x1 != preHostSausage.x1 || post.y1 != preHostSausage.y1
+              || post.x2 != preHostSausage.x2 || post.y2 != preHostSausage.y2 || post.z != preHostSausage.z;
+    if (moved) {
+      bool end1 = (preHostSausage.x1 == preForkX && preHostSausage.y1 == preForkY);
+      _stephen.forkX = end1 ? post.x1 : post.x2;
+      _stephen.forkY = end1 ? post.y1 : post.y2;
+      _stephen.forkZ = post.z;
+      if ((preHostSausage.flags ^ post.flags) & Sausage::Rolled) _stephen.forkDir = Inverse(_stephen.forkDir);
     }
   }
 
@@ -1603,12 +1627,25 @@ void Level::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
     }
     // The extra tumble is imparted only by a PERPENDICULAR base that actually ROLLED under it; a parallel base, or one
     // that merely slid, imparts none. Read the base and its roll (Rolled flag flipped) from the pre-move layout.
-    bool baseRolled = false, onParallel = false;
+    bool baseRolled = false, onParallel = false, baseFallsAway = false;
     auto examine = [&](s8 ex, s8 ey) {
       s8 b = GetSausage(ex, ey, orig.z - 1);
       if (b == -1 || b == rider) return;
       if (_sausages[b].IsHorizontal() == orig.IsHorizontal()) onParallel = true;
-      else if (((preMove[b].flags ^ plan.sausages[b].flags) & Sausage::Rolled) != 0) baseRolled = true;
+      else if (((preMove[b].flags ^ plan.sausages[b].flags) & Sausage::Rolled) != 0) {
+        baseRolled = true;
+        // The flick lands only if the rolled base stays right under the rider -- dropping AT MOST one level as it rolls
+        // onto the immediately adjacent lower ground (5-1 The Gorge m209: a base that steps down one still kicks the
+        // rider's front over). A base that PLUMMETS two or more levels off its shelf falls out from under the rider
+        // before it can flick it, so the rider slides just the one carried cell (5-1 Gorge m195, 5-4 Slope View m379).
+        // Judge the drop against where the base SETTLES (SausageSupported counts a fork/body still holding it, so a
+        // fork-borne fork-hat -- drop 0 -- keeps its flick). Simulate the fall from the base's rolled pose.
+        const Sausage& pb = plan.sausages[b];
+        s8 settledZ = pb.z;
+        while (settledZ > 0 && !SausageSupported(plan, pb.x1, pb.y1, settledZ) && !SausageSupported(plan, pb.x2, pb.y2, settledZ))
+          settledZ--;
+        if ((orig.z - 1) - settledZ >= 2) baseFallsAway = true;
+      }
     };
     examine(orig.x1, orig.y1);
     examine(orig.x2, orig.y2);
@@ -1633,7 +1670,7 @@ void Level::MarkDoubleMoves(MovePlan& plan, const Sausage* preMove) const {
     // doesn't catch.
     s8 shelfSausage = GetSausage(leadX + mdx, leadY + mdy, orig.z - 1);
     if (shelfSausage != -1 && shelfSausage != rider && !(plan.mask & (1ull << shelfSausage))) caughtByShelf = true;
-    if (baseRolled && !onParallel && !caughtByShelf && !trailPlanted) {
+    if (baseRolled && !onParallel && !caughtByShelf && !trailPlanted && !baseFallsAway) {
       plan.doubleMoveMask |= (1ull << rider);
       plan.doubleMoveDir[rider] = dir;
     }

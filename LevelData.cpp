@@ -8,7 +8,7 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
   , std::vector<Sausage> sausages
   , std::vector<SpecialTile> specialTiles
 #if OVERWORLD_HACK
-  , std::vector<std::pair<Stephen, const char*>> levelEntrances
+  , std::vector<LevelEntrance> levelEntrances
 #endif
   ) : _width(width),
     _height(height),
@@ -69,12 +69,13 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
         num = c - 'a' + 26;
       }
 
-      for (const auto& [position, letters] : levelEntrances) {
+      for (const auto& [position, letters, level] : levelEntrances) {
         if (strchr(letters, c)) {
           if (num == _overworldSausages.Size()) {
             assert(_overworldSausages.Size() == _levelEntrances.Size()); // Should stay in sync for all levels
             _overworldSausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
             _levelEntrances.Push(position);
+            _levelNames.Push(level->name);
           } else {
             _overworldSausages[num].x2 = x;
             _overworldSausages[num].y2 = y;

@@ -36,14 +36,13 @@ std::vector<Direction> Solver::Solve() {
   }
 
   // Step 2: Re-traverse the tree backwards to identify winning states.
-  for (u32 depth = maxDepth - 1; depth > 0; depth--) {
+  for (s32 depth = maxDepth - 1; depth >= 0; depth--) {
     FindWinningStates(depth);
   }
 
   // Step 3: Now that we have a minimal set of winning states, DFS to identify the fastest realtime solution.
-  std::vector<Direction> solution;
-  FindFastestSolution(initialState, solution, 0);
-  return _bestSolution;
+  std::vector<Direction> solution = FindFastestSolution(initialState);
+  return solution;
 }
 
 void Solver::ProcessOneLayer(u32 depth) {
@@ -75,17 +74,19 @@ void Solver::ProcessOneLayer(u32 depth) {
   std::cout << "Finished exploring depth " << depth << ", and found " << newStates << " new states.\n";
 }
 
-void Solver::FindWinningStates(u32 depth) {
+void Solver::FindWinningStates(s32 depth) {
   u32 newlyWinningStates = 0;
   for (u32 bucket = 0; bucket < _numBuckets; bucket++) {
     LayerCache<State> layer("depth", depth, "bucket", bucket);
     for (const State& state : layer) {
+      u32 bestCost = 0xFFFF'FFFF;
+
       for (Direction dir : { Up, Down, Left, Right }) {
         _level->SetState(state);
 
         // We will have multiple 'winning' depths, so it's possible that we find immediately winning states.
         if (_level->Won()) {
-          _winningStates.emplace(state, depth);
+          _winningStates.emplace(state, 0);
           newlyWinningStates++;
           break;
         }
@@ -97,10 +98,14 @@ void Solver::FindWinningStates(u32 depth) {
         auto search = _winningStates.find(newState);
         if (search == std::end(_winningStates)) continue; // Not a winning move
 
-        // If any move is winning from this state, we can record it and move on.
-        // We don't actually care about the sequence of moves yet, just that there is a winning move.
-        _winningStates.emplace(state, depth);
-        break;
+        // If any move is winning from this state, we record it and compute the overall cost.
+        u32 cost = search->second + ComputeScore(state, dir, _level->GetState(false));
+        if (cost < bestCost) bestCost = cost;
+      }
+
+      if (bestCost < 0xFFFF'FFFF) {
+        _winningStates.emplace(state, bestCost);
+        newlyWinningStates++;
       }
     }
   }
@@ -108,30 +113,34 @@ void Solver::FindWinningStates(u32 depth) {
   std::cout << "Finished identifying winning states at depth " << depth << ", and found " << newlyWinningStates << " new winning states.\n";
 }
 
-void Solver::FindFastestSolution(const State& state, std::vector<Direction>& solution, u32 score) {
-  _level->SetState(state);
-  if (_level->Won()) {
-    if (score < _bestScore) {
-      _bestSolution = solution;
-      _bestScore = score;
+std::vector<Direction> Solver::FindFastestSolution(const State& initialState) {
+  auto start = _winningStates.find(initialState);
+  if (start == std::end(_winningStates)) return {}; // unsolvable
+
+  std::vector<Direction> solution;
+  State state = initialState;
+  s32 remainingCost = start->second;
+  while (remainingCost > 0) {
+    for (Direction dir : { Up, Down, Left, Right }) {
+      _level->SetState(state);
+      if (!_level->Move(dir)) continue;
+
+      State newState = _level->GetState();
+      auto search = _winningStates.find(newState);
+      if (search == std::end(_winningStates)) continue; // Not a winning move
+
+      // If this move's cost + the target node's cost is equal to our optimal cost, then this is an optimal move.
+      s32 cost = search->second + ComputeScore(state, dir, _level->GetState(false));
+      if (cost == remainingCost) {
+        solution.push_back(dir);
+        state = newState;
+        remainingCost = search->second;
+        break;
+      }
     }
-    return;
   }
 
-  for (Direction dir : { Up, Down, Left, Right }) {
-    _level->SetState(state);
-
-    if (!_level->Move(dir)) continue;
-
-    State newState = _level->GetState();
-    auto search = _winningStates.find(newState);
-    if (search == std::end(_winningStates) || search->second != solution.size() + 1) continue; // Not a winning move, or not an optimal winning move.
-
-    u32 scoreDelta = ComputeScore(state, dir, _level->GetState(false));
-    solution.push_back(dir);
-    FindFastestSolution(newState, solution, score + scoreDelta);
-    solution.pop_back();
-  }
+  return solution;
 }
 
 Direction DirectionBetween(s8 x1, s8 y1, s8 x2, s8 y2) {
@@ -140,8 +149,8 @@ Direction DirectionBetween(s8 x1, s8 y1, s8 x2, s8 y2) {
   return None;
 }
 
-u32 Solver::ComputeScore(const State& state, Direction dir, const State& newState) {
-  u32 score = 1000; // By default, every accepted move costs 1 unit of time
+s32 Solver::ComputeScore(const State& state, Direction dir, const State& newState) {
+  s32 score = 1000; // By default, every accepted move costs 1 unit of time
 
   bool sidewaysPress = dir != state.stephen.dir && dir != (Direction)(7 - state.stephen.dir);
 

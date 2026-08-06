@@ -174,13 +174,27 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
 }
 
 bool SolveLevel(Level* level) {
+#if OVERWORLD_HACK
+  State start = level->GetState();
+#endif
   Solver solver(level);
   std::vector<Direction> solution = solver.Solve();
 
   if (solution.empty()) return false;
 
   std::ofstream out("solved.dem");
+#if OVERWORLD_HACK
+  // Replay the solution so each move that steps onto a level entrance can be tagged for later stitching.
+  level->SetState(start);
+  for (Direction dir : solution) {
+    out << DIR_NAMES[dir] << '\n';
+    level->Move(dir);
+    level->SetState(level->GetState()); // Re-materialize dropped overworld walls before the next move.
+    if (const char* entered = level->EnteredLevel()) out << "Level " << entered << '\n';
+  }
+#else
   for (Direction dir : solution) out << DIR_NAMES[dir] << '\n';
+#endif
   return true;
 }
 

@@ -3,10 +3,12 @@
 #   .\run-tests.ps1                            # build + replay all levels (logs to run-tests.log)
 #   .\run-tests.ps1 -Solve "3-14"              # build + solve named level
 #   .\run-tests.ps1 -TestName "3-13 Cold Gate" # only levels whose name contains this substring
-#   .\run-tests.ps1 -DemoDir "C:\path\to\dems" # Custom path to a demo directory (default ..\SSRDecompile\App)
+#   .\run-tests.ps1 -World 1                    # only world 1's levels (the route runs separately by name)
+#   .\run-tests.ps1 -TestName "Cold Gate" -DemoOverride "C:\path\to\a.dem" # replay a specific demo file
 [CmdletBinding()]
 param(
     [string] $TestName = "",
+    [int]    $World = 0,
     [string] $DemoOverride = "",
     [switch] $Solve,
     [switch] $DebugMode
@@ -30,23 +32,23 @@ $Configuration = if ($DebugMode) { "Debug" } else { "Release" }
 $exe = ".\x64\$Configuration\SSRBruteForce.exe"
 
 $levelDemos = @(
-    [pscustomobject]@{ Name = "1-1 Lachrymose Head";   Dem = "1-1.dem";  Sausages = 3 }
-    [pscustomobject]@{ Name = "1-2 Southjaunt";        Dem = "1-2.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-3 Infant's Break";    Dem = "1-3.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-5 Little Fire";       Dem = "1-4.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-7 Bay's Neck";        Dem = "1-5.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "1-8 Burning Wharf";     Dem = "1-6.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-6 Eastreach";         Dem = "1-7.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-4 Comely Hearth";     Dem = "1-8.dem";  Sausages = 2 }
-    [pscustomobject]@{ Name = "1-9 Happy Pool";        Dem = "1-9.dem";  Sausages = 1 }
-    [pscustomobject]@{ Name = "1-10 Maiden's Walk";    Dem = "1-10.dem"; Sausages = 1 }
-    [pscustomobject]@{ Name = "1-11 Fiery Jut";        Dem = "1-11.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "1-12 Merchant's Elegy"; Dem = "1-12.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "1-13 Seafinger";        Dem = "1-13.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "1-14 The Clover";       Dem = "1-14.dem"; Sausages = 3 }
-    [pscustomobject]@{ Name = "1-15 Inlet Shore";      Dem = "1-15.dem"; Sausages = 2 }
-    [pscustomobject]@{ Name = "1-16 The Anchorage";    Dem = "1-16.dem"; Sausages = 3 }
-    [pscustomobject]@{ Name = "World 1 route";         Dem = "1-route.dem"; Sausages = -1 }
+    [pscustomobject]@{ World = 1; Name = "Lachrymose Head";  Sausages = 3 }
+    [pscustomobject]@{ World = 1; Name = "Southjaunt";       Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Infant's Break";   Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Little Fire";      Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Bay's Neck";       Sausages = 1 }
+    [pscustomobject]@{ World = 1; Name = "Burning Wharf";    Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Eastreach";        Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Comely Hearth";    Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Happy Pool";       Sausages = 1 }
+    [pscustomobject]@{ World = 1; Name = "Maiden's Walk";    Sausages = 1 }
+    [pscustomobject]@{ World = 1; Name = "Fiery Jut";        Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Merchant's Elegy"; Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "Seafinger";        Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "The Clover";       Sausages = 3 }
+    [pscustomobject]@{ World = 1; Name = "Inlet Shore";      Sausages = 2 }
+    [pscustomobject]@{ World = 1; Name = "The Anchorage";    Sausages = 3 }
+    [pscustomobject]@{ World = 1; Name = "World 1 route";    Sausages = -1 }
     [pscustomobject]@{ Name = "2-1 Emerson Jetty";     Dem = "2-1.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "2-2 Sad Farm";          Dem = "2-2.dem";  Sausages = 1 }
     [pscustomobject]@{ Name = "2-3 Cove";              Dem = "2-3.dem";  Sausages = 2 }
@@ -106,10 +108,11 @@ function Build-Variant {
     }
 }
 
-# Candidate levels, optionally narrowed by -TestName (substring match on the display name).
+# Candidate levels, optionally narrowed by -World and/or -TestName (substring match on the display name).
 $candidates = $levelDemos
+if ($World)    { $candidates = $candidates | Where-Object { $_.World -eq $World } }
 if ($TestName) { $candidates = $candidates | Where-Object { $_.Name -like "*$TestName*" } }
-if (@($candidates).Count -eq 0) { throw "No level name contains $TestName." }
+if (@($candidates).Count -eq 0) { throw "No levels matched the given filters." }
 
 # Build each distinct sausage count once (rebuilds are expensive), then replay every candidate under it.
 $unified = [ordered]@{}
@@ -134,7 +137,8 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
         } else {
             echo "Testing $($lvl.Name)"
             if (-not $DemoOverride) {
-                $path = "../SSRDecompile/App/" + $lvl.Dem
+                $dem = if ($lvl.Dem) { $lvl.Dem } else { "$($lvl.Name).dem" }
+                $path = "../SSRDecompile/App/" + $dem
             } else {
                 $path = $DemoOverride
             }

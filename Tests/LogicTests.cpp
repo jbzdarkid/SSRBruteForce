@@ -1808,6 +1808,52 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({10, 1, 10, 2, 0, Sausage::None});   // cantilevered rider double-moved two cells and dropped to z0
   }
 
+  // 5-1 The Gorge (m209): a rolled base carries a rider, and the base rolls off a one-high shelf, dropping a SINGLE
+  // level onto the adjacent ground. Stepping down just one level, it stays under the rider long enough to flick it, so
+  // the aligned rider still DOUBLE-MOVES two cells (and drops to the floor). Level2 must not confuse this one-step drop
+  // with a base that plummets away.
+  MAKE_SYMMETRICAL_TEST(RolledBaseSteppingDownStillDoubleMoves) {
+    TestSymmetryHelper level(symmetry, Level(13, 8, "arena",
+      "aa___________"
+      "_____________"
+      "_____________"
+      "_____________"
+      "__________11_"
+      "__________1__"
+      "_____________"
+      "_____________",
+      Stephen{10, 5, 1, Down}, {},
+      { Sausage{10, 4, 11, 4, 1}, Sausage{10, 3, 10, 4, 2} }));
+    level.AssertPosition(10, 5, Down);
+    level.AssertMoveSucceeds(Up); // back north into the base -> it rolls off the shelf, dropping one level
+    level.AssertPosition(10, 4, Down);
+    level.AssertSausage({10, 3, 11, 3, 0, Sausage::Rolled}); // base rolled north one cell and fell to z0
+    level.AssertSausage({10, 1, 10, 2, 0, Sausage::None});   // rider double-moved two cells and dropped to z0
+  }
+
+  // 5-1 The Gorge (m195) / 5-4 Slope View (m379): same rolled-base-carries-rider setup, but the base sits on a TWO-high
+  // shelf and plummets TWO levels off its edge. A base that drops two or more levels falls out from under the rider
+  // before it can flick it, so the aligned rider is carried just ONE cell (then drops a level). Level2's double-move
+  // detector only checked that the base ROLLED, not how far it fell, so it tumbled the rider an extra cell.
+  MAKE_SYMMETRICAL_TEST(RolledBasePlummetingCancelsDoubleMove) {
+    TestSymmetryHelper level(symmetry, Level(13, 8, "arena",
+      "aa___________"
+      "_____________"
+      "_____________"
+      "_____________"
+      "__________22_"
+      "__________2__"
+      "_____________"
+      "_____________",
+      Stephen{10, 5, 2, Down}, {},
+      { Sausage{10, 4, 11, 4, 2}, Sausage{10, 3, 10, 4, 3} }));
+    level.AssertPosition(10, 5, Down);
+    level.AssertMoveSucceeds(Up); // back north into the base -> it rolls off the shelf and plummets two levels
+    level.AssertPosition(10, 4, Down);
+    level.AssertSausage({10, 3, 11, 3, 0, Sausage::Rolled}); // base rolled north one cell and fell to z0
+    level.AssertSausage({10, 2, 10, 3, 1, Sausage::None});   // rider carried just ONE cell (no flick) and dropped to z1
+  }
+
   // 3-1 Cold Jag (leading divergence): Stephen stands on a support sausage, speared into a rider sausage that is
   // stacked on a THIRD sausage sitting beside the support. Pressing back log-rolls the support, whose roll chains into
   // the third sausage; the speared rider rides rigidly one cell with Stephen. Level2 used to move the rider TWICE --

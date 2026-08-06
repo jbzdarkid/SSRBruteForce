@@ -100,8 +100,9 @@ function Get-MoveUnits {
 # table and the summary line (used when narrowed to specific levels).
 function Compare-Timing {
     param([string] $Name, [string] $Demo, [switch] $Detail)
-    $cppUnits    = Get-MoveUnits (& $exe    $Name $Demo timing 2>&1)
-    $oracleUnits = Get-MoveUnits (& $oracle $Name $Demo timing 2>&1)
+    $cppName     = $Name -replace '^1-\d+ ', ''  # world-1 C++ levels dropped their numeric prefix; the oracle still needs it
+    $cppUnits    = Get-MoveUnits (& $exe    $cppName $Demo timing 2>&1)
+    $oracleUnits = Get-MoveUnits (& $oracle $Name    $Demo timing 2>&1)
 
     $moveCount   = [Math]::Max($cppUnits.Count, $oracleUnits.Count)
     $mismatches  = 0
