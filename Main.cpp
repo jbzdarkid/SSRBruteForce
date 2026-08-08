@@ -80,9 +80,11 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
       bool moved = false;
       for (int oi = 0; oi < 4; oi++) {
         level->SetState(before);
-        if (level->Move(dirs[order[oi]])) { segment.push_back(dirs[order[oi]]); moved = true; break; }
+        // Reject bonks: the game accepts wall/grill/turn-bonks that change nothing, but they never advance an optimal
+        // solution -- treat a no-op move as refused so no demo contains one.
+        if (level->Move(dirs[order[oi]]) && !(level->GetState() == before)) { segment.push_back(dirs[order[oi]]); moved = true; break; }
       }
-      if (!moved) { level->SetState(before); break; } // dead end -- every move refused
+      if (!moved) { level->SetState(before); break; } // dead end -- every move refused or a no-op
 
       State cur = level->GetState();
       if (occupied.insert(BucketKey(cur, bin)).second) { // first state in this grid cell -> a genuinely new region
@@ -119,6 +121,7 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
   for (const auto& e : std::filesystem::directory_iterator(outDir))
     if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
   int n = 0, longestDemo = 0;
+  Solver scorer(level);
   for (int i = 1; i < (int)tree.size(); i++) {
     if (childCount[i] != 0) continue; // interior landmark -- already on some leaf's root path
     std::vector<Direction> path = rootPath(i);
@@ -127,6 +130,19 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
     std::ofstream out(outDir + "/" + name);
     for (Direction d : path) out << DIR_NAMES[d] << '\n';
     out << "Stop\n" << tree[i].state << '\n';
+    // Record this engine's per-move ComputeScore units so the oracle can check its tick-simulated timing against ours,
+    // move by move -- the timing analogue of the final-state check. ComputeScore matches sausages by array slot, so it
+    // needs the UNSORTED state (GetState(false)); the sorted GetState() reorders slots and would fabricate phantom drops.
+    level->SetState(start);
+    State prev = level->GetState(false);
+    out << "Units:";
+    for (Direction d : path) {
+      level->Move(d);
+      State cur = level->GetState(false);
+      out << ' ' << scorer.ComputeScore(prev, d, cur);
+      prev = cur;
+    }
+    out << '\n';
   }
 
   // --- Diagnostics (all O(N) -- no pairwise distance) ---
@@ -245,6 +261,25 @@ int main(int argc, char* argv[]) {
           buffer.pop_back();
           continue;
         }
+      }
+
+      // "units" mode: emit only the per-move ComputeScore units line, computed from UNSORTED slot-matched states
+      // exactly as the RRT writer does, so the timing checker can re-score a saved demo against the CURRENT
+      // ComputeScore without re-running the 100k RRT.
+      if (argc >= 4 && std::string(argv[3]) == "units") {
+        Solver scorer(test);
+        State start = test->GetState();
+        test->SetState(start);
+        State prev = test->GetState(false);
+        printf("Units:"); // plain integers (no locale grouping), matching the RRT writer's ofstream output
+        for (Direction dir : buffer) {
+          test->Move(dir);
+          State cur = test->GetState(false);
+          printf(" %d", scorer.ComputeScore(prev, dir, cur));
+          prev = cur;
+        }
+        printf("\n");
+        return 0;
       }
 
       printf("Testing level %s\n", test->name);

@@ -44,6 +44,7 @@ private:
     u64 rigidLoad = 0; // sausages moving as ONE rigid load with Stephen this move (speared+riders, head/fork hat+stack); co-movers must never be treated as obstacles to each other
     Direction doubleMoveDir[NUM_SAUSAGES] = {};
     bool rotating = false;
+    bool logRollPush = false; // this plan's pushes are a log roll: a fork SPEARED into a pushed sausage isn't an obstacle (it rides along), so don't refuse a roll onto it
   };
 
   // Build a fresh plan seeded with the current game state -- |stephen| and every |sausages| slot copied from the live
