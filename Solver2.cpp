@@ -193,8 +193,11 @@ s32 Solver::ComputeScore(const State& state, Direction dir, const State& newStat
       const Sausage& after = newState.sausages[i];
       // Mostly, the x1/y1 coordinate will identify a sausage's movement direciton.
       // However, when a sausage pivots, they will have different directions, so we skip computing the second direction in that case.
-      Direction rolled = DirectionBetween(before.x1, before.y1, after.x1, after.y1);
-      if (rolled == None) rolled = DirectionBetween(before.x2, before.y2, after.x2, after.y2);
+      Direction rolled = DirectionBetween(after.x1, after.y1, before.x1, before.y1);
+      if (rolled == None) rolled = DirectionBetween(after.x2, after.y2, before.x2, before.y2);
+
+      // If a sausage rolls in the direction stephen is facing *and* it drops, it doesn't accrue a directional cost (just a drop cost).
+      if (after.z < before.z && rolled == newState.stephen.dir) continue;
       sausageDirections |= 1u << rolled;
     }
     // -500 to account for the 'None' direction (from non-moving sausages)
@@ -224,6 +227,12 @@ s32 Solver::ComputeScore(const State& state, Direction dir, const State& newStat
     if (sausageDelta < maximumDrop) maximumDrop = sausageDelta;
   }
   score += 1000 * -maximumDrop;
+
+  // Detached fork drop (seems to run sequentially to the normal gravity steps)
+  if (state.stephen.HasFork() && !newState.stephen.HasFork()) {
+    s8 forkDelta = state.stephen.forkZ - newState.stephen.forkZ;
+    if (forkDelta > 0) score += 1000 * forkDelta;
+  }
 
   // TODO: This does not correctly handle logrolling
   Direction stephenMoved = DirectionBetween(state.stephen.x, state.stephen.y, newState.stephen.x, newState.stephen.y);
