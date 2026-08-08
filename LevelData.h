@@ -155,7 +155,12 @@ struct Sausage {
 class LevelData {
 public:
   friend class TestSymmetryHelper;
-  using LevelEntrance = std::tuple<Stephen, const char*, const LevelData*>;
+  struct LevelEntrance {
+    Stephen entrance;
+    const char* letters;
+    const LevelData* level;
+    std::vector<u8> sausageHeights = {};
+  };
 
   LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
     , const Stephen& stephen = {}

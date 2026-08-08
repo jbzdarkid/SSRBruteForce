@@ -1554,9 +1554,10 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 3, 3, 3, 3, Sausage::None});   // rider rode west with the fork-hat
   }
 
-  // Log roll carrying a fork-tip sausage oriented ACROSS the roll direction: being fork-borne (not a rigid head hat),
-  // it rolls as it rides. Level2's log-roll used to translate the fork-hat without ever flipping it to its rolled face.
-  MAKE_SYMMETRICAL_TEST(LogRollForkHatRollsAcrossAxis) {
+  // Log roll carrying a fork-tip sausage oriented ACROSS the roll direction. Per the game rule, only the log Stephen
+  // stands on rolls; anything supported by his head or fork translates RIGIDLY. So the vertical fork-hat, though carried
+  // across its long axis, does NOT roll -- it just slides one cell with the fork. (3-8 Cold Head / 5-9 Drumlin m530.)
+  MAKE_SYMMETRICAL_TEST(LogRollForkHatRidesRigidAcrossAxis) {
     TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
       "        "
       "        "
@@ -1571,13 +1572,13 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Right);                       // press east -> log rolls west, Stephen rides
     level.AssertPosition(4, 3, Left);
     level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
-    level.AssertSausage({3, 3, 3, 4, 2, Sausage::Rolled}); // fork-hat rode west ACROSS its axis -> it rolled
+    level.AssertSausage({3, 3, 3, 4, 2, Sausage::None});   // fork-hat rode west rigidly (fork-borne -> no roll)
   }
 
-  // Log roll where the fork-hat rolls AND carries a rider aligned with the motion: the rider tumbles an extra cell off
-  // the rolling fork-hat (a double-move). This exercises the second MarkDoubleMoves pass that runs after the log-roll
-  // hat carry -- reachable at 3 sausages only because the fork-hat (fork-borne) rolls, unlike a rigid head hat.
-  MAKE_SYMMETRICAL_TEST(LogRollForkHatRiderDoubleMoves) {
+  // Log roll carrying a fork-tip sausage that ITSELF has a rider aligned with the motion. Because the fork-hat rides
+  // rigidly (fork-borne, no roll), the rider stacked on it is also fork-supported (transitively) and translates rigidly
+  // too -- one cell, no double-move. (Confirms the corrected 5-9 Drumlin rule for a stacked fork-hat rider.)
+  MAKE_SYMMETRICAL_TEST(LogRollForkHatRiderRidesRigid) {
     TestSymmetryHelper level(symmetry, Level(9, 6, "arena",
       "         "
       "         "
@@ -1593,8 +1594,8 @@ TEST_CLASS(OneOffTests) {
     level.AssertMoveSucceeds(Right);                     // press east -> log rolls west, Stephen rides
     level.AssertPosition(4, 3, Left);
     level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
-    level.AssertSausage({3, 3, 3, 4, 2, Sausage::Rolled}); // fork-hat rolled west across its axis
-    level.AssertSausage({2, 3, 3, 3, 3, Sausage::None});   // rider carried one cell + double-moved a second off the rolled fork-hat
+    level.AssertSausage({3, 3, 3, 4, 2, Sausage::None});   // fork-hat rides west rigidly (fork-borne -> no roll)
+    level.AssertSausage({3, 3, 4, 3, 3, Sausage::None});   // rider rides rigidly one cell with the fork-hat (no double-move)
   }
 
   // 3-11 Cold Terrace (DiffEngines): Stephen is speared into a horizontal sausage to his west and stands on a Up-ladder.

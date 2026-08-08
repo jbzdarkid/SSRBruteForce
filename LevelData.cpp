@@ -60,20 +60,19 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
 #if OVERWORLD_HACK
-      // Fill in the floor and the sausage as a 'wall'. They will be removed by SetState at runtime once each level is completed.
-      _walls(x, y) = 0b0000'0011;
-
       if (c >= 'A' && c <= 'Z') {
         num = c - 'A';
       } else {
         num = c - 'a' + 26;
       }
 
-      for (const auto& [position, letters, level] : levelEntrances) {
-        if (strchr(letters, c)) {
+      for (const auto& [position, letters, level, sausageHeights] : levelEntrances) {
+        if (const char* j = strchr(letters, c)) {
           if (num == _overworldSausages.Size()) {
             assert(_overworldSausages.Size() == _levelEntrances.Size()); // Should stay in sync for all levels
-            _overworldSausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
+            // The wall's z is the pad it stands on, so SetState restores that terrain (not bare floor) when it clears.
+            s8 z = sausageHeights.empty() ? 0 : sausageHeights[j - letters];
+            _overworldSausages.Push({x, y, -127, -127, z, Sausage::Flags::None});
             _levelEntrances.Push(position);
             _levelNames.Push(level->name);
           } else {
@@ -115,6 +114,13 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 #if OVERWORLD_HACK
   // Add the final sausage in as a wall (but not a level entrance).
   if (_sausages.Size() > 0) _overworldSausages.Push(_sausages[0]);
+
+  // Seed every sausage-wall cell locked at its own pad height (the pad plus the sausage's own level) so the pre-solve
+  // GetState reads each level as not-yet-cleared. Runs before ladder height-extension so ladders climb the real wall.
+  for (const Sausage& s : _overworldSausages) {
+    _walls(s.x1, s.y1) = (1 << (s.z + 2)) - 1;
+    _walls(s.x2, s.y2) = (1 << (s.z + 2)) - 1;
+  }
 #endif
 
   if (stephen.x > -1 && _stephen.x > -1) {
