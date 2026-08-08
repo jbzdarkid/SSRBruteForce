@@ -204,29 +204,23 @@ s32 Solver::ComputeScore(const State& state, Direction dir, const State& newStat
     score += 500 * __popcnt(sausageDirections) - 500;
   }
 
-  // Double-moves are full cost for each sausage that moves.
+  // Count double-moves and drops for each sausage.
+  s8 maximumSausageMove = 0;
   for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+    if (i == speared) continue; // Speared sausages do not accrue a falling/double-move cost.
     const Sausage& before = state.sausages[i];
     const Sausage& after = newState.sausages[i];
-    s8 distance = (after.x1 - before.x1) + (after.y1 - before.y1);
-    if (distance < 0) distance = -distance;
-    if (distance > 1) score += 1000 * (distance - 1);
-  }
 
-  // Ladder motion costs 1 beat per rung climbed
-  s8 ladderDelta = newState.stephen.z - state.stephen.z;
-  if (ladderDelta > 0) {
-    score += 1000 * ladderDelta;
-  }
+    s8 sausageMovement = 0;
+    if (std::abs(before.x1 - after.x1) == 2 || std::abs(before.y1 - after.y1) == 2) sausageMovement++;
+    sausageMovement += std::abs(newState.sausages[i].z - state.sausages[i].z);
 
-  // Descending a ladder moves simultaneously with dropped sausages, so compute them together
-  s8 maximumDrop = 0;
-  if (ladderDelta < maximumDrop) maximumDrop = ladderDelta;
-  for (s8 i = 0; i < NUM_SAUSAGES; i++) {
-    s8 sausageDelta = newState.sausages[i].z - state.sausages[i].z;
-    if (sausageDelta < maximumDrop) maximumDrop = sausageDelta;
+    if (sausageMovement > maximumSausageMove) maximumSausageMove = sausageMovement;
   }
-  score += 1000 * -maximumDrop;
+  score += 1000 * maximumSausageMove;
+
+  s8 stephenMove = std::abs(newState.stephen.z - state.stephen.z);
+  score += 1000 * stephenMove;
 
   // Detached fork drop (seems to run sequentially to the normal gravity steps)
   if (state.stephen.HasFork() && !newState.stephen.HasFork()) {
@@ -234,13 +228,8 @@ s32 Solver::ComputeScore(const State& state, Direction dir, const State& newStat
     if (forkDelta > 0) score += 1000 * forkDelta;
   }
 
-  // TODO: This does not correctly handle logrolling
   Direction stephenMoved = DirectionBetween(state.stephen.x, state.stephen.y, newState.stephen.x, newState.stephen.y);
   if (dir == (Direction)(7 - stephenMoved)) score--; // Prefer backwards steps where possible as a tie break
-
-  // TODO: Time motion w/ fork carry
-  // TODO: Time motion as forkless -> rotations *and* lateral motion
-  // TODO: Time motion when pushing a block
 
   return score;
 }
