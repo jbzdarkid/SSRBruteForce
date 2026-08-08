@@ -516,6 +516,16 @@ Level ToadsFolly = [] {
     for (const Sausage& sausage : level->GetSausages()) {
       if (sausage.IsAt(8, 2, 2)) return false;
     }
+
+    // Sadly, the above is not sufficient to constrain the search space (although it does a good job).
+    // We compute a bare count of "distances the sausages have to travel" plus "distance stephen has to travel" (as manhattan distances).
+    // This is not perfectly accurate, it provides a safe upper bound requirement for a solution to win by move 145 (best is 142).
+    const int limit = 143 - (int)depth;
+    const Stephen& stephen = level->GetStephen();
+    for (const Sausage& s : level->GetSausages()) {
+      if (s.IsFullyCooked()) continue;
+      if (s.x1 + s.y1 > limit || stephen.x + stephen.y > limit) return false;
+    }
     return true;
   };
   return toadsFolly;
