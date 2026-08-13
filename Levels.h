@@ -432,7 +432,7 @@ Level ColdHorizon(15, 5, "3-12 Cold Horizon",
 
 Level ColdGate = [] {
   Level coldGate(18, 11, "3-13 Cold Gate",
-  "####              "
+  "#####             "
   "####?22277        "
   "####?21$$1        "
   "####?21$$1  ______"
@@ -874,7 +874,7 @@ Level OverworldSausage1(30, 33, "World 1 route",
   "               ______     ____"
   "   _______     ___11__11111___"
   "   _ _   _________1__    _1___"
-  " ____ABC __1_zz______    _>___"
+  " ____ABC __1_zz______    _____"
   " ____ABC______________    ___ "
   "          __________          "
   "____DD_______________         "
@@ -906,6 +906,7 @@ Level OverworldSausage1(30, 33, "World 1 route",
   {Ladder{18, 5, 0, Up}, Ladder{26, 5, 0, Up}},
   {},
   {},
+  Stephen{26, 5, 0, Right},
   World1Entrances);
 
 const std::vector<Level::LevelEntrance> World2Entrances = {
@@ -942,7 +943,7 @@ Level OverworldSausage2(54, 49, "World 2 route",
   "                  ______   11______________           "
   "             111111_11_____________________           "
   "             11111___1111__z1______________           "
-  "          ___<_    ___?71__z1______________           "
+  "          _____    ___?71__z1______________           "
   "           ___     ___661__11______________           "
   "                   ___111___1______________           "
   "              11   ________________________           "
@@ -975,6 +976,7 @@ Level OverworldSausage2(54, 49, "World 2 route",
   {Ladder{13, 8, 0, Right}, Ladder{5, 9, 0, Left}, Ladder{36, 10, 0, Up}, Ladder{29, 17, 0, Left}, Ladder{13, 20, 0, Up}, Ladder{21, 20, 0, Up}, Ladder{31, 41, 0, Up}, Ladder{39, 41, 0, Up}},
   {},
   {SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 1, 2, 6, 7, 8})},
+  Stephen{13, 20, 0, Left},
   World2Entrances);
 
 const std::vector<Level::LevelEntrance> World3Entrances = {
@@ -1029,7 +1031,7 @@ Level OverworldSausage3(83, 49, "World 3 route",
   "                              __   1      _e__22_______f______1__             _    "
   "                              ___  1      ____gg______________1______              "
   "                              ____ 1               ________  __ _____              "
-  "                              __<111               ________                        "
+  "                              ___111               ________                        "
   "                              ____                 ________                        "
   "                               __                  __hh__222                       "
   "                               _                   ______232_____                  "
@@ -1048,6 +1050,7 @@ Level OverworldSausage3(83, 49, "World 3 route",
   {Ladder{15, 8, 0, Up}, Ladder{59, 9, 1, Left}, Ladder{12, 10, 1, Down}, Ladder{13, 10, 1, Down}, Ladder{37, 10, 0, Right}, Ladder{47, 10, 1, Up}, Ladder{56, 10, 0, Up}, Ladder{56, 10, 1, Up}, Ladder{57, 11, 0, Down}, Ladder{28, 13, 1, Up}, Ladder{30, 13, 0, Up}, Ladder{33, 13, 1, Up}, Ladder{40, 14, 0, Up}, Ladder{28, 15, 0, Up}, Ladder{9, 16, 1, Up}, Ladder{9, 16, 2, Up}, Ladder{9, 16, 3, Up}, Ladder{9, 16, 4, Up}, Ladder{9, 16, 5, Up}, Ladder{9, 16, 6, Up}, Ladder{12, 16, 0, Left}, Ladder{12, 16, 1, Left}, Ladder{72, 16, 0, Right}, Ladder{64, 17, 0, Left}, Ladder{7, 18, 1, Right}, Ladder{7, 18, 2, Right}, Ladder{7, 18, 3, Right}, Ladder{7, 18, 4, Right}, Ladder{7, 18, 5, Right}, Ladder{7, 18, 6, Right}, Ladder{12, 20, 0, Left}, Ladder{1, 23, 0, Up}, Ladder{27, 23, 0, Up}, Ladder{45, 25, 0, Left}, Ladder{47, 25, 0, Down}, Ladder{47, 25, 1, Down}, Ladder{60, 26, 0, Up}, Ladder{34, 27, 0, Right}, Ladder{42, 27, 0, Up}, Ladder{48, 27, 0, Up}, Ladder{48, 27, 1, Up}, Ladder{72, 28, 0, Up}, Ladder{80, 28, 0, Up}, Ladder{45, 31, 0, Right}, Ladder{45, 31, 1, Right}, Ladder{32, 34, 0, Right}, Ladder{58, 35, 0, Down}, Ladder{58, 35, 1, Down}, Ladder{60, 41, 0, Left}, Ladder{60, 41, 1, Left}, Ladder{63, 44, 0, Up}, Ladder{63, 44, 1, Up}, Ladder{60, 45, 0, Left}, Ladder{54, 46, 0, Right}},
   {},
   {SpecialTile({0, 3}), SpecialTile({0, 2}), SpecialTile({0, 2}), SpecialTile({0, 2})},
+  Stephen{32, 34, 0, Left},
   World3Entrances);
 
 Level OverworldSausage4(42, 36, "World 4 route",
@@ -1091,6 +1094,7 @@ Level OverworldSausage4(42, 36, "World 4 route",
   {Ladder{27, 5, 0, Up}, Ladder{34, 9, 0, Right}, Ladder{14, 12, 2, Up}, Ladder{23, 12, 0, Left}, Ladder{23, 12, 1, Left}, Ladder{13, 13, 0, Up}, Ladder{13, 13, 1, Up}, Ladder{18, 13, 0, Right}, Ladder{23, 13, 0, Left}, Ladder{23, 13, 1, Left}, Ladder{19, 15, 0, Up}, Ladder{6, 16, 1, Right}, Ladder{32, 16, 0, Right}, Ladder{5, 17, 0, Right}, Ladder{6, 18, 0, Right}, Ladder{7, 18, 1, Up}, Ladder{14, 21, 1, Up}, Ladder{15, 21, 1, Up}, Ladder{24, 23, 0, Up}, Ladder{3, 24, 0, Up}, Ladder{3, 24, 1, Up}, Ladder{3, 24, 2, Up}, Ladder{17, 26, 0, Up}, Ladder{7, 32, 0, Right}, Ladder{15, 32, 0, Down}, Ladder{15, 32, 1, Down}, Ladder{15, 33, 2, Down}},
   {}, // sausages: all shrine-walls + D are inline grid letters
   {SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 3}), SpecialTile({0, 2}), SpecialTile({0, 3, 4, 5}), SpecialTile({0, 3, 4}), SpecialTile({0, 3, 4}), SpecialTile({0, 2})},
+  Stephen{15, 35, 3, Down}, // exit: climb the 1-2-3-3 step-up onto World 5
   {
     { Stephen{26, 6, 0, Right}, "AB", &WretchsRetreat }, // Wretch's Retreat
     { Stephen{15, 15, 0, Down}, "CGH", &CrunchyLeaves, {1, 0, 0} }, // Crunchy Leaves
@@ -1098,8 +1102,7 @@ Level OverworldSausage4(42, 36, "World 4 route",
     { Stephen{5, 17, 0, Down}, "E", &GatorPaddock }, // Gator Paddock
     { Stephen{15, 22, 1, Left}, "J", &FoulFen, {1} }, // Foul Fen
     { Stephen{24, 23, 0, Right}, "KL", &SludgeCoast } // Sludge Coast
-  },
-  Stephen{15, 35, 3, Down}); // exit: climb the 1-2-3-3 step-up onto World 5
+  });
 
 #endif
 

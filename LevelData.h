@@ -163,10 +163,11 @@ public:
   };
 
   LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
-    , const Stephen& stephen = {}
+    , const Stephen& start = {}
     , std::vector<Ladder> ladders = {}
     , std::vector<Sausage> sausages = {}
     , std::vector<SpecialTile> specialTiles = {}
+    , const Stephen& exit = {} // where Stephen has to return to win; defaults to |start|
 #if OVERWORLD_HACK
   , std::vector<LevelEntrance> levelEntrances = {}
 #endif
@@ -227,5 +228,5 @@ protected:
 private:
   NArray<u16> _grills;
   NArray<u16> _ladders;
-  Stephen _start;
+  Stephen _exit;
 };

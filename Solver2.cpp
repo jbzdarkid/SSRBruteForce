@@ -3,6 +3,19 @@
 
 #include <filesystem>
 
+// A gap in the engine must not take a long solve down with it. Those sites throw so the divergence hunt surfaces them
+// loudly; here we swallow it and skip the edge, exactly as the old silent refusal did. On x64 entering a try costs
+// nothing (table-driven unwind), so this is free unless it actually fires.
+static bool TryMove(Level* level, Direction dir) {
+  try {
+    return level->Move(dir);
+  } catch (const UnimplementedMove& gap) {
+    static bool warned = false;
+    if (!warned) { warned = true; printf("WARNING: skipping unimplemented move -- %s\n", gap.what); }
+    return false;
+  }
+}
+
 Solver::Solver(Level* level, u32 numBuckets) {
   _level = level;
   _numBuckets = numBuckets;
@@ -60,7 +73,7 @@ void Solver::ProcessOneLayer(u32 depth) {
           break;
         }
 
-        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (!TryMove(_level, dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level, depth)) continue; // Discard heuristically-pruned moves
 
         cache.AddStateUnchecked(_level->GetState());
@@ -91,7 +104,7 @@ void Solver::FindWinningStates(s32 depth) {
           break;
         }
 
-        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (!TryMove(_level, dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level, depth + 1)) continue;
 
         State newState = _level->GetState();
@@ -123,7 +136,7 @@ std::vector<Direction> Solver::FindFastestSolution(const State& initialState) {
   while (remainingCost > 0) {
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState(state);
-      if (!_level->Move(dir)) continue;
+      if (!TryMove(_level, dir)) continue;
 
       State newState = _level->GetState();
       auto search = _winningStates.find(newState);

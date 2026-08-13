@@ -14,9 +14,11 @@
 # Usage:
 #   .\oracle-explore.ps1                       # build + hunt every level
 #   .\oracle-explore.ps1 -TestName "3-8"       # only levels whose name contains this substring
+#   .\oracle-explore.ps1 -Seed 0x1234          # re-hunt with a different tree (same budget, different exploration)
 [CmdletBinding()]
 param(
-    [string] $TestName = ""
+    [string] $TestName = "",
+    [uint32] $Seed = 0xC0FFEE
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,16 +35,22 @@ $Configuration = "Release"
 $exe    = ".\x64\$Configuration\SSRBruteForce.exe"
 $oracle = ".\Oracle\bin\Release\net8.0\Oracle.exe"
 
-# RRT search budget (hard-coded; raise $Iterations for a deeper tree -- RRT is cheap).
+# RRT search budget (hard-coded; raise $Iterations for a deeper tree -- RRT is cheap). The seed is a parameter: a
+# different one grows a different tree, so re-hunting with it samples parts of the state space the last run missed.
 $Iterations = 100000
 $RolloutLen = 40
 $Bin        = 3
-$Seed       = 0xC0FFEE
 
 # Build the C# oracle (net8.0 SDK project) up front so it's always current with Oracle\*.cs.
 echo "Building oracle"
 dotnet build ".\Oracle\Oracle.csproj" -c Release --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw "Oracle build failed" }
+
+# The oracle reads every level from the game's own extracted blob. It is gitignored (game data, not ours to ship), and
+# without it the oracle dies on each level -- which would otherwise look exactly like a clean "no divergences" run.
+if (-not (Test-Path ".\Extracted\merged_binary.bin")) {
+    throw "Missing .\Extracted\merged_binary.bin -- the oracle cannot replay anything without it, so this hunt would report a false all-clear."
+}
 
 # All levels with their sausage count (needed only to pick the C++ build; the oracle reads any level from its dat).
 $levels = @(
@@ -129,21 +137,33 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
         if ($lvl.Sausages -ne $n) { continue }
         $name = $lvl.Name
         $cppName = $name -replace '^\d+-\d+ ', ''  # C++ levels dropped their numeric prefix; the oracle still needs it
-        $safe = ($cppName.ToCharArray() | ForEach-Object { if ($_ -match '[a-zA-Z0-9]') { $_ } else { '_' } }) -join ''
-        $folder = ".\oracle-demos\$safe"
+        $toSafe = { param($t) ($t.ToCharArray() | ForEach-Object { if ($_ -match '[a-zA-Z0-9]') { $_ } else { '_' } }) -join '' }
 
-        # Level2 grows one RRT tree and writes leaf demos into $folder (clearing any prior ones).
+        # Level2 grows one RRT tree and writes leaf demos into oracle-demos\<safe>, where <safe> comes from the C++
+        # level's OWN name -- which keeps the "5-9 " prefix in worlds 3-5 but not in worlds 1-2. Resolve against both
+        # spellings rather than assuming, since guessing wrong finds an empty folder and scores the level as clean.
         & $exe $cppName rrt $Iterations $RolloutLen $Bin $Seed *> $null
-        $demoCount = (Get-ChildItem $folder -Filter *.dem -EA SilentlyContinue | Measure-Object).Count
-        if ($demoCount -eq 0) { $results[$name] = @{ Lost = 0; Posdiff = 0; Reasons = ""; Repro = "" }; continue }
+        $folder = $null
+        foreach ($cand in @((& $toSafe $name), (& $toSafe $cppName))) {
+            $path = ".\oracle-demos\$cand"
+            if ((Get-ChildItem $path -Filter *.dem -EA SilentlyContinue | Measure-Object).Count -gt 0) { $folder = $path; break }
+        }
+        if (-not $folder) { throw "No demos for $name -- the RRT wrote nothing, so this level would have scored as clean." }
+        $safe = Split-Path $folder -Leaf
+        $demoCount = (Get-ChildItem $folder -Filter *.dem | Measure-Object).Count
 
         # The oracle prints one "Reason: <reason>; Count: <n>; Sample: <path>" line per outcome: empty reason = agree,
-        # "Final state" = a position divergence, anything else (Lost/Burned/Drowned/Fork Lost) = a loss.
-        $lost = 0; $posdiff = 0; $reasons = ""; $repro = ""
-        $out = & $oracle $name $folder
+        # "Final state" = a position divergence, "Timing" = ComputeScore disagreeing with the game's tick-simulated move
+        # duration (a solver cost-model gap, NOT a move-resolution bug -- bucketed apart so it can't masquerade as one),
+        # anything else (Lost/Burned/Drowned/Fork Lost) = a loss.
+        $lost = 0; $posdiff = 0; $timing = 0; $reasons = ""; $repro = ""
+        $out = & $oracle $name $folder 2>&1
+        # A crashed oracle prints no "Reason:" lines at all, which would score as a clean level. Treat it as fatal.
+        if ($LASTEXITCODE -ne 0) { throw "Oracle failed on $name (exit $LASTEXITCODE):`n$($out -join "`n")" }
         foreach ($m in ($out | Select-String "^Reason: (.*); Count: (\d+)(?:; Sample: (.*))?$")) {
             $r = $m.Matches[0].Groups[1].Value; $c = [int]$m.Matches[0].Groups[2].Value; $s = $m.Matches[0].Groups[3].Value
             if     ($r -eq "")            { continue }
+            elseif ($r -eq "Timing")      { $timing += $c; continue } # cost model only -- the move itself resolved identically
             elseif ($r -eq "Final state") { $posdiff += $c }
             else                          { $lost += $c; $reasons += "$($r -replace ' ','')=$c " }
             if (-not $repro -and $s) {
@@ -153,10 +173,9 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
             }
         }
         $reasons = $reasons.Trim()
-        $results[$name] = @{ Lost = $lost; Posdiff = $posdiff; Reasons = $reasons; Repro = $repro }
+        $results[$name] = @{ Lost = $lost; Posdiff = $posdiff; Timing = $timing; Reasons = $reasons; Repro = $repro }
 
-        $col = if (($lost + $posdiff) -gt 0) { "Red" } else { "Green" }
-        Write-Host ("{0,-22} lost={1} [{2}] posdiff={3}" -f $name, $lost, $reasons, $posdiff) -ForegroundColor $col
+        echo ("{0,-22} demos={1} lost={2} [{3}] posdiff={4} timing={5}" -f $name, $demoCount, $lost, $reasons, $posdiff, $timing)
     }
 }
 
@@ -170,5 +189,13 @@ foreach ($k in $results.Keys) {
         if ($r.Repro) { Write-Host ("    repro: {0}" -f $r.Repro) -ForegroundColor DarkYellow }
     }
 }
-if (-not $any) { Write-Host "  No divergences." -ForegroundColor Green }
+if (-not $any) { Write-Host "  No engine divergences." -ForegroundColor Green }
+
+# Reported separately: the move resolves identically, only its simulated duration differs.
+$timingLevels = $results.Keys | Where-Object { $results[$_].Timing -gt 0 }
+if ($timingLevels) {
+    echo "=== Cost-model gaps (ComputeScore vs the game's tick simulation; engine agrees) ==="
+    foreach ($k in $timingLevels) { Write-Host ("  {0,-24} timing={1}" -f $k, $results[$k].Timing) -ForegroundColor Yellow }
+}
+
 if ($any) { exit 1 }
