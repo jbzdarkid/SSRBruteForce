@@ -94,6 +94,15 @@ bool Level::Move(Direction dir) {
     }
   }
 
+  // Reconnect a thrown fork: the instant Stephen's body ends a move directly behind it, he takes it back into his hand.
+  // This must stay at the END of Move, not inside ReactAndCommit: a ladder DESCENT reacts-and-commits at its step-off
+  // and only then crouches down the rungs, so reattaching there fires before the move has actually finished (it
+  // diverges on 3-2 Cold Finger, 3-5 Cold Cliff and 4-5 Crunchy Leaves).
+  // It runs BEFORE the burn chain, because the grill recoil is a move in its own right: a fork picked up as Stephen
+  // lands on the grill is already in hand -- and already spearing -- when the recoil drags him back off it, so the
+  // speared sausage comes with him (5-6 Crater m112). The recoil's own Move() reconnects again at its own landing.
+  if (!_stephen.HasFork() && ForkInReach(_stephen)) _stephen.forkDir = None;
+
   // Can occur after (most) movements, so handle it commonly.
   if (!HandleBurnedStep(dir, preMove, handled)) return false;
 
@@ -315,7 +324,6 @@ bool Level::HandleLogRolling(Direction dir, bool& handled) {
   // The log, everything riding it, Stephen's head/fork hats and any speared sausage all ride the roll as ONE rigid load
   // (same translation), so they must never treat each other as obstacles (move-stages.md: motion is one event).
   plan.rigidLoad = MovingLoad(onSausage) | MovingLoad(speared) | MovingLoad(headHat) | MovingLoad(forkHat);
-  plan.logRollPush = true; // a fork speared into a rolled-onto sausage rides along with it, so it is not an obstacle here
 
   // Stephen's hats ride HIM, so the carry at the bottom of this handler is the only thing entitled to place them. Claim
   // them BEFORE the roll's push chain runs: otherwise the chain would provisionally carry a hat by its far end and the
@@ -457,16 +465,18 @@ bool Level::HandleLadderMotion(Direction dir, bool& handled) {
         nz++;
       }
       if (IsWall(ax, ay, nz) || !CanWalkOnto(ax, ay, nz)) return false;
-      // A sausage occupying the step-off cell itself (not merely under it) would be shoved along by the body arriving --
-      // the game pushes it; we never modelled that push during a forkless climb (5-6 Crater m195).
-      if (GetSausage(ax, ay, nz) != -1) throw UnimplementedMove{ "forkless ladder climb: body shoves a sausage off the ladder top" };
       MovePlan plan = NewPlan();
+      // A sausage occupying the step-off cell itself (not merely under it) is shoved one cell along the climb by the
+      // body arriving. A fork lodged in it rides it out, which can land the fork back in Stephen's reach (5-6 Crater).
+      s8 stepOffSausage = GetSausage(ax, ay, nz);
+      if (stepOffSausage != -1 && !PlanSausagePush(stepOffSausage, dir, plan)) return false;
       plan.stephen.x = ax; plan.stephen.y = ay; plan.stephen.z = nz;
       carryHeadHat(plan, nz - _stephen.z);
-      // If the thrown fork lies on the cell we step off onto, the body shoves it one cell further along |dir| (a wall
-      // directly behind it blocks the whole climb), then it falls to its support -- the common reconnect at the end of
-      // Move() takes it back into hand when it lands one cell ahead at Stephen's level.
-      if (_stephen.forkX == ax && _stephen.forkY == ay && _stephen.forkZ == nz) {
+      // If the thrown fork lies LOOSE on the cell we step off onto, the body shoves it one cell further along |dir| (a
+      // wall directly behind it blocks the whole climb), then it falls to its support -- the common reconnect at the end
+      // of Move() takes it back into hand when it lands one cell ahead at Stephen's level. A fork LODGED in a sausage
+      // is not loose: it rides its host's push above, tracked by TrackLodgedFork.
+      if (_stephen.forkX == ax && _stephen.forkY == ay && _stephen.forkZ == nz && stepOffSausage == -1) {
         s8 pfx = ax + fdx, pfy = ay + fdy;
         if (IsWall(pfx, pfy, nz)) return false;
         plan.stephen.forkX = pfx; plan.stephen.forkY = pfy;
@@ -1332,12 +1342,21 @@ bool Level::PlanSausageCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan
   if (IsWall(sausage.x1, sausage.y1, sausage.z) || IsWall(sausage.x2, sausage.y2, sausage.z)) return true;
 
   // A non-carried sausage where this carried sausage lands is shoved the same way first (the carry propagates as a
-  // push); if it can't be shoved, this sausage is left behind like the wall case above.
+  // push); if it can't be shoved, this sausage is left behind like the wall case above. Ask the PLAN whether that cell
+  // is really being vacated -- a nominal co-mover the carry ended up leaving behind still sits there -- and fall back
+  // to |rigidLoad|'s up-front prediction only for a co-mover the traversal hasn't reached yet.
+  // That fallback is load-bearing, not belt-and-braces: probing it (throw when it decides the outcome) fires on
+  // 3-2 Cold Finger and 3-5 Cold Cliff. It is what makes the carry order-independent, so it can only go once the
+  // traversal places every co-mover before any of them is tested as an obstacle.
+  auto vacating = [&](s8 other, s8 cellX, s8 cellY) {
+    if (plan.mask & (1ull << other)) return !plan.sausages[other].IsAt(cellX, cellY, sausage.z);
+    return (plan.rigidLoad & (1ull << other)) != 0;
+  };
   s8 destA = GetSausage(sausage.x1, sausage.y1, sausage.z);
-  if (destA != -1 && destA != sausageNo && !(plan.mask & (1ull << destA)) && !(plan.rigidLoad & (1ull << destA)))
+  if (destA != -1 && destA != sausageNo && !vacating(destA, sausage.x1, sausage.y1))
     if (!PlanSausagePush(destA, dir, plan)) return true;
   s8 destB = GetSausage(sausage.x2, sausage.y2, sausage.z);
-  if (destB != -1 && destB != sausageNo && destB != destA && !(plan.mask & (1ull << destB)) && !(plan.rigidLoad & (1ull << destB)))
+  if (destB != -1 && destB != sausageNo && destB != destA && !vacating(destB, sausage.x2, sausage.y2))
     if (!PlanSausagePush(destB, dir, plan)) return true;
 
   bool rolls = sausage.IsHorizontal() ? (dir == Up || dir == Down) : (dir == Left || dir == Right);
@@ -1396,6 +1415,19 @@ void Level::Commit(const MovePlan& plan) {
   for (int i = 0; i < _sausages.Size(); i++) _sausages[i] = plan.sausages[i];
 }
 
+bool Level::PlanHasOverlap(const MovePlan& plan) const {
+  // Two sausages in one cell means a carry lapped onto a co-mover that didn't actually vacate. The game drops the
+  // carried sausage and drowns it -- a loss -- so refusing prunes the same branch.
+  for (int i = 0; i < _sausages.Size(); i++) {
+    const Sausage& a = plan.sausages[i];
+    for (int j = i + 1; j < _sausages.Size(); j++) {
+      const Sausage& b = plan.sausages[j];
+      if (b.IsAt(a.x1, a.y1, a.z) || b.IsAt(a.x2, a.y2, a.z)) return true;
+    }
+  }
+  return false;
+}
+
 bool Level::AnchoredAt(s8 x, s8 y, s8 z, s8 self, u64 moving) const {
   if (z < 0 || IsWall(x, y, z)) return false;
   if (z == 0 ? CanWalkOnto(x, y, 0) : IsWall(x, y, z - 1)) return true;
@@ -1413,6 +1445,7 @@ bool Level::ReactAndCommit(MovePlan& plan) {
   if (!Settle(plan, movedMask, _sausages.begin(), _stephen, plan.doubleMoveMask)) return false;
   if (!CookMoved(plan, movedMask, plan.doubleMoveMask)) return false;
   if (!DoubleMove(plan)) return false;
+  if (PlanHasOverlap(plan)) return false; // a carry produced an impossible two-in-one-cell state -> refuse
   DropDetachedFork(plan);                 // ...then falls through the settled tableau to its own footing
   // A thrown fork that still has nothing under it once everything has settled has fallen off the map -- the game's
   // "Fork Lost" loss. Refuse the move rather than commit it (3-13 Cold Gate m342).
@@ -1426,11 +1459,6 @@ bool Level::ReactAndCommit(MovePlan& plan) {
     // into his hand and it never needs footing.
     if (!lodged && !resting && !ForkInReach(f)) return false;
   }
-  // Reconnect a thrown fork that ended the move within reach -- one cell ahead in his facing, at his level, pointing his
-  // way (TryReattachFork). Done here, in the plan, so it commits with everything else. It lands BEFORE the burn chain,
-  // which matters: a fork picked up as Stephen steps onto a grill is already in hand -- and already spearing -- when the
-  // recoil drags him back off it, so the speared sausage comes with him (5-6 Crater m112).
-  if (!plan.stephen.HasFork() && ForkInReach(plan.stephen)) plan.stephen.forkDir = None;
   Commit(plan);
   return true;
 }

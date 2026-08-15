@@ -63,7 +63,6 @@ private:
     Sausage lodgedPose{}; // that host's pose when the fork was tracked onto it, so later stages' motion can be replayed
     Direction doubleMoveDir[NUM_SAUSAGES] = {};
     bool rotating = false;
-    bool logRollPush = false; // this plan's pushes are a log roll: a fork SPEARED into a pushed sausage isn't an obstacle (it rides along), so don't refuse a roll onto it
     bool airborne = false; // Stephen may end this move unsupported (a log roll off a ledge), so stage 5 drops him too
   };
 
@@ -87,6 +86,7 @@ private:
   // True when a thrown fork lies back within Stephen's grasp -- one cell ahead in his facing, at his level, pointing the
   // way he faces (TryReattachFork). A fork facing crosswise is not picked up.
   bool ForkInReach(const Stephen& s) const;
+  bool PlanHasOverlap(const MovePlan& plan) const;
 
   s8 RollTorsion(const MovePlan& plan, s8 idx, int depth = 0) const;
   bool TrackLodgedFork(MovePlan& plan) const;

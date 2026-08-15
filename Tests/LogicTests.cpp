@@ -1235,6 +1235,10 @@ TEST_CLASS(OneOffTests) {
   // head hat all shift by the same vector. Here backing east makes the rider's carry destination land exactly where the
   // head hat currently sits (and vice versa) -- they SWAP cells. Neither may treat the other as an obstacle: co-movers
   // ride rigidly and must NOT ram/roll each other (3-2 Cold Finger: order-dependent ram used to roll one of them).
+  // This is the case that keeps |rigidLoad| alive. Whichever of the two is placed first, the other asks "will that cell
+  // clear?" before there is anything in the plan to answer it, so only the up-front prediction can say. Carrying the hat
+  // first instead breaks PlanHatCarry, which needs a complete plan to judge its own shove -- the dependency is a cycle,
+  // so no static ordering removes the prediction. Deleting it fails this test.
   MAKE_SYMMETRICAL_TEST(SpearedDragHeadHatCoMove) {
     TestSymmetryHelper level(symmetry, Level(9, 7, "arena",
       "         "
@@ -1548,6 +1552,30 @@ TEST_CLASS(OneOffTests) {
     level.AssertPosition(4, 3, Down);                    // Stephen never turns
     level.AssertSausage({4, 3, 4, 4, 1, Sausage::None}); // the hat swung and came home
     level.AssertSausage({5, 3, 5, 4, 1, Sausage::None}); // C was shoved by the sweep, then put back
+  }
+
+  // A forkless climb-up whose step-off cell is occupied by a wall-borne sausage: the arriving body shoves that sausage
+  // one cell along the climb, and the fork lodged in it rides along. Here the fork lands exactly where Stephen reaches,
+  // so the reconnect takes it back into hand. Mirrors 5-6 Crater, where the oracle gives precisely this result; we used
+  // to refuse the move instead, which pruned the branch and hid it from the divergence hunt.
+  MAKE_SYMMETRICAL_TEST(ForklessClimbShovesWallBorneSausage) {
+    TestSymmetryHelper level(symmetry, Level(7, 6, "arena",
+      "_______"
+      "__2____"                              // (2,1) wall: catches A's north end after the shove
+      "__2____"                              // (2,2) wall: sausage A's north end
+      "__2____"                              // (2,3) wall: A's south end -- and the step-off cell
+      "__U____"                              // (2,4) Up ladder (z=0,1) Stephen climbs
+      "_______",
+      Stephen{2, 4, 1, Up}, {},
+      { Sausage{2, 2, 2, 3, 2},              // A: rests across the (2,2)/(2,3) wall tops
+        Sausage{2, 4, 2, 5, 0},              // B: Stephen stands on its (2,4) end
+        Sausage{6, 6, 6, 6, 0} }));          // parked filler
+    level.SetDetachedFork(2, 3, 2, Up);       // fork lodged in A's (2,3) end -- the cell Stephen climbs off onto
+    level.AssertBodyAt(2, 4, 1, Up);
+    level.AssertMoveSucceeds(Up);
+    level.AssertBodyAt(2, 3, 2, Up);                     // stepped off onto the cell A vacated
+    level.AssertSausage({2, 1, 2, 2, 2, Sausage::None}); // A slid one north along its own axis -- no roll
+    level.AssertHasFork();                               // the lodged fork rode A into reach and reconnected
   }
 
   // 3-4 Cold Trail (DiffEngines divergence, move 430): a log-roll carries a horizontal rider west, and the rider's

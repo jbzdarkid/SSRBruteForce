@@ -142,7 +142,14 @@ foreach ($n in ($candidates.Sausages | Sort-Object -Unique)) {
         # Level2 grows one RRT tree and writes leaf demos into oracle-demos\<safe>, where <safe> comes from the C++
         # level's OWN name -- which keeps the "5-9 " prefix in worlds 3-5 but not in worlds 1-2. Resolve against both
         # spellings rather than assuming, since guessing wrong finds an empty folder and scores the level as clean.
-        & $exe $cppName rrt $Iterations $RolloutLen $Bin $Seed *> $null
+        # Keep the engine's chatter out of the log, but never swallow an UnimplementedMove report -- those are the gaps
+        # this hunt exists to find, and discarding stdout wholesale makes a gap look exactly like a clean run.
+        $rrtOut = & $exe $cppName rrt $Iterations $RolloutLen $Bin $Seed 2>&1
+        $gaps = $rrtOut | Select-String -Pattern "UNIMPLEMENTED" -Context 0,16
+        if ($gaps) {
+            echo "  !!! ENGINE GAP while exploring $name"
+            $gaps | ForEach-Object { $_.Line; $_.Context.PostContext }
+        }
         $folder = $null
         foreach ($cand in @((& $toSafe $name), (& $toSafe $cppName))) {
             $path = ".\oracle-demos\$cand"
