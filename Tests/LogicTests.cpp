@@ -1932,6 +1932,28 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({6, 2, 6, 3, 0, Sausage::Rolled}); // the freed sausage shoved one cell east by the recoil
   }
 
+  // An unspear leaves the freed sausage exactly where it was, and a sausage balanced on the fork TIP sits directly over
+  // that cell -- so its near end is propped on a support that does not move and it stays behind with it. This is the
+  // one configuration the unspear's fork-tip carry can ever see, which is why the carry never fires.
+  MAKE_SYMMETRICAL_TEST(UnspearLeavesForkHatOnTheFreedBase) {
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
+      "________"
+      "________"
+      "________"
+      "________"
+      "____1___"
+      "________",
+      Stephen{4, 3, 0, Right}, {},
+      { Sausage{5, 3, 5, 4, 0}, Sausage{5, 3, 6, 3, 1}, Sausage{1, 1, 2, 1, 0} }));
+    level.AssertPosition(4, 3, Right);
+    level.AssertSausage({5, 3, 5, 4, 0, Sausage::None}); // speared on the fork, its south end pinned by the Wall1
+    level.AssertSausage({5, 3, 6, 3, 1, Sausage::None}); // fork-tip hat: far end cantilevered, nothing in its path
+    level.AssertMoveSucceeds(Left);                      // press backward -- the fork pulls free instead of dragging
+    level.AssertPosition(3, 3, Right);
+    level.AssertSausage({5, 3, 5, 4, 0, Sausage::None}); // unspeared: left exactly where it was
+    level.AssertSausage({5, 3, 6, 3, 1, Sausage::None}); // hat stays -- its near end rests on that freed base
+  }
+
   // 3-2 Cold Finger (DiffEngines divergence #1): a sausage rides on the fork-tip while a two-high stack sits one cell
   // ahead, its far side pinned by a Wall3. Stepping forward would carry the fork-hat onto the stack, but the stack
   // can't be shoved further (the wall reaches z1), so the hat has nowhere to go -- it's LEFT BEHIND, and as Stephen's
@@ -2001,6 +2023,106 @@ TEST_CLASS(OneOffTests) {
     level.AssertPosition(4, 3, Left);
     level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
     level.AssertSausage({2, 3, 3, 3, 2, Sausage::None});   // fork-hat rode the roll west (slides along its axis)
+  }
+
+  // A fork-hat whose far end rests on a sausage that the roll ITSELF shoves along is not anchored: both its supports
+  // (the fork tip and that sausage) travel one cell west, so the hat rides with them. Level2's log-roll treated ANY
+  // sausage under the far end as an anchor -- contradicting its own comment and every other carry in the engine -- and
+  // left the hat behind, where it landed on Stephen's head as his body slid under it.
+  MAKE_SYMMETRICAL_TEST(LogRollCarriesForkHatOverMovingSupport) {
+    TestSymmetryHelper level(symmetry, Level(8, 6, "arena",
+      "        "
+      "        "
+      "  _____ "
+      "  11___ "
+      "        "
+      "        ",
+      Stephen{5, 3, 1, Left}, {},
+      { Sausage{5, 2, 5, 3, 0}, Sausage{2, 3, 3, 3, 1}, Sausage{3, 3, 4, 3, 2} }));
+    level.AssertPosition(5, 3, Left);
+    level.AssertSausage({2, 3, 3, 3, 1, Sausage::None}); // on the Wall1 tops, right where the fork lands
+    level.AssertSausage({3, 3, 4, 3, 2, Sausage::None}); // fork-hat: near end on the fork tip, far end on that sausage
+    level.AssertMoveSucceeds(Right);                     // press east -> log rolls west, Stephen rides
+    level.AssertPosition(4, 3, Left);
+    level.AssertSausage({4, 2, 4, 3, 0, Sausage::Rolled}); // the log rolled one cell west
+    level.AssertSausage({1, 3, 2, 3, 1, Sausage::None});   // the arriving fork shoved that sausage one cell west
+    level.AssertSausage({2, 3, 3, 3, 2, Sausage::None});   // fork-hat rode west with both of its supports
+  }
+
+  // The head-hat carries a rider whose OTHER end is propped on a Wall3 top. That end cannot travel, so the hat slides
+  // out from under the rider and the rider stays put -- the rule every other carry in the engine applies (AnchoredAt,
+  // PlanHatCarry, MovingLoad). The log-roll used to translate the whole CarriedMask tower regardless, dragging the
+  // anchored rider off its wall.
+  MAKE_SYMMETRICAL_TEST(LogRollHeadHatLeavesAnchoredRider) {
+    TestSymmetryHelper level(symmetry, Level(9, 8, "arena",
+      "_________"
+      "_________"
+      "_________"
+      "_________"
+      "_________"
+      "______3__"
+      "_________"
+      "_________",
+      Stephen{5, 4, 1, Left}, {},
+      { Sausage{5, 3, 5, 4, 0}, Sausage{5, 4, 6, 4, 2}, Sausage{6, 4, 6, 5, 3} }));
+    level.AssertPosition(5, 4, Left);
+    level.AssertSausage({5, 4, 6, 4, 2, Sausage::None}); // head-hat: near end on Stephen, far end cantilevered
+    level.AssertSausage({6, 4, 6, 5, 3, Sausage::None}); // rider: one end on the hat, one on the Wall3 top
+    level.AssertMoveSucceeds(Left);                      // press across the log -> it rolls east, Stephen rides
+    level.AssertPosition(6, 4, Left);
+    level.AssertSausage({6, 3, 6, 4, 0, Sausage::Rolled}); // log rolled one cell east
+    level.AssertSausage({6, 4, 7, 4, 2, Sausage::None});   // head-hat rode east with Stephen
+    level.AssertSausage({6, 4, 6, 5, 3, Sausage::None});   // rider held by its wall end -- the hat slid out from under it
+  }
+
+  // A head-hat whose destination cell holds another sausage shoves it along, exactly as an ordinary step's hat carry
+  // does; the shoved sausage is left over open space and drops. The log-roll used to translate the hat without
+  // consulting the cell it landed in, producing a two-in-one-cell overlap that refused the whole move.
+  MAKE_SYMMETRICAL_TEST(LogRollHeadHatShovesSausageInItsPath) {
+    TestSymmetryHelper level(symmetry, Level(9, 8, "arena",
+      "_________"
+      "_________"
+      "_________"
+      "_________"
+      "_______2_"
+      "_______2_"
+      "_________"
+      "_________",
+      Stephen{5, 4, 1, Left}, {},
+      { Sausage{5, 3, 5, 4, 0}, Sausage{5, 4, 6, 4, 2}, Sausage{7, 4, 7, 5, 2} }));
+    level.AssertPosition(5, 4, Left);
+    level.AssertSausage({5, 4, 6, 4, 2, Sausage::None}); // head-hat riding Stephen
+    level.AssertSausage({7, 4, 7, 5, 2, Sausage::None}); // parked on the Wall2 tops, in the hat's path
+    level.AssertMoveSucceeds(Left);                      // press across the log -> it rolls east, Stephen rides
+    level.AssertPosition(6, 4, Left);
+    level.AssertSausage({6, 3, 6, 4, 0, Sausage::Rolled}); // log rolled one cell east
+    level.AssertSausage({6, 4, 7, 4, 2, Sausage::None});   // head-hat rode east into the vacated cell
+    level.AssertSausage({8, 4, 8, 5, 0, Sausage::Rolled}); // shoved east off the wall tops, then dropped to the floor
+  }
+
+  // An unspear mid-log-roll leaves the freed sausage exactly where it was, so a fork-hat resting on it is propped on a
+  // NON-MOVING support and stays behind too -- the same near-end rule HandleSpearedMotion's unspear already applies.
+  // The log-roll judged only the hat's FAR end, so it rode the fork away off a support that never moved.
+  MAKE_SYMMETRICAL_TEST(LogRollForkHatAnchoredOnUnspearedBase) {
+    TestSymmetryHelper level(symmetry, Level(9, 8, "arena",
+      "_________"
+      "_________"
+      "_________"
+      "_________"
+      "_________"
+      "____12___"
+      "_________"
+      "_________",
+      Stephen{5, 4, 1, Left}, {},
+      { Sausage{5, 3, 5, 4, 0}, Sausage{4, 4, 4, 5, 1}, Sausage{4, 3, 4, 4, 2} }));
+    level.AssertPosition(5, 4, Left);
+    level.AssertSausage({4, 4, 4, 5, 1, Sausage::None}); // speared on the fork, its south end pinned by the Wall2
+    level.AssertSausage({4, 3, 4, 4, 2, Sausage::None}); // fork-hat: near end on the speared base, far end cantilevered
+    level.AssertMoveSucceeds(Left);                      // press across the log -> rolls east; the fork pulls free
+    level.AssertPosition(6, 4, Left);
+    level.AssertSausage({6, 3, 6, 4, 0, Sausage::Rolled}); // log rolled one cell east
+    level.AssertSausage({4, 4, 4, 5, 1, Sausage::None});   // unspeared -- the fork backed out and left it put
+    level.AssertSausage({4, 3, 4, 4, 2, Sausage::None});   // hat stays: its near end rests on that non-moving base
   }
 
   // Log roll carrying a fork-tip sausage that ITSELF has a rider stacked on it. The whole fork-borne stack rides west

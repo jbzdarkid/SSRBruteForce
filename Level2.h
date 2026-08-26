@@ -79,16 +79,16 @@ private:
   // stays put. |self| is excluded so a sausage never anchors on itself.
   bool AnchoredAt(s8 x, s8 y, s8 z, s8 self, u64 moving) const;
 
-  // A DETACHED fork is a passive rider in the reference (SubjectToPassiveForces / NeedsGround): it travels with whatever
-  // it rests on and falls when nothing holds it up. CarryDetachedFork tracks it onto its support's new pose (run before
-  // gravity, reading the pre-move layout to find that support); DropDetachedFork then lets it fall through the settled
-  // tableau. A fork lodged INSIDE a sausage is held there and neither pass touches it.
   // True when a thrown fork lies back within Stephen's grasp -- one cell ahead in his facing, at his level, pointing the
   // way he faces (TryReattachFork). A fork facing crosswise is not picked up.
   bool ForkInReach(const Stephen& s) const;
   bool PlanHasOverlap(const MovePlan& plan) const;
 
   s8 RollTorsion(const MovePlan& plan, s8 idx, int depth = 0) const;
+  // A DETACHED fork is a passive rider in the reference (SubjectToPassiveForces / NeedsGround): it travels with whatever
+  // it rests on and falls when nothing holds it up. CarryDetachedFork tracks it onto its support's new pose (run before
+  // gravity, reading the pre-move layout to find that support); DropDetachedFork then lets it fall through the settled
+  // tableau. A fork lodged INSIDE a sausage is held there and neither pass touches it.
   bool TrackLodgedFork(MovePlan& plan) const;
   void CarryDetachedFork(MovePlan& plan) const;
   void DropDetachedFork(MovePlan& plan) const;
@@ -121,7 +121,7 @@ private:
   // A sausage resting on Stephen's head or fork rides rigidly with a step (no roll); carries riders. Wall-blocked stays.
   void PlanHatCarry(s8 sausageNo, s8 dx, s8 dy, Direction dir, MovePlan& plan, u64 rigidMask) const;
 
-  // Common to every motion (Level1's HandleBurnedStep): a body left resting on a grill is on hot ground, so it recoils
+  // Common to every motion: a body left resting on a grill is on hot ground, so it recoils
   // straight back the way it came as its own fresh move. Sets |handled| when it fires. The recoil is forced, so a
   // refused one refuses the whole press: |preMove| is the tableau from before the first half committed, restored so the
   // chained pair is as atomic as a single move.
