@@ -60,16 +60,26 @@ static class Oracle {
         Console.WriteLine($"  {k} offset={mg.offsets[k]} {entry} \"{disp}\"");
       }
 
-      int minx = worldKeys.Min(k => mg.offsets[k].x), maxx = worldKeys.Max(k => mg.offsets[k].x);
-      int miny = worldKeys.Min(k => mg.offsets[k].y), maxy = worldKeys.Max(k => mg.offsets[k].y);
-      Console.WriteLine($"--- world island bbox x[{minx}..{maxx}] y[{miny}..{maxy}]; islands within margin 8 ---");
-      const int margin = 8;
+      // terrain abs bbox for an island (ground/barrier/ladder/bbq cells); null if it has no terrain
+      (int x0, int x1, int y0, int y1)? TerrainBBox(string k) {
+        if (!mg.offsets.TryGetValue(k, out Coord o) || !mg.islands.ContainsKey(k)) return null;
+        GameState gi = GameState.Load(mg.islands[k].Save(false, false), null, false);
+        var cells = gi.entities.Where(e => e.type == EntType.ground || e.type == EntType.barrier || e.type == EntType.bbq || e.type == EntType.ladder).ToList();
+        if (cells.Count == 0) return null;
+        return (cells.Min(e => e.pos.x) + o.x, cells.Max(e => e.pos.x) + o.x, cells.Min(e => e.pos.y) + o.y, cells.Max(e => e.pos.y) + o.y);
+      }
+      // world terrain bbox = union of all worldKeys' terrain
+      int minx = int.MaxValue, maxx = int.MinValue, miny = int.MaxValue, maxy = int.MinValue;
+      foreach (string k in worldKeys) { var bb = TerrainBBox(k); if (bb is (int x0, int x1, int y0, int y1)) { minx = Math.Min(minx, x0); maxx = Math.Max(maxx, x1); miny = Math.Min(miny, y0); maxy = Math.Max(maxy, y1); } }
+      Console.WriteLine($"--- world TERRAIN bbox x[{minx}..{maxx}] y[{miny}..{maxy}]; islands whose terrain overlaps (margin 3) ---");
+      const int margin = 3;
       foreach (string k in mg.islandnames.OrderBy(k => mg.offsets[k].y).ThenBy(k => mg.offsets[k].x)) {
+        var bb = TerrainBBox(k);
+        if (bb is not (int x0, int x1, int y0, int y1)) continue;
+        if (x1 < minx - margin || x0 > maxx + margin || y1 < miny - margin || y0 > maxy + margin) continue; // no bbox overlap
         Coord o = mg.offsets[k];
-        if (o.x < minx - margin || o.x > maxx + margin || o.y < miny - margin || o.y > maxy + margin) continue;
         string tag = (k == shrine ? "[SHRINE]" : mg.IsShrine(k) ? "[shrine]" : "") + (worldKeys.Contains(k) ? "[world]" : "") + (k == "start" ? "[START]" : "");
-        string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : "?";
-        Console.WriteLine($"  {k} offset={o} {tag} \"{disp}\"");
+        Console.WriteLine($"  {k,-18} offset={o} terrain=x[{x0}..{x1}] y[{y0}..{y1}] {tag} \"{mg.islands[k].displayname}\"");
       }
       return 0;
     }
@@ -92,6 +102,67 @@ static class Oracle {
       mg.LoadBinary(reader);
       var extras = args.Length >= 3 ? args[2].Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() : new List<string>();
       Console.WriteLine(EmitWorldSchema(mg, args[1], "1-final Overworld sausage", extras, preferStartPlayer: true));
+      return 0;
+    }
+
+    // THROWAWAY AUDIT: for every world, compare each shrine's sausage resting z (its overworld terrain height) to that
+    // level's entrance z. The proposed pit fix restores a cleared shrine to (entranceZ) height; this checks that the
+    // sausage actually sits at that height. sausages + entrance are offset by the SAME mg.offsets[k], so z is comparable.
+    if (args.Length >= 1 && args[0] == "--audit-entrance-z") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      var worlds = new[] { (1, "temple2j1"), (2, "temple1d1"), (3, "temple1x1"), (4, "temple1h1"), (5, "temple2c1") };
+      int shrinesChecked = 0, mismatches = 0;
+      foreach (var (w, shrine) in worlds) {
+        var prereqs = mg.templedat.TryGetValue(shrine, out var pr) ? pr : new List<string>();
+        foreach (string k in prereqs) {
+          if (!mg.sausagepositions.ContainsKey(k)) continue;
+          string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : k;
+          int? entZ = mg.playerpositions.ContainsKey(k) ? (mg.playerpositions[k].Key + mg.offsets[k]).z : (int?)null;
+          var zs = mg.sausagepositions[k].Select(kv => (kv.Key + mg.offsets[k]).z).ToList();
+          int baseZ = zs.Min(), topZ = zs.Max();
+          bool tower = baseZ != topZ;
+          bool ok = entZ.HasValue && baseZ == entZ.Value;
+          shrinesChecked++;
+          if (!ok) mismatches++;
+          string zrange = tower ? $"[{baseZ}..{topZ}]" : $"{baseZ}";
+          Console.WriteLine($"W{w} {k,-14} sausBaseZ={baseZ} ({zrange}) entZ={(entZ?.ToString() ?? "none"),-4} {(ok ? "ok" : "MISMATCH")}{(tower ? "  (tower)" : "")}  \"{disp}\"");
+        }
+      }
+      Console.WriteLine($"--- {mismatches}/{shrinesChecked} shrines have sausage-base-z != entrance-z ---");
+      return 0;
+    }
+
+    // THROWAWAY AUDIT: per shrine, collapse sausages to 2D footprints (== emitted letters) and report each footprint's
+    // base terrain z. A shrine with >1 distinct base z among its letters can't be restored with a single per-shrine
+    // height -- the restore terrain must ride on each letter/sausage.
+    if (args.Length >= 1 && args[0] == "--audit-shrine-heights") {
+      using var reader = new BinaryReader(File.OpenRead("Extracted/merged_binary.bin"));
+      MetaGameState mg = new();
+      mg.LoadBinary(reader);
+      var worlds = new[] { (1, "temple2j1"), (2, "temple1d1"), (3, "temple1x1"), (4, "temple1h1"), (5, "temple2c1") };
+      int mixed = 0, checkedShrines = 0;
+      foreach (var (w, shrine) in worlds) {
+        var prereqs = mg.templedat.TryGetValue(shrine, out var pr) ? pr : new List<string>();
+        foreach (string k in prereqs) {
+          if (!mg.sausagepositions.ContainsKey(k)) continue;
+          string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : k;
+          Coord io = mg.offsets[k];
+          var footBase = new Dictionary<(int, int, int, int), int>();
+          foreach (var kv in mg.sausagepositions[k]) {
+            Coord a = kv.Key + io, b = a + kv.Value;
+            var fp = (a.x < b.x || (a.x == b.x && a.y <= b.y)) ? (a.x, a.y, b.x, b.y) : (b.x, b.y, a.x, a.y);
+            if (!footBase.TryGetValue(fp, out int cur) || a.z < cur) footBase[fp] = a.z;
+          }
+          var heights = footBase.Values.Distinct().OrderBy(z => z).ToList();
+          bool isMixed = heights.Count > 1;
+          checkedShrines++;
+          if (isMixed) mixed++;
+          Console.WriteLine($"W{w} {k,-14} letters={footBase.Count,-2} padZ=[{string.Join(",", heights)}] {(isMixed ? "MIXED" : "")}  \"{disp}\"");
+        }
+      }
+      Console.WriteLine($"--- {mixed}/{checkedShrines} shrines have letters at >1 distinct pad height ---");
       return 0;
     }
 
@@ -257,6 +328,15 @@ static class Oracle {
       Coord io = mg.offsets[k];
       foreach (var kv in mg.sausagepositions[k]) { Coord a = kv.Key + io; saus.Add((a, a + kv.Value, k)); }
     }
+    // Collapse stacked sausage towers: in the overworld a shrine is only a wall, so keep one letter per unique 2D
+    // footprint -- several sausages sharing the same (x,y) cells (e.g. Cold Gate's 7-high tower) would otherwise collide.
+    {
+      var seenFoot = new HashSet<(int, int, int, int)>();
+      saus = saus.Where(s => {
+        var key = (s.a.x < s.b.x || (s.a.x == s.b.x && s.a.y <= s.b.y)) ? (s.a.x, s.a.y, s.b.x, s.b.y) : (s.b.x, s.b.y, s.a.x, s.a.y);
+        return seenFoot.Add(key);
+      }).ToList();
+    }
     Coord dOff = mg.offsets[shrine];
     var dkv = mg.sausagepositions[shrine][0];
     Coord dA = dkv.Key + dOff, dB = dA + dkv.Value;
@@ -300,11 +380,20 @@ static class Oracle {
     // --- Overlay letters: D -> 'z', prereq sausages -> A..Z,a..y in grid reading order ---
     var overlay = new char[H, W];
     var ownerLetters = new Dictionary<string, List<char>>();
+    var letterPad = new Dictionary<char, int>(); // pad terrain height (== emitted digit) under each shrine letter
     void Put(Coord c, char ch) {
       Coord t = T(c);
       if (t.x < 0 || t.y < 0 || t.x >= W || t.y >= H) { warnings.Add($"overlay cell ({t.x},{t.y}) for '{ch}' is off-grid"); return; }
       if (overlay[t.y, t.x] != '\0') warnings.Add($"overlay collision at ({t.x},{t.y}): '{overlay[t.y, t.x]}' vs '{ch}'");
       overlay[t.y, t.x] = ch;
+    }
+    int PadUnder(Coord cell) {
+      Coord t = T(cell);
+      if (t.x < 0 || t.y < 0 || t.x >= W || t.y >= H || solid[t.y, t.x].Count == 0) return 0;
+      int top = solid[t.y, t.x].Max();
+      if (!Enumerable.Range(0, top + 1).All(solid[t.y, t.x].Contains))
+        warnings.Add($"sausage-wall pad at ({t.x},{t.y}) is non-contiguous; height {top} may need a SpecialTile");
+      return Math.Clamp(top, 0, 8);
     }
     Put(dA, 'z'); Put(dB, 'z');
     // reading order by translated min-cell (row-major); guarantees the C++ num==Size() invariant on first encounter
@@ -314,12 +403,16 @@ static class Oracle {
     for (int i = 0; i < saus.Count; i++) {
       char L = i < 26 ? (char)('A' + i) : (char)('a' + (i - 26));
       Put(saus[i].a, L); Put(saus[i].b, L);
+      int pad = PadUnder(saus[i].a);
+      if (PadUnder(saus[i].b) != pad) warnings.Add($"letter '{L}' spans two pad heights; both cells forced to {pad}");
+      letterPad[L] = pad;
       if (!ownerLetters.TryGetValue(saus[i].owner, out var list)) ownerLetters[saus[i].owner] = list = new();
       list.Add(L);
     }
 
     // --- Render grid chars (overlay wins; otherwise ConvertToLevelH terrain rules) ---
     var specials = new List<string>();
+    var grillCells = new List<string>(); // grills are disabled in the overworld: still detect them, but emit ground
     var grid = new char[H, W];
     for (int y = 0; y < H; y++) {
       for (int x = 0; x < W; x++) {
@@ -327,20 +420,18 @@ static class Oracle {
         var S = solid[y, x]; var G = grill[y, x];
         if (S.Count == 0) { grid[y, x] = ' '; continue; }
         int top = S.Max();
-        bool grillTop = G.Contains(top) && top <= 2;
+        if (G.Count > 0) grillCells.Add($"({x},{y})"); // identified, but dropped from the emitted terrain
         bool contigFromMin = Enumerable.Range(S.Min(), top - S.Min() + 1).All(S.Contains);
-        bool grillOk = G.Count == 0 || (grillTop && G.Count == 1);
-        if (contigFromMin && grillOk) {
-          grid[y, x] = grillTop ? "#$%"[top] : "_12345678"[Math.Clamp(top, 0, 8)];
+        if (contigFromMin) {
+          grid[y, x] = "_12345678"[Math.Clamp(top, 0, 8)];
         } else {
           grid[y, x] = '?';
           var wallBits = Enumerable.Range(0, S.Min()).Concat(S).OrderBy(v => v).ToList();
-          specials.Add(G.Count == 0
-            ? $"SpecialTile({{{string.Join(", ", wallBits)}}})"
-            : $"SpecialTile({{{string.Join(", ", wallBits)}}}, {{{string.Join(", ", G.OrderBy(v => v))}}})");
+          specials.Add($"SpecialTile({{{string.Join(", ", wallBits)}}})");
         }
       }
     }
+    if (grillCells.Count > 0) warnings.Add($"{grillCells.Count} grill cell(s) emitted as ground (grills disabled in overworld): {string.Join(",", grillCells)}");
 
     // --- Ladders -> explicit list (overworld mode: U/D/L/R aren't grid chars) ---
     var kept = ladders
@@ -366,7 +457,9 @@ static class Oracle {
       Coord E = T(en.pos);
       string letterStr = new string(letters.OrderBy(c => c).ToArray());
       string disp = mg.islands.ContainsKey(k) ? mg.islands[k].displayname : k;
-      entries.Add((letterStr, disp, $"{{ Stephen{{{E.x}, {E.y}, {E.z}, {CppDir(en.dir)}}}, \"{letterStr}\" }}"));
+      var pads = letterStr.Select(c => letterPad.TryGetValue(c, out int h) ? h : 0).ToList();
+      string padArg = pads.All(h => h == 0) ? "" : $", {{{string.Join(", ", pads)}}}";
+      entries.Add((letterStr, disp, $"{{ Stephen{{{E.x}, {E.y}, {E.z}, {CppDir(en.dir)}}}, \"{letterStr}\", nullptr{padArg} }}"));
     }
     entries.Sort((a, b) => string.CompareOrdinal(a.letters, b.letters));
 
@@ -414,6 +507,17 @@ static class Oracle {
 
     long totalUnits = 0;
     string[] lines = File.ReadAllLines(demoPath);
+
+    // The RRT writer may embed this engine's per-move timing ("Units: u0 u1 ..."); when present, validate our own
+    // tick-simulated units against it move-by-move. A |delta| <= 1 gap is the intentional sub-beat backpedal tiebreak,
+    // not a model error, so only a larger gap counts. The final-state line is the line right after "Stop".
+    int stopIdx = Array.IndexOf(lines, "Stop");
+    long[] expectedUnits = lines.FirstOrDefault(l => l.StartsWith("Units:")) is string u
+      ? u.Substring("Units:".Length).Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(long.Parse).ToArray()
+      : null;
+    int timingMismatch = -1; // 1-based index of the first diverging move, -1 = none
+
+    int moveNo = 0;
     for (int i = 0; i < lines.Length; i++) {
       if (lines[i] == "Undo") i += 2; // Real demos have a second-move Undo, then immediately replay move 1 as move 3. Jump to move 4.
       string line = lines[i];
@@ -427,24 +531,49 @@ static class Oracle {
         _     => Direction.None,
       };
 
+      int prevPlayerZ = debug ? gs.player.pos.z : 0;
+      Direction prevPlayerDir = debug ? gs.player.direction : Direction.None;
+      bool prevForkHeld = debug && gs.fork == null;
+      int prevForkZ = debug && gs.fork != null ? gs.fork.pos.z : prevPlayerZ;
+      var prevSaus = debug
+        ? gs.dynamicentities.Where(e => e.type == EntType.sausage).ToDictionary(e => e.id, e => (z: e.pos.z, rot: e.rot, cook: e.cookdata))
+        : null;
       gs.ProcessInput(dir);
       long moveUnits = Game.ResolveMove(gs);
+      totalUnits += moveUnits;
+
+      if (expectedUnits != null && moveNo < expectedUnits.Length && timingMismatch < 0
+          && Math.Abs(moveUnits - expectedUnits[moveNo]) > 1)
+        timingMismatch = moveNo + 1;
 
       if (debug) {
         string success = (gs.Lost().Length == 0) ? "SUCCEEDED" : "FAILED";
         Console.WriteLine();
         Console.WriteLine($"=== move {i + 1}: {line} {success} ===");
         Console.WriteLine($"{ToString(gs)} {moveUnits} {totalUnits}");
+        int pDrop = prevPlayerZ - gs.player.pos.z, sDrop = 0, rollCount = 0, cookGained = 0;
+        foreach (Entity e in gs.dynamicentities) {
+          if (e.type != EntType.sausage || !prevSaus.TryGetValue(e.id, out var pv)) continue;
+          if (pv.z - e.pos.z > sDrop) sDrop = pv.z - e.pos.z;
+          if (pv.rot != e.rot) rollCount++;
+          if (e.cookdata != pv.cook) cookGained++;
+        }
+        int forkDetach = (prevForkHeld && gs.fork != null) ? 1 : 0;
+        int forkDrop = gs.fork != null ? prevForkZ - gs.fork.pos.z : 0;
+        int turned = gs.player.direction != prevPlayerDir ? 1 : 0;
+        Console.WriteLine($"DIAG playerDrop={pDrop} maxSausDrop={sDrop} rolls={rollCount} forkDetach={forkDetach} forkDrop={forkDrop} cookGained={cookGained} turned={turned}");
       }
 
-      if (gs.Won()) return ""; // Real demos have trailing moves to get to the next level, check early
+      if (gs.Won()) return timingMismatch >= 0 ? "Timing" : ""; // Real demos have trailing moves to get to the next level, check early
       string reason = gs.Lost();
       if (reason.Length > 0) return reason;
+      moveNo++;
     }
 
-    string expectedFinalState = lines[^1];
+    string expectedFinalState = stopIdx >= 0 && stopIdx + 1 < lines.Length ? lines[stopIdx + 1] : lines[^1];
     string actualFinalState = ToString(gs);
-    return expectedFinalState == actualFinalState ? "" : "Final state";
+    if (expectedFinalState != actualFinalState) return "Final state";
+    return timingMismatch >= 0 ? "Timing" : "";
   }
 
   static string ToString(GameState gs) {

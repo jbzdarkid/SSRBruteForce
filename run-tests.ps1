@@ -32,32 +32,32 @@ $Configuration = if ($DebugMode) { "Debug" } else { "Release" }
 $exe = ".\x64\$Configuration\SSRBruteForce.exe"
 
 $levelDemos = @(
-    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Bay's Neck"; }
-    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Happy Pool"; }
-    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Maiden's Walk"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Burning Wharf"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Comely Hearth"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Eastreach"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Fiery Jut"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Infant's Break"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Inlet Shore"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Little Fire"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Merchant's Elegy"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Seafinger"; }
-    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Southjaunt"; }
-    [pscustomobject]@{ World = 1; Sausages = 3; Name = "Lachrymose Head"; }
-    [pscustomobject]@{ World = 1; Sausages = 3; Name = "The Anchorage"; }
-    [pscustomobject]@{ World = 1; Sausages = 3; Name = "The Clover"; }
-    [pscustomobject]@{ World = 1; Sausages = -1; Name = "World 1 route"; }
-    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Emerson Jetty"; }
-    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Fallow Earth"; }
-    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Sad Farm"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Barrow Set"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Beautiful Horizon"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Cove"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Rough Field"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "The Paddock"; }
-    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Twisty Farm"; }
+    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Bay's Neck";       Dem = "1-5.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Happy Pool";       Dem = "1-9.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 1; Name = "Maiden's Walk";    Dem = "1-10.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Burning Wharf";    Dem = "1-6.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Comely Hearth";    Dem = "1-8.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Eastreach";        Dem = "1-7.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Fiery Jut";        Dem = "1-11.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Infant's Break";   Dem = "1-3.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Inlet Shore";      Dem = "1-15.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Little Fire";      Dem = "1-4.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Merchant's Elegy"; Dem = "1-12.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Seafinger";        Dem = "1-13.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 2; Name = "Southjaunt";       Dem = "1-2.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 3; Name = "Lachrymose Head";  Dem = "1-1.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 3; Name = "The Anchorage";    Dem = "1-16.dem" }
+    [pscustomobject]@{ World = 1; Sausages = 3; Name = "The Clover";       Dem = "1-14.dem" }
+    [pscustomobject]@{ World = 1; Sausages = -1; Name = "World 1 route";   Dem = "1-route.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Emerson Jetty";    Dem = "2-1.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Fallow Earth";     Dem = "2-9.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 1; Name = "Sad Farm";         Dem = "2-2.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Barrow Set";       Dem = "2-10.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Beautiful Horizon"; Dem = "2-6.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Cove";             Dem = "2-3.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Rough Field";      Dem = "2-7.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "The Paddock";      Dem = "2-5.dem" }
+    [pscustomobject]@{ World = 2; Sausages = 2; Name = "Twisty Farm";      Dem = "2-8.dem" }
     [pscustomobject]@{ World = 2; Sausages = 8; Name = "The Great Tower"; }
     [pscustomobject]@{ World = 2; Sausages = -1; Name = "World 2 route"; }
     [pscustomobject]@{ Name = "3-1 Cold Jag";          Dem = "3-1.dem";  Sausages = 3 }

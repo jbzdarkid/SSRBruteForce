@@ -3,10 +3,11 @@
 #include <vector>
 
 LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGrid
-  , const Stephen& stephen
+  , const Stephen& start
   , std::vector<Ladder> extraLadders
   , std::vector<Sausage> sausages
   , std::vector<SpecialTile> specialTiles
+  , const Stephen& exit
 #if OVERWORLD_HACK
   , std::vector<LevelEntrance> levelEntrances
 #endif
@@ -60,20 +61,19 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
     else if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
       int num;
 #if OVERWORLD_HACK
-      // Fill in the floor and the sausage as a 'wall'. They will be removed by SetState at runtime once each level is completed.
-      _walls(x, y) = 0b0000'0011;
-
       if (c >= 'A' && c <= 'Z') {
         num = c - 'A';
       } else {
         num = c - 'a' + 26;
       }
 
-      for (const auto& [position, letters, level] : levelEntrances) {
-        if (strchr(letters, c)) {
+      for (const auto& [position, letters, level, sausageHeights] : levelEntrances) {
+        if (const char* j = strchr(letters, c)) {
           if (num == _overworldSausages.Size()) {
             assert(_overworldSausages.Size() == _levelEntrances.Size()); // Should stay in sync for all levels
-            _overworldSausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
+            // The wall's z is the pad it stands on, so SetState restores that terrain (not bare floor) when it clears.
+            s8 z = sausageHeights.empty() ? 0 : sausageHeights[j - letters];
+            _overworldSausages.Push({x, y, -127, -127, z, Sausage::Flags::None});
             _levelEntrances.Push(position);
             _levelNames.Push(level->name);
           } else {
@@ -102,9 +102,12 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 
       if (num == _sausages.Size()) {
         _sausages.Push({x, y, -127, -127, 0, Sausage::Flags::None});
-      } else {
+      } else if (num < _sausages.Size()) {
         _sausages[num].x2 = x;
         _sausages[num].y2 = y;
+      } else {
+        printf("Sausage '%c' appears before '%c' for puzzle '%s', giving up\n", c, (char)('a' + _sausages.Size()), name);
+        return;
       }
     } else {
       printf("Couldn't parse character '%c' for puzzle '%s', giving up\n", c, name);
@@ -115,18 +118,20 @@ LevelData::LevelData(u8 width, u8 height, const char* name, const char* asciiGri
 #if OVERWORLD_HACK
   // Add the final sausage in as a wall (but not a level entrance).
   if (_sausages.Size() > 0) _overworldSausages.Push(_sausages[0]);
+
+  // Seed every sausage-wall cell locked at its own pad height (the pad plus the sausage's own level) so the pre-solve
+  // GetState reads each level as not-yet-cleared. Runs before ladder height-extension so ladders climb the real wall.
+  for (const Sausage& s : _overworldSausages) {
+    _walls(s.x1, s.y1) = (1 << (s.z + 2)) - 1;
+    _walls(s.x2, s.y2) = (1 << (s.z + 2)) - 1;
+  }
 #endif
 
-  if (stephen.x > -1 && _stephen.x > -1) {
-    // Both argument and ascii specified; _start becomes the 'level exit' and stephen is the startpoint.
-    _start = _stephen;
-    _stephen = stephen;
-  } else if (stephen.x > -1) {
-    // Just argument specified; set both based on arg
-    _start = _stephen = stephen;
-  } else if (_stephen.x > -1) {
-    // Just ascii specified; set both based on grid
-    _start = _stephen;
+  if (start.x > -1) { // Custom start point; ignore the grid
+    _stephen = start;
+    _exit = (exit.x > -1) ? exit : start; // exit defaults to the start
+  } else if (_stephen.x > -1) { // Use the position set by the grid for the exit, too
+    _exit = _stephen;
   } else {
     printf("No stephen for puzzle '%s', giving up\n", name);
     return;
@@ -227,7 +232,7 @@ void LevelData::Print() const {
 }
 
 bool LevelData::Won() const {
-  if (_stephen != _start) return false;
+  if (_stephen != _exit) return false;
 #if !OVERWORLD_HACK
   for (Sausage sausage : _sausages) {
     if (!sausage.IsFullyCooked()) return false;

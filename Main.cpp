@@ -44,6 +44,20 @@ struct RRTNode {
   int depth;                       // total moves from the root
 };
 
+// Print an unimplemented-move gap once per kind, with the scenario it fired on: the level layout, the pre-move state
+// and the direction pressed -- everything needed to paste a MAKE_SYMMETRICAL_TEST straight out of the log. Leaves
+// |level| restored to |before| so the caller can carry on treating the move as refused.
+static void ReportGap(const UnimplementedMove& gap, Level* level, const State& before, Direction dir) {
+  static std::vector<const char*> seen;
+  for (const char* s : seen) if (strcmp(s, gap.what) == 0) return;
+  seen.push_back(gap.what);
+
+  level->SetState(before);
+  printf("\n*** UNIMPLEMENTED: %s\n*** pressing %s from:\n", gap.what, DIR_NAMES[dir]);
+  level->Print();
+  std::cout << before << std::endl;
+}
+
 static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, int frontierK, u32 seed, const std::string& outDir) {
   const int INF = 1 << 30;
   if (bin < 1) bin = 1;
@@ -80,9 +94,17 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
       bool moved = false;
       for (int oi = 0; oi < 4; oi++) {
         level->SetState(before);
-        if (level->Move(dirs[order[oi]])) { segment.push_back(dirs[order[oi]]); moved = true; break; }
+        // Reject bonks: the game accepts wall/grill/turn-bonks that change nothing, but they never advance an optimal
+        // solution -- treat a no-op move as refused so no demo contains one.
+        // A move that hits a gap in the engine is reported (once per kind) and then treated as refused, so one hunt
+        // surfaces every distinct gap instead of dying on the first.
+        try {
+          if (level->Move(dirs[order[oi]]) && !(level->GetState() == before)) { segment.push_back(dirs[order[oi]]); moved = true; break; }
+        } catch (const UnimplementedMove& gap) {
+          ReportGap(gap, level, before, dirs[order[oi]]);
+        }
       }
-      if (!moved) { level->SetState(before); break; } // dead end -- every move refused
+      if (!moved) { level->SetState(before); break; } // dead end -- every move refused or a no-op
 
       State cur = level->GetState();
       if (occupied.insert(BucketKey(cur, bin)).second) { // first state in this grid cell -> a genuinely new region
@@ -119,6 +141,7 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
   for (const auto& e : std::filesystem::directory_iterator(outDir))
     if (e.path().extension() == ".dem") std::filesystem::remove(e.path());
   int n = 0, longestDemo = 0;
+  Solver scorer(level);
   for (int i = 1; i < (int)tree.size(); i++) {
     if (childCount[i] != 0) continue; // interior landmark -- already on some leaf's root path
     std::vector<Direction> path = rootPath(i);
@@ -127,6 +150,19 @@ static void RRTExplore(Level* level, int iterations, int rolloutLen, int bin, in
     std::ofstream out(outDir + "/" + name);
     for (Direction d : path) out << DIR_NAMES[d] << '\n';
     out << "Stop\n" << tree[i].state << '\n';
+    // Record this engine's per-move ComputeScore units so the oracle can check its tick-simulated timing against ours,
+    // move by move -- the timing analogue of the final-state check. ComputeScore matches sausages by array slot, so it
+    // needs the UNSORTED state (GetState(false)); the sorted GetState() reorders slots and would fabricate phantom drops.
+    level->SetState(start);
+    State prev = level->GetState(false);
+    out << "Units:";
+    for (Direction d : path) {
+      level->Move(d);
+      State cur = level->GetState(false);
+      out << ' ' << scorer.ComputeScore(prev, d, cur);
+      prev = cur;
+    }
+    out << '\n';
   }
 
   // --- Diagnostics (all O(N) -- no pairwise distance) ---
@@ -152,10 +188,18 @@ bool TestLevel(Level* level, std::vector<Direction> moves) {
   u32 totalUnits = 0;
   for (int i = 0; i < (int)moves.size(); i++) {
     Direction dir = moves[i];
-    bool success = level->Move(dir);
+    bool success;
+    try {
+      success = level->Move(dir);
+    } catch (const UnimplementedMove& gap) {
+      ReportGap(gap, level, previousState, dir);
+      return false; // the replay can't continue past a move we don't model
+    }
 
     State state = level->GetState();
-    level->SetState(state); // Re-materialize overworld walls from the new bit-state (no-op for normal levels).
+#if OVERWORLD_HACK
+    level->RefreshOverworldWalls();
+#endif
     printf("\n=== move %d: %s %s ===\n", (i+1), DIR_NAMES[dir], (success ? "SUCCEEDED" : "FAILED"));
 
     u32 moveUnits = Solver(level).ComputeScore(previousState, dir, state);
@@ -189,7 +233,7 @@ bool SolveLevel(Level* level) {
   for (Direction dir : solution) {
     out << DIR_NAMES[dir] << '\n';
     level->Move(dir);
-    level->SetState(level->GetState()); // Re-materialize dropped overworld walls before the next move.
+    level->RefreshOverworldWalls();
     if (const char* entered = level->EnteredLevel()) out << "Level " << entered << '\n';
   }
 #else
@@ -245,6 +289,25 @@ int main(int argc, char* argv[]) {
           buffer.pop_back();
           continue;
         }
+      }
+
+      // "units" mode: emit only the per-move ComputeScore units line, computed from UNSORTED slot-matched states
+      // exactly as the RRT writer does, so the timing checker can re-score a saved demo against the CURRENT
+      // ComputeScore without re-running the 100k RRT.
+      if (argc >= 4 && std::string(argv[3]) == "units") {
+        Solver scorer(test);
+        State start = test->GetState();
+        test->SetState(start);
+        State prev = test->GetState(false);
+        printf("Units:"); // plain integers (no locale grouping), matching the RRT writer's ofstream output
+        for (Direction dir : buffer) {
+          test->Move(dir);
+          State cur = test->GetState(false);
+          printf(" %d", scorer.ComputeScore(prev, dir, cur));
+          prev = cur;
+        }
+        printf("\n");
+        return 0;
       }
 
       printf("Testing level %s\n", test->name);

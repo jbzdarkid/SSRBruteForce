@@ -100,13 +100,13 @@ public:
     {
       InlineTransform(_level._stephen.x, _level._stephen.y);
       InlineTransform(_level._stephen.forkX, _level._stephen.forkY);
-      InlineTransform(_level._start.x, _level._start.y);
-      InlineTransform(_level._start.forkX, _level._start.forkY);
+      InlineTransform(_level._exit.x, _level._exit.y);
+      InlineTransform(_level._exit.forkX, _level._exit.forkY);
 
       _level._stephen.dir = sym(_level._stephen.dir);
       _level._stephen.forkDir = sym(_level._stephen.forkDir);
-      _level._start.dir = sym(_level._start.dir);
-      _level._start.forkDir = sym(_level._start.forkDir);
+      _level._exit.dir = sym(_level._exit.dir);
+      _level._exit.forkDir = sym(_level._exit.forkDir);
     }
 
     // Transform all the sausages
@@ -135,7 +135,7 @@ public:
   void SetDetachedFork(s8 x, s8 y, s8 z, Direction dir) {
     InlineTransform(x, y);
     dir = _sym(dir);
-    for (Stephen* p : { &_level._stephen, &_level._start }) {
+    for (Stephen* p : { &_level._stephen, &_level._exit }) {
       p->forkX = x; p->forkY = y; p->forkZ = z; p->forkDir = dir;
     }
     _level.SetState(_level.GetState());

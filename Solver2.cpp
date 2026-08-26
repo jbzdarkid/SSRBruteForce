@@ -3,6 +3,19 @@
 
 #include <filesystem>
 
+// A gap in the engine must not take a long solve down with it. Those sites throw so the divergence hunt surfaces them
+// loudly; here we swallow it and skip the edge, exactly as the old silent refusal did. On x64 entering a try costs
+// nothing (table-driven unwind), so this is free unless it actually fires.
+static bool TryMove(Level* level, Direction dir) {
+  try {
+    return level->Move(dir);
+  } catch (const UnimplementedMove& gap) {
+    static bool warned = false;
+    if (!warned) { warned = true; printf("WARNING: skipping unimplemented move -- %s\n", gap.what); }
+    return false;
+  }
+}
+
 Solver::Solver(Level* level, u32 numBuckets) {
   _level = level;
   _numBuckets = numBuckets;
@@ -64,7 +77,7 @@ u64 Solver::ProcessOneLayer(u32 depth) {
           break;
         }
 
-        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (!TryMove(_level, dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level, depth)) continue; // Discard heuristically-pruned moves
 
         cache.AddStateUnchecked(_level->GetState());
@@ -96,7 +109,7 @@ void Solver::FindWinningStates(s32 depth) {
           break;
         }
 
-        if (!_level->Move(dir)) continue; // Discard illegal (losing) moves
+        if (!TryMove(_level, dir)) continue; // Discard illegal (losing) moves
         if (_level->heuristic && !_level->heuristic(_level, depth + 1)) continue;
 
         State newState = _level->GetState();
@@ -128,7 +141,7 @@ std::vector<Direction> Solver::FindFastestSolution(const State& initialState) {
   while (remainingCost > 0) {
     for (Direction dir : { Up, Down, Left, Right }) {
       _level->SetState(state);
-      if (!_level->Move(dir)) continue;
+      if (!TryMove(_level, dir)) continue;
 
       State newState = _level->GetState();
       auto search = _winningStates.find(newState);
@@ -198,45 +211,43 @@ s32 Solver::ComputeScore(const State& state, Direction dir, const State& newStat
       const Sausage& after = newState.sausages[i];
       // Mostly, the x1/y1 coordinate will identify a sausage's movement direciton.
       // However, when a sausage pivots, they will have different directions, so we skip computing the second direction in that case.
-      Direction rolled = DirectionBetween(before.x1, before.y1, after.x1, after.y1);
-      if (rolled == None) rolled = DirectionBetween(before.x2, before.y2, after.x2, after.y2);
+      Direction rolled = DirectionBetween(after.x1, after.y1, before.x1, before.y1);
+      if (rolled == None) rolled = DirectionBetween(after.x2, after.y2, before.x2, before.y2);
+
+      // If a sausage rolls in the direction stephen is facing *and* it drops, it doesn't accrue a directional cost (just a drop cost).
+      if (after.z < before.z && rolled == newState.stephen.dir) continue;
       sausageDirections |= 1u << rolled;
     }
     // -500 to account for the 'None' direction (from non-moving sausages)
     score += 500 * __popcnt(sausageDirections) - 500;
   }
 
-  // Double-moves are full cost for each sausage that moves.
+  // Count double-moves and drops for each sausage.
+  s8 maximumSausageMove = 0;
   for (s8 i = 0; i < NUM_SAUSAGES; i++) {
+    if (i == speared) continue; // Speared sausages do not accrue a falling/double-move cost.
     const Sausage& before = state.sausages[i];
     const Sausage& after = newState.sausages[i];
-    s8 distance = (after.x1 - before.x1) + (after.y1 - before.y1);
-    if (distance < 0) distance = -distance;
-    if (distance > 1) score += 1000 * (distance - 1);
+
+    s8 sausageMovement = 0;
+    if (std::abs(before.x1 - after.x1) == 2 || std::abs(before.y1 - after.y1) == 2) sausageMovement++;
+    sausageMovement += std::abs(newState.sausages[i].z - state.sausages[i].z);
+
+    if (sausageMovement > maximumSausageMove) maximumSausageMove = sausageMovement;
+  }
+  score += 1000 * maximumSausageMove;
+
+  s8 stephenMove = std::abs(newState.stephen.z - state.stephen.z);
+  score += 1000 * stephenMove;
+
+  // Detached fork drop (seems to run sequentially to the normal gravity steps)
+  if (state.stephen.HasFork() && !newState.stephen.HasFork()) {
+    s8 forkDelta = state.stephen.forkZ - newState.stephen.forkZ;
+    if (forkDelta > 0) score += 1000 * forkDelta;
   }
 
-  // Ladder motion costs 1 beat per rung climbed
-  s8 ladderDelta = newState.stephen.z - state.stephen.z;
-  if (ladderDelta > 0) {
-    score += 1000 * ladderDelta;
-  }
-
-  // Descending a ladder moves simultaneously with dropped sausages, so compute them together
-  s8 maximumDrop = 0;
-  if (ladderDelta < maximumDrop) maximumDrop = ladderDelta;
-  for (s8 i = 0; i < NUM_SAUSAGES; i++) {
-    s8 sausageDelta = newState.sausages[i].z - state.sausages[i].z;
-    if (sausageDelta < maximumDrop) maximumDrop = sausageDelta;
-  }
-  score += 1000 * -maximumDrop;
-
-  // TODO: This does not correctly handle logrolling
   Direction stephenMoved = DirectionBetween(state.stephen.x, state.stephen.y, newState.stephen.x, newState.stephen.y);
   if (dir == (Direction)(7 - stephenMoved)) score--; // Prefer backwards steps where possible as a tie break
-
-  // TODO: Time motion w/ fork carry
-  // TODO: Time motion as forkless -> rotations *and* lateral motion
-  // TODO: Time motion when pushing a block
 
   return score;
 }
