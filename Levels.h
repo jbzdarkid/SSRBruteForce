@@ -264,7 +264,7 @@ Level TheGreatTower = [] {
     }
 
     // IW(2) novelty check.
-    if (!level->inWinningPass && depth >= DROP_SAUSAGES && depth < SLOT_SAUSAGES && stephen.z == 0) {
+    if (depth >= DROP_SAUSAGES && depth < SLOT_SAUSAGES && stephen.z == 0) {
       struct Atom {
         u32 index : 4, x : 5, y : 5, z : 3, flags : 6, pad : 9;
         Atom() = default;
@@ -300,9 +300,6 @@ Level TheGreatTower = [] {
 
   return theGreatTower;
 }();
-  {},
-  {},
-  {Sausage{11, 10, 12, 10, 1}, Sausage{11, 10, 11, 11, 2}, Sausage{11, 10, 12, 10, 3}, Sausage{12, 10, 12, 11, 2}, Sausage{11, 11, 12, 11, 1}, Sausage{11, 11, 12, 11, 3}});
 
 Level ThePaddock(10, 6, "The Paddock",
   " 11____111"
