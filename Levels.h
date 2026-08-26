@@ -1,4 +1,5 @@
 #pragma once
+#include <absl/container/flat_hash_set.h>
 #include "Level2.h"
 
 Level LachrymoseHead(5, 4, "Lachrymose Head",
@@ -159,26 +160,146 @@ Level GreatTowerImanex(14, 11, "2-4 Great Tower (after imanex's start) (with no 
   " # ___________"
   " 11L__________");
 
-Level TheGreatTower(19, 19, "The Great Tower",
-  "         $  $      "
-  "        $$ $$      "
-  "         #  #      "
-  "       1##1##      "
-  "    1111 11 1      "
-  "    1_______U______"
-  "    1______________"
-  "$$##1______________"
-  " $ # ______________"
-  "   11______________"
-  "$$##1______ab______"
-  " $ # ______ab______"
-  "   11L______>______"
-  "     ______________"
-  "     ______________"
-  "     ______________"
-  "     ______________"
-  "     ______________"
-  "     ______________",
+
+Level TheGreatTower = [] {
+  Level theGreatTower(19, 19, "The Great Tower",
+    "         $  $      "
+    "        $$ $$      "
+    "         #  #      "
+    "       1##1##      "
+    "    1111 11 1      "
+    "    1_______U______"
+    "    1______________"
+    "$$##1______________"
+    " $ # ______________"
+    "   11______________"
+    "$$##1______ab______"
+    " $ # ______ab______"
+    "   11L______>______"
+    "     ______________"
+    "     ______________"
+    "     ______________"
+    "     ______________"
+    "     ______________"
+    "     ______________",
+    {},
+    {},
+    {Sausage{11, 10, 12, 10, 1}, Sausage{11, 10, 11, 11, 2}, Sausage{11, 10, 12, 10, 3}, Sausage{12, 10, 12, 11, 2}, Sausage{11, 11, 12, 11, 1}, Sausage{11, 11, 12, 11, 3}});
+  theGreatTower.heuristic = [](const Level* level, u32 depth) {
+    // This level has *many* sausages, so we need quite a few heuristics to prevent a state explosion.
+    const Stephen& stephen = level->GetStephen();
+    if (!stephen.HasFork()) return false; // We cannot drop the fork in this level.
+
+    u8 groundedSausages = 0;
+    u8 nearestUncookedSausage = 0xFF;
+    u8 partiallyCooked = 0;
+    u8 fullyCooked = 0;
+
+    constexpr u32 DROP_SAUSAGES = 25;
+    constexpr u32 SLOT_SAUSAGES = 40;
+    constexpr u32 COOK_SAUSAGES = 140;
+
+    for (const Sausage& sausage : level->GetSausages()) {
+      if (depth < DROP_SAUSAGES) {
+        if (sausage.IsAt(stephen.forkX, stephen.forkY, stephen.forkZ)) return false; // We cannot unspear in this level.
+        if (sausage.IsAt(stephen.x, stephen.y, stephen.z + 1)
+          && sausage.IsAt(stephen.forkX, stephen.forkY, stephen.forkZ + 1)) return false; // We cannot unseat an aligned head-hat in this level.
+
+        if (sausage.z == 0) {
+          groundedSausages++;
+          int distance = std::abs(sausage.x1 - stephen.x) + std::abs(sausage.y1 - stephen.y);
+          if (distance < nearestUncookedSausage) nearestUncookedSausage = (u8)distance;
+        }
+
+      } else if (depth < SLOT_SAUSAGES) {
+        if (sausage.z >= 2) return false; // We expect all towers to be fully unstacked by this point.
+        if (sausage.z == 0) {
+          groundedSausages++;
+
+          // Once the sausages are dropped, they must stay within the lanes of the grills.
+          if (sausage.x1 == sausage.x2) {
+            if (sausage.x1 < 8 || sausage.x2 > 13) return false;
+          } else {
+            if (sausage.y1 < 8 || sausage.y2 > 13) return false;
+          }
+
+          if (sausage.CookedFaces() == 2) {
+            partiallyCooked++;
+          } else {
+            int distance = std::abs(sausage.x1 - stephen.x) + std::abs(sausage.y1 - stephen.y);
+            if (distance < nearestUncookedSausage) nearestUncookedSausage = (u8)distance;
+          }
+        }
+
+      } else if (depth < COOK_SAUSAGES) {
+        if (sausage.CookedFaces() == 2) partiallyCooked++;
+        if (sausage.CookedFaces() == 4) fullyCooked++;
+      } else {
+        if (sausage.CookedFaces() == 4) fullyCooked++;
+      }
+    }
+
+    if (groundedSausages > 4) return false; // There is no way to re-stack sausages in this level, so if we drop 5 sausages the level is impossible.
+    if (depth < SLOT_SAUSAGES && partiallyCooked < 4 && nearestUncookedSausage > 7) return false; // Stephen must stay near the sausages during the drop and slot phases.
+
+    if (depth < COOK_SAUSAGES && stephen.z == 1 && partiallyCooked + fullyCooked < 4) return false; // Stephen may not climb up the ladder until all 4 sausages are at least half-cooked.
+    if (depth >= COOK_SAUSAGES && stephen.z == 0 && fullyCooked != 8) return false; // Stephen may not climb down the ladder until all 8 sausages are don.
+
+    // Post-drop: two stacked sausages must be PARALLEL -- aligned, or offset one cell either way (the 3 valid cases). A
+    // perpendicular supporter only ever crosses the upper sausage at a single cell, so it's a dead-end cantilever.
+    // Sausages are normalized, so IsHorizontal() (x1<x2 vs x1==x2) is the orientation: prune any elevated sausage that
+    // sits directly on a perpendicular one. Curbs the state explosion. NOTE: this also rejects perpendicular bridges
+    // (fine post-drop) and is not strictly accuracy-safe -- back it out if a solve turns up empty because of it.
+    if (depth >= DROP_SAUSAGES) {
+      const auto& sausages = level->GetSausages();
+      for (int gi = 0; gi < sausages.Size(); gi++) {
+        const Sausage& g = sausages[gi];
+        if (g.z < 1) continue;
+        for (int hi = 0; hi < sausages.Size(); hi++) {
+          const Sausage& h = sausages[hi];
+          if (h.IsHorizontal() == g.IsHorizontal()) continue; // parallel (or g itself) -> a valid stack
+          if (h.IsAt(g.x1, g.y1, (s8)(g.z - 1)) || h.IsAt(g.x2, g.y2, (s8)(g.z - 1))) return false;
+        }
+      }
+    }
+
+    // IW(2) novelty check.
+    if (!level->inWinningPass && depth >= DROP_SAUSAGES && depth < SLOT_SAUSAGES && stephen.z == 0) {
+      struct Atom {
+        u32 index : 4, x : 5, y : 5, z : 3, flags : 6, pad : 9;
+        Atom() = default;
+        Atom(u32 i, const Sausage& g)
+          : index(i), x(g.x1), y(g.y1), z(g.z), flags((g.flags & 0x1F) | ((u32)(g.x1 != g.x2) << 5)), pad(0) {}
+        Atom(const Stephen& s)
+          : index(15), x(s.x), y(s.y), z(s.z), flags((u32)s.dir), pad(0) {}
+        u64 bits() const { return *(u32*)this; }
+      };
+      static absl::flat_hash_set<u64> seen;
+
+      Atom atoms[NUM_SAUSAGES + 1];
+      atoms[0] = Atom(stephen);
+      u32 i = 1;
+      for (const Sausage& sausage : level->GetSausages()) {
+        atoms[i] = Atom(i, sausage);
+        i++;
+      }
+
+      bool novel = false;
+      for (int i = 0; i < NUM_SAUSAGES + 1; i++) {
+        for (int j = 0; j < i; j++) {
+          u64 key = (atoms[i].bits() << 32) | atoms[j].bits();
+          novel |= seen.insert(key).second;
+        }
+      }
+      if (!novel) return false;
+    }
+    //*/
+
+    return true;
+  };
+
+  return theGreatTower;
+}();
   {},
   {},
   {Sausage{11, 10, 12, 10, 1}, Sausage{11, 10, 11, 11, 2}, Sausage{11, 10, 12, 10, 3}, Sausage{12, 10, 12, 11, 2}, Sausage{11, 11, 12, 11, 1}, Sausage{11, 11, 12, 11, 3}});

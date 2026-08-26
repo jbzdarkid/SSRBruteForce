@@ -25,7 +25,11 @@ std::vector<Direction> Solver::Solve() {
   }
 
   for (u32 depth = 1; depth < maxDepth; depth++) {
-    ProcessOneLayer(depth);
+    u64 newStates = ProcessOneLayer(depth);
+    if (newStates == 0) {
+      std::cout << "Frontier exhausted at depth " << depth << " giving up.\n";
+      break;
+    }
 
     if (_winningStateFound) {
       printf("Winning state found at depth %d!\n", depth);
@@ -45,7 +49,7 @@ std::vector<Direction> Solver::Solve() {
   return solution;
 }
 
-void Solver::ProcessOneLayer(u32 depth) {
+u64 Solver::ProcessOneLayer(u32 depth) {
   FrontierBuilder cache(depth, _numBuckets);
 
   // First, iterate through all the states in the previous layer (bucketed by the top hash bits)
@@ -72,6 +76,7 @@ void Solver::ProcessOneLayer(u32 depth) {
   u64 newStates = cache.ProcessStates();
 
   std::cout << "Finished exploring depth " << depth << ", and found " << newStates << " new states.\n";
+  return newStates;
 }
 
 void Solver::FindWinningStates(s32 depth) {

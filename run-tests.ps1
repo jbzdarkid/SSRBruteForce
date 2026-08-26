@@ -58,7 +58,7 @@ $levelDemos = @(
     [pscustomobject]@{ World = 2; Sausages = 2; Name = "Rough Field"; }
     [pscustomobject]@{ World = 2; Sausages = 2; Name = "The Paddock"; }
     [pscustomobject]@{ World = 2; Sausages = 2; Name = "Twisty Farm"; }
-    [pscustomobject]@{ World = 2; Sausages = 6; Name = "The Great Tower"; }
+    [pscustomobject]@{ World = 2; Sausages = 8; Name = "The Great Tower"; }
     [pscustomobject]@{ World = 2; Sausages = -1; Name = "World 2 route"; }
     [pscustomobject]@{ Name = "3-1 Cold Jag";          Dem = "3-1.dem";  Sausages = 3 }
     [pscustomobject]@{ Name = "3-2 Cold Finger";       Dem = "3-2.dem";  Sausages = 3 }

@@ -120,6 +120,7 @@ struct Sausage {
     if (x_ == x2 && y_ == y2) return true;
     return false;
   }
+  inline u16 CookedFaces() const { return __popcnt16(flags & FullyCooked); }
   inline bool IsFullyCooked() const { return (flags & FullyCooked) == FullyCooked; }
   // The compiler optimizes the std::pair reasonably well here.
   inline std::pair<s8, s8> OtherEnd(s8 x, s8 y) const {

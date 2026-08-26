@@ -20,7 +20,7 @@ private:
   // Stage 1
   bool _winningStateFound = false;
 
-  void ProcessOneLayer(u32 depth);
+  u64 ProcessOneLayer(u32 depth);
 
   // Stage 2
   absl::flat_hash_map<State, u32> _winningStates;
