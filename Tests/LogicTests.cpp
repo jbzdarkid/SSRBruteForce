@@ -1333,6 +1333,31 @@ TEST_CLASS(OneOffTests) {
     level.AssertSausage({2, 2, 2, 3, 2, Sausage::None}); // rider stayed -- its pivot-cell support never moved
   }
 
+  // The contrast to TurnLeavesRiderOnBridgePivotEnd (2-4 The Great Tower m5). A head-hat spins as Stephen turns, and a
+  // PERPENDICULAR rider on it ALSO spins -- because the rider's cantilevered far end lies over the very cell the hat's
+  // arm swings INTO, so the arm rotates up under it and carries it round (it isn't merely resting on the stationary
+  // pivot). Both logs quarter-turn together, so the vertical/horizontal split is conserved (here 1H+1V -> 1V+1H). The
+  // old collinear guard spun only squarely-stacked riders and wrongly stranded this one, welding it upright forever.
+  MAKE_SYMMETRICAL_TEST(TurnSpinsRiderRidingSwingDestination) {
+    TestSymmetryHelper level(symmetry, Level(8, 7, "arena",
+      "________"
+      "________"
+      "________"
+      "________"
+      "________"
+      "________"
+      "________",
+      Stephen{3, 3, 0, Up}, {},
+      { Sausage{2, 3, 3, 3, 1}, Sausage{3, 2, 3, 3, 2}, Sausage{6, 1, 6, 2, 0} }));
+    level.AssertPosition(3, 3, Up);
+    level.AssertSausage({2, 3, 3, 3, 1, Sausage::None}); // head-hat: east end on Stephen's head, west end cantilevered
+    level.AssertSausage({3, 2, 3, 3, 2, Sausage::None}); // rider ACROSS it: south end on the head cell, north end over the swing-dest
+    level.AssertMoveSucceeds(Right);                      // turn north->east: the hat's west arm swings up to the north
+    level.AssertPosition(3, 3, Right);
+    level.AssertSausage({3, 2, 3, 3, 1, Sausage::None}); // head-hat swung to vertical about the head
+    level.AssertSausage({3, 3, 4, 3, 2, Sausage::None}); // rider spun with it -- carried round by the swinging arm
+  }
+
   // Spot test for 3-2 Cold Finger move 20 (a turn drops a fork-borne rider). A vertical rider spans a base sausage
   // (north end) and Stephen's fork (south end). Stephen turns east->north: the corner-sweep shoves the base out north
   // and the fork swings away, so the rider loses BOTH supports and drops straight down -- it is NOT carried north with

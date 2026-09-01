@@ -966,8 +966,8 @@ void Level::PlanHatRotation(Direction dir, MovePlan& plan, u64& hatMask) const {
   }
 
   // Rotation taking the old facing onto the new one, applied to every end's offset about the head cell. The direct head
-  // hat pivots; a squarely-stacked rider above it pivots with it, but a rider resting only on the stationary pivot cell
-  // stays put (guarded per-level below).
+  // hat pivots; a rider above it joined to the swinging arm pivots with it, but a rider resting only on the stationary
+  // pivot cell stays put (guarded per-level below).
   auto [odx, ody] = Delta(_stephen.dir);
   auto [ndx, ndy] = Delta(dir);
   bool cw = (odx * ndy - ody * ndx) > 0;
@@ -978,17 +978,28 @@ void Level::PlanHatRotation(Direction dir, MovePlan& plan, u64& hatMask) const {
     // does NOT spin: its support never moves. Once an upper level fails this, nothing above it spins.
     if (stackZ > z + 1) {
       const Sausage& u = _sausages[sausageNo];
-      // A rider spins only if it lies ALONG the sausage turning under it. Collinear, the pivot drags its whole length
-      // round (3-5 Cold Cliff m372); lying ACROSS, it merely rests on a patch that spins in place and stays put
-      // (m330). An end propped on a wall-top, or on a sausage that isn't pivoting, anchors it either way. Once a level
-      // fails this, nothing above it spins.
+      // A rider follows the SAME clean-hat rule as the arm turning under it: it spins only when it is rigidly joined to
+      // that arm's swing. Its far (non-head) end must lie over the arm either BEFORE the swing (collinear -- the pivot
+      // drags its whole length round: 3-5 Cold Cliff m372, SausageDoubleHat) or AFTER it (the arm rotates up under the
+      // rider's cantilevered end and carries it round: 2-4 The Great Tower m5). A far end pointing any other way rests
+      // only on the stationary pivot cell and stays put (3-5 Cold Cliff m330). An end propped on a wall-top or on a
+      // sausage that isn't pivoting anchors it. Once a level fails this, nothing above it spins.
       s8 below1 = GetSausage(u.x1, u.y1, u.z - 1), below2 = GetSausage(u.x2, u.y2, u.z - 1);
       bool pivot1 = below1 != -1 && (hatMask & (1ull << below1));
       bool pivot2 = below2 != -1 && (hatMask & (1ull << below2));
       bool anchored = IsWall(u.x1, u.y1, u.z - 1) || IsWall(u.x2, u.y2, u.z - 1)
                    || (below1 != -1 && !pivot1) || (below2 != -1 && !pivot2);
       s8 base = pivot1 ? below1 : pivot2 ? below2 : (s8)-1;
-      if (base == -1 || anchored || _sausages[base].IsHorizontal() != u.IsHorizontal()) break;
+      if (base == -1 || anchored) break;
+      // The arm the rider's head-cell end rests on. Its far end sweeps from |af| to |raf| (same rotation as the hat);
+      // the rider joins the spin iff its own far end coincides with either.
+      s8 arm = GetSausage(headX, headY, u.z - 1);
+      if (arm == -1 || !(hatMask & (1ull << arm))) break;
+      auto [ufx, ufy] = u.OtherEnd(headX, headY);
+      auto [afx, afy] = _sausages[arm].OtherEnd(headX, headY);
+      s8 rafx = cw ? (s8)(headX - (afy - headY)) : (s8)(headX + (afy - headY));
+      s8 rafy = cw ? (s8)(headY + (afx - headX)) : (s8)(headY - (afx - headX));
+      if (!((ufx == afx && ufy == afy) || (ufx == rafx && ufy == rafy))) break;
     }
     Sausage s = _sausages[sausageNo];
     s8 ox1 = s.x1, oy1 = s.y1, ox2 = s.x2, oy2 = s.y2;
